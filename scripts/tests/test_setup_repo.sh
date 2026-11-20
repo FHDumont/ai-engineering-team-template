@@ -153,7 +153,7 @@ reset_board() { rm -f "$TMP/boardvar" "$TMP/linked" "$TMP/views.tsv" "$TMP/workf
 reset_board
 rc=0; out="$(FAKE_SCOPES="'gist', 'repo'" "$SETUP" --project 2>&1)" || rc=$?
 assert_eq 1 "$rc" "missing scope exits 1"
-assert_contains "$out" "gh auth refresh --scopes project,read:project" "missing scope prints the real step"
+assert_contains "$out" "gh auth login -h github.com -p https -w -s gist,project,read:org,repo,workflow" "missing scope prints the real step"
 assert_contains "$out" "never types the device code" "scope step forbids typing the code"
 assert_not_contains "$out" "done:" "missing scope is not declared as success"
 assert_not_contains "$(gh_calls)" "project create" "missing scope creates nothing"
@@ -243,9 +243,9 @@ assert_status 0 "no board: the filter does nothing" board project_set_phase_filt
 assert_eq "" "$(last_output)" "no board: the filter prints nothing"
 assert_status 1 "board without scope: project_set_status fails" env FAKE_BOARD_VAR=7 FAKE_SCOPES="'repo'" bash -c "source '$SCRIPTS/lib/common.sh'; source '$SCRIPTS/lib/project.sh'; project_set_status 3 Done"
 assert_contains "$(last_output)" "error: could not set the board status of #3 to 'Done' (board #7): the gh token has no 'project' scope" "missing scope: cause"
-assert_contains "$(last_output)" "fix: gh auth refresh --scopes project,read:project" "missing scope: fix command"
+assert_contains "$(last_output)" "fix: gh auth login -h github.com -p https -w -s gist,project,read:org,repo,workflow" "missing scope: fix command"
 assert_status 1 "board without scope: the filter fails" env FAKE_BOARD_VAR=7 FAKE_SCOPES="'repo'" bash -c "source '$SCRIPTS/lib/common.sh'; source '$SCRIPTS/lib/project.sh'; project_set_phase_filter is:open"
-assert_contains "$(last_output)" "fix: gh auth refresh" "filter without scope: fix command"
+assert_contains "$(last_output)" "fix: gh auth login -h github.com -p https -w -s gist,project,read:org,repo,workflow" "filter without scope: fix command"
 assert_status 1 "item-add failing fails" env FAKE_BOARD_VAR=7 FAKE_GH_FAIL='^project item-add' FAKE_GH_FAIL_MSG="could not add item" bash -c "source '$SCRIPTS/lib/common.sh'; source '$SCRIPTS/lib/project.sh'; project_set_status 3 Done"
 assert_contains "$(last_output)" "the issue was not added to the board: could not add item" "item-add failure: cause from gh"
 assert_status 1 "preflight fails without scope" env FAKE_BOARD_VAR=7 FAKE_SCOPES="'repo'" bash -c "source '$SCRIPTS/lib/common.sh'; source '$SCRIPTS/lib/project.sh'; project_preflight"

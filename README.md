@@ -39,7 +39,7 @@ Antes da primeira fase, troque o que é exemplo: a pasta `app/`, o passo de depl
 ## Requisitos
 
 - **Claude Code** no app desktop: o método usa sessões filhas abertas pela sessão de planejamento.
-- **`gh`** (GitHub CLI) autenticado, com os escopos `repo` e `workflow`; o escopo `project` só se você aceitar o quadro do GitHub Projects.
+- **`gh`** (GitHub CLI) autenticado, com os escopos `gist`, `project`, `read:org`, `repo` e `workflow`. Faltou escopo: o único comando a rodar é `gh auth login -h github.com -p https -w -s gist,project,read:org,repo,workflow`.
 - **`git`**, **`bash`** (3.2 ou mais novo), **`jq`**, **`shellcheck`**, **`python3`** e **`curl`**.
 - **Proteção de branch:** o portão exige a proteção da `main` com `CI` e `review/independent`. O GitHub só oferece proteção de branch em repositório público ou em plano pago. Sem ela, o `scripts/setup-repo.sh` sai 6 e o `scripts/close-phase.sh --merge` recusa todo merge.
 - **Runner:** o CI usa runners hospedados pelo GitHub (`ubuntu-latest`) por padrão. Repositório público usa só runners hospedados: o `scripts/setup-runner.sh` recusa registrar runner próprio em repositório público, porque ele rodaria o código de qualquer PR. Em repositório privado, o runner próprio é opcional e a variável `CI_RUNS_ON` aponta para ele.

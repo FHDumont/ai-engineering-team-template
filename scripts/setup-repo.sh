@@ -17,7 +17,7 @@
 #: Offers (asked once; the agent shows one choice board per offer):
 #:    --offers   lists unanswered offers (`offer:project`, `offer:runner`);
 #:    --project  idempotent: checks the `project` scope (includes read; if missing, prints
-#:               `gh auth refresh --scopes project,read:project` and exits 1), creates the board
+#:               the single `gh auth login` command with every scope of the method and exits 1), creates the board
 #:               if none is stored (PROCESS_PROJECT_NUMBER), links the repo and reads it back,
 #:               creates the default views that are missing (by name; what the API refuses
 #:               becomes a `pending:` line for the browser) and reads the native workflows

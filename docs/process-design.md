@@ -468,6 +468,7 @@ São duas ofertas opcionais, feitas uma vez pela skill `setup`, nunca em reposit
 
 - `setup-repo.sh --offers` lista as ofertas sem resposta. O "não" fica numa variável do repositório (`setup-repo.sh --decline project|runner`), fora do git.
 - **Quadro aceito:** `setup-repo.sh --project`, idempotente: cria o quadro se não houver, vincula ao repo, cria as views que faltam e lê tudo de volta. O que a API não faz sai em linhas `pending:`, e a sessão faz no navegador. Sem o escopo `project` no token do `gh`, o script sai 1 com a linha `fix:`; o passo de login é do dono (skill `setup`).
+- **Escopo do `gh`:** toda correção de escopo é um comando só, rodado pelo dono, com a lista completa de escopos que o método usa: `gh auth login -h github.com -p https -w -s gist,project,read:org,repo,workflow` (a lista fica num lugar só, `scripts/lib/project.sh`). Pedir um escopo avulso derruba os outros de um login que outras sessões podem usar. O agente só roda `gh auth status`; nunca pede nem roda `gh auth refresh`, `gh auth logout`, `gh auth setup-git` ou `--with-token`, e nunca define `GH_TOKEN=` ou `GITHUB_TOKEN=` (o `ci.yml` usa o token do próprio job). O `test_gh_login.sh` recusa esses textos no repositório.
 - **Escrita no quadro** (`scripts/lib/project.sh`): repo sem quadro não tenta nada. Repo com quadro lê cada escrita de volta; a que não confirma faz o script sair ≠ 0 com `error:` (a causa) e `fix:` (o comando de correção).
 - **Status movido pelos scripts:** `open-issue.sh` → `Todo`; `phase-start.sh` → `In Progress`; `close-phase.sh --cleanup` → `Done`; `close-phase.sh --abort` → `Todo`.
 
@@ -500,9 +501,9 @@ O arquivo é a fonte. Jobs: `changes`, `policy`, `lint`, `tests`, `workflows` e 
 | CI só no PR | roda em `pull_request` (`opened`, `synchronize`, `reopened`, `ready_for_review`); nada de CI no push da `main` |
 | Um run por rodada | editar título, corpo e labels do PR não gera run. O corpo final é conferido pelo `close-phase.sh --merge` |
 | Filtro de mudanças | o job `changes` decide o que roda, por `git diff` da base ao HEAD; o gatilho não usa `paths-ignore`, para o `CI` sempre reportar |
-| Jobs condicionais | filtro por exclusão: doc é arquivo em `docs/` e `.md` (fora os templates de issue); todo o resto é código e roda `lint` e `tests`. PR só de docs pula os dois. O `ci-gate.sh` só dispensa `lint` e `tests` com `code` exatamente `false` |
-| `policy` | sempre roda: assinatura de IA nos commits e no corpo do PR, `.github/sensitive-paths` → label `needs-owner-ok`, `check-docs.sh` |
-| Verificadores da base | `ci-gate.sh`, `check-attribution.sh`, `sensitive_paths.py` e `.github/sensitive-paths` são lidos do commit base do PR: o PR não enfraquece a checagem que o julga |
+| Jobs condicionais | filtro por exclusão: doc é arquivo em `docs/` e `.md` (fora os templates de issue); todo o resto é código e roda `lint`. O job `tests` roda em todo PR, inclusive no só de docs: os testes leem `AGENTS.md`, as skills e este desenho. PR só de docs pula só o `lint`; o `ci-gate.sh` exige `tests` sempre e só dispensa o `lint` com `code` exatamente `false` |
+| `policy` | sempre roda: assinatura de IA nos commits e no corpo do PR, `.github/sensitive-paths` → label `needs-owner-ok`, `check-docs.sh` (o da base, sobre os docs do PR) |
+| Verificadores da base | `ci-gate.sh`, `check-attribution.sh`, `check-docs.sh`, `sensitive_paths.py` e `.github/sensitive-paths` são lidos do commit base do PR: o PR não enfraquece a checagem que o julga |
 | Agregador | o job `CI`, com `if: always()`, é o único check exigido além de `review/independent`; falha se um job necessário falhou ou foi pulado sem motivo |
 | Runner | todo `runs-on` lê `vars.CI_RUNS_ON` (JSON: string ou lista de labels), padrão `ubuntu-latest` |
 | Concurrency | cancela o CI em andamento do mesmo PR |
@@ -568,7 +569,7 @@ O agente `close-reviewer`, aberto com o par do peso `reviewer` (§3), lê a issu
 Lista: cobrança, autenticação, migração de banco, credenciais, infraestrutura de produção, dependências e lockfiles. Vale mesmo com `end:auto-close`. Três camadas:
 
 1. As labels `area:billing`, `area:auth`, `area:migration` e `area:credentials` são aplicadas pela triagem e pelo workflow.
-2. `.github/sensitive-paths` tem os globs do projeto; o job `policy` do CI põe `needs-owner-ok` quando o diff toca um deles.
+2. `.github/sensitive-paths` tem os globs do projeto e os arquivos do próprio portão (`close-phase.sh`, workflows de deploy, `ci.yml`, os verificadores lidos da base e a própria lista); o job `policy` do CI põe `needs-owner-ok` quando o diff toca um deles.
 3. O `close-phase.sh --merge` sai 5 com `needs-owner-ok` ou com label de área sensível. A filha pede o ok do dono num quadro `Fase #<n> — <título>:` e roda `--merge --owner-ok --wait`. O `--owner-ok` só vale com a label `needs-owner-ok` já posta no PR: sem ela, a recusa põe a label e sai 5.
 
 Para todo o resto, `end:auto-close` vale como ok prévio do dono para o merge.

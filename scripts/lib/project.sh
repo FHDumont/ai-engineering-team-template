@@ -12,7 +12,12 @@
 # `fix: <command>` on stderr and the function returns 1; the caller exits != 0.
 # Success is only declared after the fact is read back.
 
-PROJECT_FIX_SCOPE="gh auth refresh --scopes project,read:project (opens the browser; the owner only logs in and authorizes)"
+# Every gh scope the method uses, in one place. A scope fix is always this one
+# command with the whole list, run by the owner: asking for a single scope would
+# drop the others from a login that other sessions and tools may share.
+GH_SCOPES="gist,project,read:org,repo,workflow"
+GH_LOGIN_CMD="gh auth login -h github.com -p https -w -s $GH_SCOPES"
+PROJECT_FIX_SCOPE="$GH_LOGIN_CMD (only the owner runs it and logs in on the browser; an agent never types the device code)"
 PROJECT_FIX_SETUP="scripts/setup-repo.sh --project (recreates what the board is missing)"
 
 project_fail() { # project_fail <cause> <fix>
@@ -180,7 +185,7 @@ PROJECT_PENDING=0
 project_require_scopes() {
   if ! project_has_scopes; then
     echo "needs-owner: gh token is missing scope: project"
-    echo "next: gh auth refresh --scopes project,read:project (opens the browser; the owner only logs in and authorizes; an agent never types the device code)"
+    echo "next: $PROJECT_FIX_SCOPE"
     return 1
   fi
   echo "ok: gh scope project present (includes read)"

@@ -10,6 +10,7 @@ Repositório criado a partir do template do método (`docs/process-design.md`). 
 - **App:** `app/` é só um marcador para o workflow de exemplo; troque pelo código do projeto.
 - **Deploy:** `deploy-example.yml` é um exemplo que builda `app/` e guarda o artefato, sem publicar nada. Roda só por `workflow_dispatch`, disparado pelo `scripts/deploy.sh` na sessão principal.
 - **Fim do grupo:** passo único da sessão principal (skill `integrate`): `gen-docs.sh`, `deploy.sh`, arquivamento das sessões filhas, `end-check.sh`.
+- **CI:** um run por rodada; verificadores lidos da base do PR; o job `tests` roda em todo PR. `ci.yml`, verificadores, `deploy-*.yml` e `close-phase.sh` são caminho sensível.
 - **Runner:** hospedado pelo GitHub (`ubuntu-latest`); a variável `CI_RUNS_ON` não está definida.
 - **Bots (caminho B):** nenhum webhook configurado; `docs/BOTS.md` e `scripts/lib/bots.tsv` trazem só exemplos.
 - **Projects:** sem quadro.

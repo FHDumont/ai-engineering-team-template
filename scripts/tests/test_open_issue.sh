@@ -80,7 +80,7 @@ assert_contains "$(gh_calls)" "--single-select-option-id OT" "board: moves the i
 assert_status 1 "board without the project scope fails" env FAKE_BOARD=7 FAKE_SCOPES="'repo'" "${create[@]}"
 out="$(last_output)"
 assert_contains "$out" "the gh token has no 'project' scope" "missing scope: says the cause"
-assert_contains "$out" "fix: gh auth refresh --scopes project,read:project" "missing scope: says the fix command"
+assert_contains "$out" "fix: gh auth login -h github.com -p https -w -s gist,project,read:org,repo,workflow" "missing scope: says the fix command"
 assert_contains "$out" "issue #9 was created, but it is not on the board" "missing scope: says the issue exists"
 assert_status 1 "board write refused by the API fails" env FAKE_BOARD=7 FAKE_GH_FAIL='^project item-edit' FAKE_GH_FAIL_MSG="GraphQL: forbidden" "${create[@]}"
 assert_contains "$(last_output)" "the API refused the update: GraphQL: forbidden" "refused write: says the cause"

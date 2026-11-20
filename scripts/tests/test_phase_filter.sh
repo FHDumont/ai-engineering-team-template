@@ -93,7 +93,7 @@ assert_eq 'is:open' "$(filter)" "aborting the last phase resets the neutral filt
 rc=0; out="$(cd "$repo" && FAKE_SCOPES="'gist', 'repo'" scripts/new-phase.sh 20 --no-check 2>&1)" || rc=$?
 assert_eq 1 "$rc" "missing scope fails new-phase"
 assert_contains "$out" "the gh token has no 'project' scope" "missing scope: says the cause"
-assert_contains "$out" "fix: gh auth refresh --scopes project,read:project" "missing scope: says the fix command"
+assert_contains "$out" "fix: gh auth login -h github.com -p https -w -s gist,project,read:org,repo,workflow" "missing scope: says the fix command"
 assert_eq 0 "$(mutations)" "missing scope never calls the view mutation"
 assert_eq 0 "$([ -d "$repo/.worktrees/issue-20" ] && echo 1 || echo 0)" "missing scope: no worktree is created"
 assert_eq "" "$(git -C "$repo" branch --list '*issue-20*')" "missing scope: no branch is created"
