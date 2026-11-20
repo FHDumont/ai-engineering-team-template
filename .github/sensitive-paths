@@ -1,0 +1,29 @@
+# Sensitive paths: one glob per line. The `policy` job of CI puts `needs-owner-ok`
+# on the PR that touches any of them, and close-phase.sh --merge refuses without
+# the repo owner's ok. `**` matches any number of folders.
+**/auth/**
+**/billing/**
+**/payments/**
+db/migrations/**
+**/migrations/**
+.env*
+**/.env*
+**/secrets/**
+**/credentials/**
+infra/production/**
+# Dependencies and lockfiles
+package-lock.json
+**/package-lock.json
+pnpm-lock.yaml
+**/pnpm-lock.yaml
+yarn.lock
+**/yarn.lock
+poetry.lock
+uv.lock
+requirements*.txt
+Gemfile.lock
+go.sum
+Cargo.lock
+# Gate: deploy workflows and the phase close
+.github/workflows/deploy-*.yml
+scripts/close-phase.sh

@@ -1,0 +1,33 @@
+# name	color	description	old_names (comma separated; renamed when one exists)
+type:feature	1d76db	Funcionalidade nova	enhancement
+type:bug	d73a4a	Algo não funciona como deveria	bug
+type:docs	0075ca	Só documentação	documentation
+type:chore	c5def5	Manutenção, processo ou ferramenta	
+roadmap	5319e7	Trabalho planejado	
+debt	b60205	Débito técnico	
+area:scripts	bfdadc	Scripts em scripts/	
+area:ci	bfdadc	Workflows, labels e templates do GitHub	
+area:docs	bfdadc	Docs e arquivos de IA	
+area:process	bfdadc	Skills, comandos, agentes e hooks do método	
+area:app	bfdadc	Código do app (exemplo: troque pela área do seu projeto)	
+area:billing	e11d21	Área sensível: cobrança (nunca merge automático)	
+area:auth	e11d21	Área sensível: autenticação (nunca merge automático)	
+area:migration	e11d21	Área sensível: migração de banco (nunca merge automático)	
+area:credentials	e11d21	Área sensível: credenciais e segredos (nunca merge automático)	
+priority:high	b60205	Prioridade alta	
+priority:medium	fbca04	Prioridade média	
+priority:low	0e8a16	Prioridade baixa	
+group:app	d4c5f9	Grupo de afinidade: app (exemplo)	
+size:small	c2e0c6	Achado pequeno: resolve na fase	
+size:medium	fef2c0	Achado médio: resolve na fase se não mudar o escopo	
+size:large	f9d0c4	Achado grande: precisa de planejamento	
+end:lab-test	0052cc	Fim da fase: o dono do repo testa no lab e diz "fechar fase"	
+end:auto-close	0e8a16	Fim da fase: o agente fecha sozinho pelo portão	
+needs-context	fbca04	Não deu para classificar ou falta seção obrigatória	
+needs-owner-ok	e11d21	PR toca caminho ou área sensível: precisa do ok do dono do repo	
+finding	c5def5	Achado durante o trabalho	achado
+friction	f9d0c4	Atrito do método (na 2ª vez, propor um hook)	
+ask:bot-a	ededed	O Bot A não foi avisado	
+ask:bot-b	ededed	O Bot B não foi avisado	
+approved	0e8a16	Ok do dono do repo na spec (só o dono do repo aplica)	
+test	ededed	Issue ou PR de teste: fora do roadmap e do changelog	

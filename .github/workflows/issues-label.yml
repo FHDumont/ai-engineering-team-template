@@ -1,0 +1,40 @@
+# Automatic issue labels from the template sections (design §8). Runs on
+# creation, and on edit only when the body changed.
+name: "Issues · Auto-label"
+run-name: "Issues · Auto-label · #${{ github.event.issue.number }} · ${{ github.event.action }}"
+
+on:
+  issues:
+    types: [opened, edited]
+
+permissions: {}
+
+concurrency:
+  group: issues-label-${{ github.event.issue.number }}
+  cancel-in-progress: true
+
+jobs:
+  label:
+    name: "Auto-label"
+    # Skips when the issue was born with a type:* label (issue templates).
+    if: >-
+      (github.event.action == 'opened' || github.event.changes.body != null)
+      && !contains(join(github.event.issue.labels.*.name, ','), 'type:')
+    runs-on: ${{ fromJSON(vars.CI_RUNS_ON || '"ubuntu-latest"') }}
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      issues: write
+    steps:
+      - name: "Checkout"
+        uses: actions/checkout@v4
+        with:
+          sparse-checkout: |
+            scripts
+            .github
+      - name: "Apply labels from the issue sections"
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          ISSUE_NUMBER: ${{ github.event.issue.number }}
+        run: python3 scripts/auto-label.py --issue "$ISSUE_NUMBER"

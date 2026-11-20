@@ -1,0 +1,212 @@
+# The single CI of the repository (design §9.2). Runs only on PRs and only on
+# code events: one run per round. Editing the title, body or labels of the PR
+# starts no run. The "CI" job is the aggregator required by the protection of
+# main, together with the review/independent status. `runs-on` reads the
+# CI_RUNS_ON variable (JSON: a string or a list of labels) for a self-hosted
+# runner; without it, ubuntu-latest (GitHub-hosted).
+#
+# The verifiers that decide the gate (scripts/ci-gate.sh,
+# scripts/check-attribution.sh, scripts/lib/sensitive_paths.py and
+# .github/sensitive-paths) are read from the base commit of the PR, checked out
+# at base/: a PR cannot weaken the check that judges it.
+name: "CI"
+run-name: "CI · PR #${{ github.event.pull_request.number }} · ${{ github.event.pull_request.title }}"
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+
+permissions: {}
+
+# A new push cancels the previous run of the same PR.
+concurrency:
+  group: ci-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  changes:
+    name: "Changes"
+    runs-on: ${{ fromJSON(vars.CI_RUNS_ON || '"ubuntu-latest"') }}
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    outputs:
+      code: ${{ steps.detect.outputs.code }}
+      workflows: ${{ steps.detect.outputs.workflows }}
+      app: ${{ steps.detect.outputs.app }}
+      docs_only: ${{ steps.detect.outputs.docs_only }}
+    steps:
+      - name: "Checkout"
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: "Detect changed paths"
+        id: detect
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          # Files of the PR (since the merge-base), one per line.
+          files="$(git diff --name-only "$BASE_SHA...$HEAD_SHA")"
+          echo "$files"
+          has() { echo "$files" | grep -qE "$1" && echo true || echo false; }
+          # By exclusion: a doc is a file in docs/ or a .md, except the issue
+          # templates (read by the scripts). Everything else is code and runs
+          # lint and tests, whatever its folder.
+          nondocs="$(echo "$files" | grep -vE '(^docs/|\.md$)' || true)"
+          templates="$(echo "$files" | grep -E '^\.github/ISSUE_TEMPLATE/' || true)"
+          if [ -z "$nondocs" ] && [ -z "$templates" ]; then code=false; else code=true; fi
+          {
+            echo "code=$code"
+            echo "workflows=$(has '^\.github/workflows/')"
+            echo "app=$(has '^(app/|\.github/workflows/deploy-example\.yml)')"
+            if [ "$code" = true ]; then echo "docs_only=false"; else echo "docs_only=true"; fi
+          } >>"$GITHUB_OUTPUT"
+          cat "$GITHUB_OUTPUT"
+
+  policy:
+    name: "Policy"
+    runs-on: ${{ fromJSON(vars.CI_RUNS_ON || '"ubuntu-latest"') }}
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      pull-requests: write
+    steps:
+      - name: "Checkout"
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      # After the PR checkout, which cleans the workspace.
+      - name: "Checkout the verifiers from the base"
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.base.sha }}
+          path: base
+          persist-credentials: false
+          sparse-checkout: |
+            scripts
+            .github
+      - name: "Check AI attribution in commits and PR body"
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          PR_BODY: ${{ github.event.pull_request.body }}
+        run: |
+          printf '%s\n' "$PR_BODY" >"$RUNNER_TEMP/pr-body.md"
+          base="$(git merge-base "$BASE_SHA" "$HEAD_SHA")"
+          base/scripts/check-attribution.sh --range "$base..$HEAD_SHA" --text-file "$RUNNER_TEMP/pr-body.md"
+      - name: "Label sensitive paths with needs-owner-ok"
+        env:
+          GH_TOKEN: ${{ github.token }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          touched="$(git diff --name-only "$BASE_SHA...$HEAD_SHA" | python3 base/scripts/lib/sensitive_paths.py base/.github/sensitive-paths)"
+          if [ -n "$touched" ]; then
+            echo "sensitive paths:"; echo "$touched"
+            gh api "repos/$GITHUB_REPOSITORY/issues/$PR_NUMBER/labels" -f "labels[]=needs-owner-ok" >/dev/null
+            echo "::notice::needs-owner-ok: this PR touches sensitive paths and needs the owner's ok"
+          else
+            echo "no sensitive paths"
+          fi
+      - name: "Check docs limits"
+        run: scripts/check-docs.sh
+
+  lint:
+    name: "Lint"
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
+    runs-on: ${{ fromJSON(vars.CI_RUNS_ON || '"ubuntu-latest"') }}
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - name: "Checkout"
+        uses: actions/checkout@v4
+      - name: "Shellcheck and Python syntax"
+        run: scripts/validate.sh --lint
+
+  tests:
+    name: "Tests"
+    needs: changes
+    if: (needs.changes.outputs.code == 'true' || needs.changes.outputs.app == 'true')
+    runs-on: ${{ fromJSON(vars.CI_RUNS_ON || '"ubuntu-latest"') }}
+    timeout-minutes: 15
+    permissions:
+      contents: read
+    steps:
+      - name: "Checkout"
+        uses: actions/checkout@v4
+      - name: "Script and hook tests"
+        run: scripts/validate.sh --tests
+      # Example: the app is only built here on the PR; deploy-example.yml
+      # validates main, builds and deploys, by workflow_dispatch. Replace the
+      # command with the build of your project.
+      - name: "Build the app"
+        if: needs.changes.outputs.app == 'true'
+        run: app/build.sh "$RUNNER_TEMP/app-dist"
+
+  workflows:
+    name: "Workflows"
+    needs: changes
+    if: needs.changes.outputs.workflows == 'true'
+    runs-on: ${{ fromJSON(vars.CI_RUNS_ON || '"ubuntu-latest"') }}
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    env:
+      ACTIONLINT_VERSION: "1.7.7"
+    steps:
+      - name: "Checkout"
+        uses: actions/checkout@v4
+      - name: "Install actionlint"
+        env:
+          RUNNER_OS_NAME: ${{ runner.os }}
+          RUNNER_ARCH_NAME: ${{ runner.arch }}
+        run: |
+          # Binary by the OS and architecture of the runner (hosted or self-hosted).
+          case "$RUNNER_OS_NAME" in
+            Linux) os=linux ;;
+            macOS) os=darwin ;;
+            *) echo "::error::actionlint: unsupported runner.os $RUNNER_OS_NAME"; exit 1 ;;
+          esac
+          case "$RUNNER_ARCH_NAME" in
+            X64) arch=amd64 ;;
+            ARM64) arch=arm64 ;;
+            *) echo "::error::actionlint: unsupported runner.arch $RUNNER_ARCH_NAME"; exit 1 ;;
+          esac
+          # Pinned version, verified against the checksums file of the release itself.
+          base="https://github.com/rhysd/actionlint/releases/download/v${ACTIONLINT_VERSION}"
+          tarball="actionlint_${ACTIONLINT_VERSION}_${os}_${arch}.tar.gz"
+          cd "$RUNNER_TEMP"
+          curl -sSfLO "$base/$tarball"
+          if command -v sha256sum >/dev/null; then sum="sha256sum"; else sum="shasum -a 256"; fi
+          curl -sSfL "$base/actionlint_${ACTIONLINT_VERSION}_checksums.txt" | grep " $tarball\$" | $sum -c -
+          tar xzf "$tarball" actionlint
+          echo "$RUNNER_TEMP" >>"$GITHUB_PATH"
+      - name: "Run actionlint"
+        run: actionlint -color
+      - name: "Check workflow standard"
+        run: python3 scripts/check-workflows.py
+
+  ci:
+    name: "CI"
+    needs: [changes, policy, lint, tests, workflows]
+    if: always()
+    runs-on: ${{ fromJSON(vars.CI_RUNS_ON || '"ubuntu-latest"') }}
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    steps:
+      - name: "Checkout the gate from the base"
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.base.sha }}
+          path: base
+          persist-credentials: false
+          sparse-checkout: scripts
+      - name: "Aggregate required jobs"
+        env:
+          NEEDS: ${{ toJSON(needs) }}
+        run: base/scripts/ci-gate.sh

@@ -1,0 +1,7 @@
+.worktrees/
+__pycache__/
+*.pyc
+.process/
+.env
+*.env
+dist/
