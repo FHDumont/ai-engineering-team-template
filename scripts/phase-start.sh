@@ -10,9 +10,9 @@
 #: branch and the worktree, commits the spec on the branch (the session that
 #: opens the phase never commits in the worktree), removes the loose copy of the
 #: spec from the main checkout and prints the exact start_session arguments of
-#: each phase, followed by the manager steps: open every session in this turn,
-#: create the manager heartbeat (a recurring agent task, every 8 minutes) and
-#: delete it in the single end step. --no-check skips check-env.sh; --dry-run
+#: each phase, followed by the manager steps: create the manager heartbeat (a
+#: recurring agent task, every 8 minutes), open every session in this turn and
+#: delete the heartbeat in the single end step. --no-check skips check-env.sh; --dry-run
 #: only checks and lists.
 set -euo pipefail
 HERE="$(cd "$(dirname "$0")" && pwd)"
@@ -94,15 +94,22 @@ done
 # that the heartbeat exists; these lines are the instruction.
 if [ ${#issues[@]} -eq 1 ]; then
   label="phase #${issues[0]}"
+  cards="no cartão \"Fase #${issues[0]}\""
 else
   label="phases $(printf '#%s ' "${issues[@]}" | sed 's/ $//')"
+  cards="nos cartões $(printf '"Fase #%s", ' "${issues[@]}" | sed -e 's/, $//' -e 's/\(.*\), /\1 e /')"
 fi
+# The sentence of --need is for the owner (Portuguese): which card, in which
+# session, and where that session is in the sidebar.
+need="clique $cards na sessão \"TITULO\", na barra lateral, dentro do agrupamento da sessão principal; se não aparecer, abra o agrupamento"
 cat <<STEPS
 
-Manager steps. Do all three, in this order:
-1. Open every session above in this same turn. start_session refused (the turn was not started by an owner message): call it again with initiation: own_initiative and the same fields, then stop with scripts/status.sh --state esperando.
-2. Right after the first session opens, create the manager heartbeat: one recurring agent task, every 8 minutes, with the text below (in Claude Code: the CronCreate tool, cron "*/8 * * * *", recurring). Create it once, not once per phase. The tool does not exist: write in "Você precisa" (scripts/status.sh --need) that the owner must write here when a phase ends.
+Manager steps. Do all four, in this order:
+1. NOW, before any start_session, create the manager heartbeat: one recurring agent task, every 8 minutes, with the text below (in Claude Code: the CronCreate tool, cron "*/8 * * * *", recurring). Create it once, not once per phase. Do not wait for a session to open. The tool does not exist: write in "Você precisa" (scripts/status.sh --need) that the owner must write here when a phase ends.
    Heartbeat text, copy it as is:
-   Manager heartbeat of $label: read the state of the linked sessions and of the pull request of each open phase (scripts/status.sh --state trabalhando), then do the next step: answer a child session that asked something, or, when every pull request is MERGED, run the integrate skill. Nothing changed: end the turn.
-3. Delete the heartbeat in the single end step (integrate skill), before scripts/end-check.sh (in Claude Code: the CronDelete tool).
+   Manager heartbeat of $label: read the state of the linked sessions and of the pull request of each open phase (scripts/status.sh --state trabalhando). A child session not started yet (its card was not clicked): only repeat the same "Você precisa" (the card, the exact title of this session and where it is in the sidebar) and end the turn. Otherwise do the next step: answer a child session that asked something, or, when every pull request is MERGED, run the integrate skill. Nothing changed: end the turn.
+2. Open every session above in this same turn. start_session refused (the turn was not started by an owner message): call it again with initiation: own_initiative and the same fields. It becomes a card that the owner clicks.
+3. Only now, and only when a session became a card, stop with the command below. Replace TITULO with the exact title of this session, as the sidebar shows it. Change nothing else:
+   scripts/status.sh --state esperando --need '$need'
+4. Delete the heartbeat in the single end step (integrate skill), before scripts/end-check.sh (in Claude Code: the CronDelete tool).
 STEPS

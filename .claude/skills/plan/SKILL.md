@@ -16,10 +16,10 @@ description: Planejamento nível 2 — lê por inteiro só as issues escolhidas 
    - etapas (um commit cada) com `modelo: … · esforço: … · motivo: …`, o par que `scripts/weights.sh <peso>` imprime (`light`, `medium` ou `strong`, §3), nunca de memória;
    - modo de fim, área sensível, solo ou paralela (`integration.md`).
 6. Ok da spec: quadro (ou label `approved`). Aplique `end:*` e `group:*`.
-7. **Antes de qualquer `start_session`:** linha com o par atual e o da spec; nunca execute aqui. Fecho liberado: passo 6. Abertura: só `scripts/phase-start.sh <n> [<n>…]`; recusa sem spec ou issue fechada, commita a spec e imprime os campos do `start_session`.
-   - **Filhas:** no mesmo turno do "executar", um `start_session` por fase, com: `initiation: "user_asked"`, `context: "fresh"`, `use_worktree: false`, `title`, `prompt`, `background`, `model`/`effort` da spec; o fecho vai no brief. O `check-env.sh` da filha confere o par real (§3); divergência avisada: `set_session_model`/`set_session_effort`, e ela roda o `check-env.sh` de novo.
-   - **Recusado** (turno sem mensagem do dono): repita com `initiation: "own_initiative"` (cartão) e pare com `status.sh --state esperando`. Nunca subagente.
-8. Vira a **gerenciadora**: não edita nem executa; só ela pergunta ao dono e repassa mensagens dele, inclusive "fechar fase". Atrasada: leia o estado da fase. Após o último merge: skill `integrate`.
-   - **Batimento:** aberta a primeira filha, crie a tarefa recorrente que o `phase-start.sh` imprime (8 minutos): lê sessões ligadas e PRs e faz o próximo passo; o aviso de fim nem sempre chega. Sem ferramenta: "Você precisa". A `integrate` apaga.
+7. **Antes de qualquer `start_session`:** linha com o par atual e o da spec; nunca execute aqui. Fecho liberado: passo 6. Abertura: só `scripts/phase-start.sh <n> [<n>…]`.
+   - **Batimento, antes de qualquer `start_session`:** tarefa recorrente do `phase-start.sh` (8 minutos): lê sessões ligadas e PRs e faz o próximo passo; cartão ainda não clicado: só repete o "Você precisa". A `integrate` apaga.
+   - **Filhas:** no mesmo turno do "executar", um `start_session` por fase, com: `initiation: "user_asked"`, `context: "fresh"`, `use_worktree: false`, `title`, `prompt`, `background`, `model`/`effort` da spec; o fecho vai no brief. O `check-env.sh` da filha confere o par real (§3); divergência avisada: `set_session_model`/`set_session_effort`, e ela o roda de novo.
+   - **Recusado**: repita com `initiation: "own_initiative"` (cartão) e só então pare com o `--state esperando --need` do `phase-start.sh`: cartão, título exato da sessão e onde fica ("na barra lateral, dentro do agrupamento da sessão principal; se não aparecer, abra o agrupamento"). Nunca subagente.
+8. Vira a **gerenciadora**: não edita nem executa; só ela pergunta ao dono e repassa, inclusive "fechar fase". Atrasada: leia o estado. Após o último merge: skill `integrate`.
 9. Feito: só lido de volta.
-10. Fim de turno: saída do `scripts/status.sh`, sem bloco de código.
+10. Fim de turno: saída do `status.sh`, sem bloco de código.

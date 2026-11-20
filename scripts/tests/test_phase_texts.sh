@@ -101,7 +101,13 @@ for name in .claude/skills/close-phase/SKILL.md .claude/skills/integrate/SKILL.m
 done
 # Manager heartbeat: plan creates it and says what it reads, integrate deletes
 # it in the end step, the design has the rule and the reason and names no app tool.
-assert_contains "$plan" "**Batimento:** aberta a primeira filha" "plan creates the heartbeat after the first child session"
+assert_contains "$plan" "**Batimento, antes de qualquer \`start_session\`:**" "plan creates the heartbeat before the sessions"
+assert_eq 1 "$(($(grep -n -F '**Batimento' <<<"$plan" | cut -d: -f1) < $(grep -n -F '**Filhas:**' <<<"$plan" | cut -d: -f1)))" "plan puts the heartbeat before the child sessions"
+assert_eq 1 "$(($(grep -n -F '**Filhas:**' <<<"$plan" | cut -d: -f1) < $(grep -n -F '**Recusado**' <<<"$plan" | cut -d: -f1)))" "plan puts the stop after the child sessions"
+where="na barra lateral, dentro do agrupamento da sessão principal; se não aparecer, abra o agrupamento"
+assert_contains "$plan" "$where" "plan has the sentence that says where the session is"
+assert_contains "$plan" "título exato" "plan asks for the exact title of the session"
+assert_contains "$plan" "cartão ainda não clicado" "plan covers the heartbeat with a card not clicked yet"
 assert_contains "$plan" "lê sessões ligadas e PRs e faz o próximo passo" "plan says what the heartbeat checks"
 assert_contains "$plan" "8 minutos" "plan gives the interval of the heartbeat"
 assert_contains "$integrate" "Apague o batimento" "integrate deletes the heartbeat in the end step"
@@ -109,6 +115,10 @@ assert_contains "$integrate" "Nenhum script confere" "integrate says no lock che
 hb="$(printf '%s\n' "$design" | grep -F '**batimento**')"
 assert_eq 1 "$(printf '%s\n' "$hb" | grep -c .)" "the design states the heartbeat rule in one place"
 assert_contains "$hb" "o apaga no passo único de fim" "the design says when the heartbeat goes away"
+assert_contains "$hb" "Antes de qualquer \`start_session\`" "the design creates the heartbeat before the sessions"
+assert_contains "$hb" "cartão ainda não clicado" "the design covers the heartbeat with a card not clicked yet"
+assert_eq 1 "$(grep -c -F "$where" <<<"$design")" "the design has the sentence that says where the session is, in one place"
+assert_eq 1 "$(($(grep -n -F '**batimento**' <<<"$design" | cut -d: -f1) < $(grep -n -F 'abre todas as filhas do grupo' <<<"$design" | cut -d: -f1)))" "the design puts the heartbeat before the child sessions"
 assert_contains "$hb" "o aviso de fim da filha nem sempre chega" "the design gives the reason of the heartbeat"
 assert_eq "" "$(printf '%s\n' "$design" | grep -n 'Cron' || true)" "the design names no tool of one app for the heartbeat"
 # Model and effort: one path. The pairs come from the weights file, the design no longer

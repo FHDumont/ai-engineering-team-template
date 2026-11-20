@@ -84,7 +84,28 @@ assert_contains "$out" "$wt" "the prompt names the worktree"
 # and its removal in the single end step.
 assert_eq 1 "$(grep -c "Open every session above in this same turn" <<<"$out")" "says once to open every session in this turn"
 assert_contains "$out" "create the manager heartbeat" "says to create the manager heartbeat"
-assert_contains "$out" "after the first session opens" "says when to create the heartbeat"
+assert_contains "$out" "before any start_session" "says when to create the heartbeat"
+# Order: the heartbeat comes before the sessions and the stop comes last. A
+# session that becomes a card opens by the click of the owner, outside any turn of
+# the manager, so a heartbeat left for "after the first session opens" is never created.
+# A missing step counts as line 0, so the comparison fails instead of breaking.
+step_line() { local l; l="$(grep -n -F -- "$1" <<<"$out" | head -1 | cut -d: -f1)"; echo "${l:-0}"; }
+hb_line="$(step_line "create the manager heartbeat")"
+open_line="$(step_line "Open every session above in this same turn")"
+stop_line="$(step_line "scripts/status.sh --state esperando --need")"
+del_line="$(step_line "Delete the heartbeat in the single end step")"
+assert_eq 1 "$((hb_line < open_line))" "the heartbeat step comes before the sessions step"
+assert_eq 1 "$((open_line < stop_line))" "the stop comes after the sessions step"
+assert_eq 1 "$((stop_line < del_line))" "the removal of the heartbeat comes last"
+assert_eq 1 "$(grep -c -F -- "--state esperando" <<<"$out")" "one stop command, after the sessions"
+# The stop sentence is ready for --need: which card, in which session, and where the
+# owner finds that session in the sidebar.
+need="$(grep -F -- "scripts/status.sh --state esperando --need" <<<"$out" || true)"
+assert_contains "$need" 'clique no cartão "Fase #7" na sessão "TITULO"' "the stop sentence names the card and the session"
+assert_contains "$need" "na barra lateral, dentro do agrupamento da sessão principal; se não aparecer, abra o agrupamento" "the stop sentence says where the session is"
+assert_contains "$out" "Replace TITULO with the exact title of this session" "says to put the exact title of the session"
+assert_contains "$out" "A child session not started yet (its card was not clicked)" "the heartbeat covers the card not clicked yet"
+assert_contains "$out" 'only repeat the same "Você precisa"' "the heartbeat only repeats the need while the card waits"
 assert_contains "$out" "every 8 minutes" "gives the interval of the heartbeat"
 assert_contains "$out" "CronCreate" "names the Claude Code tool of the heartbeat"
 assert_contains "$out" "Você precisa" "says what to do when the tool does not exist"
@@ -126,6 +147,7 @@ assert_contains "$out" "phase #12" "arguments for the second issue"
 assert_contains "$out" "model: fable" "pair of the section"
 assert_contains "$out" "Manager heartbeat of phases #10 #12:" "one heartbeat names every phase of the group"
 assert_eq 1 "$(grep -c "create the manager heartbeat" <<<"$out")" "one heartbeat for the whole group"
+assert_contains "$out" 'clique nos cartões "Fase #10" e "Fase #12" na sessão "TITULO"' "the stop sentence names every card of the group"
 assert_eq 2 "$(cut -f1 "$repo/.worktrees/parallel-active.tsv" | grep -c .)" "registers the parallel phases"
 for n in 10 12; do
   assert_eq "docs/specs/group.md" "$(git -C "$repo/.worktrees/issue-$n" show --name-only --format= HEAD)" "spec committed on the branch of #$n"
