@@ -1,0 +1,25 @@
+---
+name: execute
+description: Sessão filha de uma fase já aberta por scripts/phase-start.sh — trabalha no worktree dela, um commit por etapa, achados como issues e parada no modo de fim. Carrega só pelo brief da gerenciadora (start_session); pedido do dono para começar uma issue é da skill plan.
+---
+
+# Sessão filha da fase
+
+0. A sessão nasce no checkout principal: edite só o worktree da fase (`.worktrees/issue-<n>`) por caminho absoluto, sem `EnterWorktree`; nunca o checkout principal.
+1. Confirme o ambiente com `(cd <worktree> && scripts/check-env.sh)`; ele grava o `phase_session` que o portão exige (fora da `main`, spec da issue no git, par real da sessão conferido contra a spec, hooks instalados, testes rodando). Falhou por falta de spec: pare e avise a gerenciadora; a fase só abre por `scripts/phase-start.sh`, depois da skill `plan`.
+2. Leia só a seção da sua fase na spec e a issue. Defina o critério de sucesso verificável antes de codar.
+2a. Princípios (§2.1): bug começa com teste que falha no código antigo, provado rodando (patch revertido), não por raciocínio; dúvida nova vira suposição no PR ou cartão, nunca invenção; toque só o escopo da spec (o resto vira achado); sem abstração "para um dia"; leia o arquivo antes de mudar, remova só com certeza e preserve comentário que não entendeu.
+3. Par da sessão: o `check-env.sh` do passo 1 lê o par real e o compara com o da spec. Saiu ≠ 0 por divergência: nenhuma etapa começa; avise a gerenciadora (`SendMessage`), que ajusta o par desta sessão, e rode o `check-env.sh` de novo. Sessão aberta no par da principal (a spec pede mais): ele sai 0, a fase segue nesse par e a tabela do PR registra.
+3a. A fase roda nesta sessão filha (regra única, §4.3 do `process-design`). Por etapa, compare o par dela na spec com o par desta sessão (o `check-env.sh` imprime os dois): par igual roda nesta sessão; par diferente vai a um subagente (ferramenta `Agent`) com o `model` e o `effort` da etapa, que faz o commit dela. Implemente, rode `scripts/validate.sh`, faça um commit Conventional Commits em inglês, adicionando arquivos pelo nome. Bug: primeiro o teste que falha no código antigo.
+4. Achados (§4.2): `scripts/open-issue.sh --type finding --size small|medium|large …`.
+   - Leve e só em arquivos do PR: corrija num commit no próprio PR. Os outros entram numa única issue guarda-chuva por grupo, com checklist; nunca uma issue por ponto. Grande: avise a gerenciadora por mensagem; ela pergunta ao dono.
+5. Suposições vão para o PR. Nada de refatoração de carona.
+6. A tabela do PR "etapa | modelo/esforço pedido | modelo/esforço usado" é escrita pelo `close-phase.sh --prepare` (do trace, `scripts/trace-view.py --pairs <n>`); não a preencha à mão.
+7. Ao terminar as etapas, se a fase mudou o estado atual, atualize a sua parte do `docs/STATE.md` (só o estado atual, ≤500 palavras); se houve decisão, crie a ADR (`docs/adr/TEMPLATE.md`) e a linha no índice.
+8. Modo de fim:
+   - `end:auto-close`: siga para a skill `close-phase`.
+   - `end:lab-test`: pare **antes** do `close-phase` (nada de `--prepare`, PR ou revisão) com `scripts/status.sh --state esperando --need "testar no lab …"`. O dono do repo testa e fala só na sessão de planejamento (a gerenciadora), que repassa as mensagens e o "fechar fase"; "fechar fase" também vale dito aqui, e aí avise a gerenciadora por `send_message`. Só então siga a skill `close-phase`.
+9. Mande ao menos uma mensagem de andamento à gerenciadora (`SendMessage` para a sessão que abriu esta). Dúvida que só o dono resolve: mande à gerenciadora por `SendMessage`; ela pergunta e devolve `respondido: <decisão>`. Esta sessão abre quadro só para a autorização da ação sensível que ela mesma executa (merge `needs-owner-ok` e `--abort --discard`, skill `close-phase`), começando por `Fase #<n> — <título>:`. Último turno: termine com `Próximo passo: a gerenciadora arquiva esta sessão`.
+10. Fecho: ao começar o `close-phase`, avise "agora vou finalizar, espere"; nenhum bloco de status parece final enquanto há revisão, CI ou commit pendente. "acabou" só depois do merge e do arquivamento.
+10a. **Verificar antes de declarar feito** (`process-design` §2.1): commit, push, issue, label, quadro ou sessão só entram no status, no PR ou no `STATE.md` depois de lidos de volta (`git log`, `gh … view`, `get_session`); conferência falhou: `trabalhando` ou `esperando você` com o passo real.
+11. Toda mensagem final de turno termina com a saída de `scripts/status.sh` colada como está (três linhas em negrito, sem bloco de código). `--state pronto` roda o `scripts/end-check.sh --issue <n>` e sai 1 enquanto sobrar algo da fase; com `--need` também sai 1.

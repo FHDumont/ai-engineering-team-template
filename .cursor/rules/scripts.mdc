@@ -1,0 +1,7 @@
+---
+description: Regras ao mexer nos scripts do método
+globs: scripts/**,.claude/hooks/**,.githooks/**
+alwaysApply: false
+---
+
+Siga o `scripts/CLAUDE.md`: todo script tem `--help`, teste em `scripts/tests/`, comentários e saída curta em inglês e roda em bash 3.2.

@@ -1,0 +1,30 @@
+---
+name: close-phase
+description: Fecha a fase da branch atual pelo portão — PR, revisão independente publicada em review/independent e merge só com --rebase. Use quando a fase terminou (auto-close) ou o dono do repo disse "fechar fase", aqui ou na gerenciadora, que repassa. Frases: "fechar fase", "fechar a fase".
+---
+
+# Fechar a fase
+
+0. Comece avisando "agora vou finalizar, espere". Em `end:lab-test`, só rode esta skill depois do teste no lab e do "fechar fase" do dono. Diga "acabou" só após o merge e o arquivamento; antes disso nenhum bloco de status parece final.
+
+0a. **Sessão que abriu a fase (gerenciadora): repasse e pare.** "Fechar fase" dito a ela vai à sessão da fase por `send_message`, e ela para com o bloco de status. Ela não roda o `close-phase.sh` (saída 9 nela) nem escreve no worktree (os hooks recusam). Os passos abaixo são da sessão da fase.
+
+1. Preencha `.github/pull_request_template.md` num arquivo temporário: resumo, `Closes #n`, ID e nome da sessão da fase, achados, suposições. A seção "Modelo e esforço" fica vazia: o `--prepare` escreve nela a tabela pedido × usado do trace. Sem assinatura de IA.
+   - Nunca diga que abriu um agente, sessão ou subagente sem um evento em `.process/events.jsonl` que prove; sem evento, escreva que não há prova.
+2. `scripts/close-phase.sh --prepare --title "<tipo>: <resumo em inglês>" --body-file <arquivo>`. Ele valida, faz um push só (um run de CI), abre o PR ou o edita se o título ou o corpo mudou e copia as labels da issue. A fase não gera `CHANGELOG.md` nem `ROADMAP.md`: a sessão principal gera uma vez no fim (`scripts/gen-docs.sh`).
+3. Antes e durante a espera do CI, rode `scripts/close-phase.sh --check` (lê `mergeable`, `mergeStateStatus` e os checks do SHA do HEAD); só com `ok` espere `gh pr checks`. Falhou: corrija com um commit novo e rode o `--prepare` de novo.
+   - PR em conflito com a `main`: o `--check` chama o `scripts/redo-phase.sh` sozinho (branch nova da `main`, cherry-pick dos commits da fase, PR novo `Closes #n`, PR antigo fechado, branch remota antiga apagada, registro paralelo regravado) e sai 0 mostrando o PR novo; siga dele, do passo 3. Saída 4 (conflito real no cherry-pick): resolva os arquivos listados, `git add` pelo nome, `git cherry-pick --continue` e rode `scripts/redo-phase.sh` de novo. PR só atrasado, sem conflito, não é refeito.
+   - Saída 7 (CI ausente no HEAD, ~3 min) ou 8 (`mergeable` segue `UNKNOWN`): não espere mais; investigue e diga no bloco de status. Check verde de SHA anterior não vale.
+4. Revisão independente: abra o agente `close-reviewer` com o par de `scripts/weights.sh reviewer` (`model` e `effort`; o hook recusa outro par) passando só o número da issue, o número do PR, o comando dos testes, o número da rodada e, da 2ª em diante, o SHA revisado na rodada anterior. Nunca passe o seu resumo.
+5. Salve o parecer dele (em português) num arquivo e rode `scripts/close-phase.sh --publish-review <arquivo> --verdict success|failure`. Ele recusa parecer sem rodada do `close-reviewer` desta sessão posterior ao último push (lê o trace): todo push pede uma rodada nova antes de publicar. Toda rodada, aprovada ou não, vira comentário no PR. Limites:
+   - só problema **grave** ou **médio** dentro do escopo da issue bloqueia; corrija só esses com um commit novo e volte ao passo 2;
+   - ponto **leve** só em arquivos do PR: corrija num commit no PR e volte ao passo 2 (a rodada seguinte olha só esse diff); os outros entram numa única issue guarda-chuva por grupo (`scripts/open-issue.sh --type finding`), com checklist;
+   - critério do "Pronto quando" que não dá para cumprir ou provar na sessão atual vira **nota** no parecer, nunca bloqueio; a revisão não pede ao dono do repo nenhuma ação para gerar prova (`/compact`, `attach`, terminal);
+   - a rodada N+1 olha só o diff desde a rodada N e as regressões que ele causou;
+   - no máximo 2 rodadas de "mudanças pedidas": se a 3ª também pedir, pare e avise a gerenciadora por mensagem; ela pergunta ao dono (corrigir / aceitar com achado / pausar) e devolve `respondido: <decisão>`.
+6. `scripts/close-phase.sh --merge --wait`.
+   - Recusou por `needs-owner-ok` ou área sensível: esta sessão, que roda o `--merge`, pede o ok nela mesma, num único quadro de escolha (`AskUserQuestion`) que começa por `Fase #<n> — <título>:`, e roda `scripts/status.sh --state esperando --need "responder ao cartão do merge"` (a principal mostra a pendência em "Você precisa"); com o ok, `--merge --owner-ok --wait`. A autorização do dono não atravessa sessões: ok dado em outra sessão e repassado por mensagem não vale. Toda outra dúvida vai à gerenciadora por mensagem.
+7. O `--wait` roda o `--cleanup`: tira a linha da fase de `.worktrees/parallel-active.tsv`, apaga worktree, branch local e branch remota e atualiza a `main`; confira que `gh pr view --json state` devolve `MERGED` antes de dizer que entrou (`process-design` §2.1: código de saída 0 não prova o merge).
+8. A fase não faz deploy: o `--merge` não dispara nada, e o hook barra `gh workflow run`, `gh run rerun` e `gh api …/dispatches`. Depois do último merge do grupo, solo ou paralelo, a gerenciadora faz o passo único de fim da skill `integrate`, uma vez, no checkout principal: `scripts/gen-docs.sh`, `scripts/deploy.sh`, arquivamento das sessões filhas, `scripts/end-check.sh`. Pare com `scripts/status.sh --issue <n> --state pronto`: ele roda o `scripts/end-check.sh --issue <n>` e sai 1 enquanto sobrar worktree, branch, linha do registro ou PR aberto da fase.
+8a. Desistir da fase: `scripts/close-phase.sh --abort` lista o que seria perdido (alteração não commitada, arquivo não rastreado, commit sem push, commit enviado que nenhum PR guarda) e sai 10 sem tocar em nada. Faça commit e push do que fica. Perda aceita: peça o ok do dono nesta sessão, num quadro `Fase #<n> — <título>:`, e rode `--abort --discard`. O abort fecha o PR, apaga a branch remota e tira a linha do registro.
+9. Toda mensagem final de turno termina com a saída do `status.sh` colada como está (três linhas em negrito, sem bloco de código).

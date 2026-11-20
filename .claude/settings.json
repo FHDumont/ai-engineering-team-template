@@ -1,0 +1,200 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-settings.json",
+  "attribution": {
+    "commit": "",
+    "pr": ""
+  },
+  "permissions": {
+    "allow": [
+      "Bash(scripts/*)",
+      "Bash(./scripts/*)",
+      "Bash(gh issue *)",
+      "Bash(gh label *)",
+      "Bash(gh pr create *)",
+      "Bash(gh pr view *)",
+      "Bash(gh pr list *)",
+      "Bash(gh pr checks *)",
+      "Bash(gh pr diff *)",
+      "Bash(gh pr edit *)",
+      "Bash(gh pr comment *)",
+      "Bash(gh run *)",
+      "Bash(git status *)",
+      "Bash(git diff *)",
+      "Bash(git log *)",
+      "Bash(git fetch *)",
+      "Bash(git switch *)",
+      "Bash(git worktree *)",
+      "Bash(git commit *)",
+      "Bash(git push *)"
+    ],
+    "deny": [
+      "Bash(gh pr merge*)",
+      "Bash(gh * pr merge*)",
+      "Bash(gh workflow run*)",
+      "Bash(gh * workflow run*)",
+      "Bash(gh run rerun*)",
+      "Bash(gh * run rerun*)",
+      "Bash(gh api *dispatches*)",
+      "Bash(gh api *rerun*)",
+      "Bash(gh api *mergePullRequest*)",
+      "Bash(gh api *enablePullRequestAutoMerge*)",
+      "Bash(gh api *enqueuePullRequest*)",
+      "Bash(gh api *mergeBranch*)",
+      "Bash(gh api *pulls/*/merge*)",
+      "Bash(gh api *BranchProtectionRule*)",
+      "Bash(gh api *-X PUT*branches/*/protection*)",
+      "Bash(gh api *--method PUT*branches/*/protection*)",
+      "Bash(gh api *branches/*/protection*-X PUT*)",
+      "Bash(gh api *branches/*/protection*--method PUT*)",
+      "Bash(gh api *-X PATCH*branches/*/protection*)",
+      "Bash(gh api *--method PATCH*branches/*/protection*)",
+      "Bash(gh api *branches/*/protection*-X PATCH*)",
+      "Bash(gh api *branches/*/protection*--method PATCH*)",
+      "Bash(gh api *-X POST*branches/*/protection*)",
+      "Bash(gh api *--method POST*branches/*/protection*)",
+      "Bash(gh api *branches/*/protection*-X POST*)",
+      "Bash(gh api *branches/*/protection*--method POST*)",
+      "Bash(gh api *branches/*/protection*-X DELETE*)",
+      "Bash(gh api *branches/*/protection*--method DELETE*)",
+      "Bash(gh api *branches/*/protection* -f *)",
+      "Bash(gh api *branches/*/protection* -F *)",
+      "Bash(gh api *branches/*/protection* --field *)",
+      "Bash(gh api *branches/*/protection* --raw-field *)",
+      "Bash(gh api *branches/*/protection* --input *)",
+      "Bash(git push --force*)",
+      "Bash(git push -f*)",
+      "Bash(git push *--force*)",
+      "Bash(git push * -f*)",
+      "Bash(git reset --hard*)",
+      "Bash(git reset * --hard*)",
+      "Bash(gh repo delete *)",
+      "Bash(gh api -X DELETE *)",
+      "Bash(gh api --method DELETE *)",
+      "Bash(op *)",
+      "Bash(security find-generic-password*)"
+    ]
+  },
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"${CLAUDE_PROJECT_DIR}\"/.claude/hooks/block-dangerous-git.sh"
+          },
+          {
+            "type": "command",
+            "command": "\"${CLAUDE_PROJECT_DIR}\"/.claude/hooks/block-attribution.sh"
+          },
+          {
+            "type": "command",
+            "command": "\"${CLAUDE_PROJECT_DIR}\"/.claude/hooks/block-phase-commit.sh"
+          }
+        ]
+      },
+      {
+        "matcher": "Edit|Write|NotebookEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"${CLAUDE_PROJECT_DIR}\"/.claude/hooks/block-phase-edit.sh"
+          }
+        ]
+      },
+      {
+        "matcher": "AskUserQuestion",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"${CLAUDE_PROJECT_DIR}\"/.claude/hooks/block-card-title.sh"
+          }
+        ]
+      },
+      {
+        "matcher": "Agent",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"${CLAUDE_PROJECT_DIR}\"/.claude/hooks/block-agent-pair.sh"
+          },
+          {
+            "type": "command",
+            "command": "\"${CLAUDE_PROJECT_DIR}\"/.claude/hooks/trace-event.sh"
+          }
+        ]
+      }
+    ],
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"${CLAUDE_PROJECT_DIR}\"/.claude/hooks/prompt-phase-entry.sh"
+          }
+        ]
+      }
+    ],
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"${CLAUDE_PROJECT_DIR}\"/.claude/hooks/trace-event.sh"
+          }
+        ]
+      }
+    ],
+    "SubagentStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"${CLAUDE_PROJECT_DIR}\"/.claude/hooks/trace-event.sh"
+          }
+        ]
+      }
+    ],
+    "SubagentStop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"${CLAUDE_PROJECT_DIR}\"/.claude/hooks/trace-event.sh"
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"${CLAUDE_PROJECT_DIR}\"/.claude/hooks/trace-event.sh"
+          }
+        ]
+      }
+    ],
+    "SessionEnd": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"${CLAUDE_PROJECT_DIR}\"/.claude/hooks/trace-event.sh"
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Agent",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"${CLAUDE_PROJECT_DIR}\"/.claude/hooks/trace-event.sh"
+          }
+        ]
+      }
+    ]
+  }
+}

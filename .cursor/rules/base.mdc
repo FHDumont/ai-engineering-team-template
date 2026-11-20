@@ -1,0 +1,6 @@
+---
+description: Regras do projeto para todo agente
+alwaysApply: true
+---
+
+Leia e siga o `AGENTS.md` na raiz: ele é a fonte única das regras (idioma, git, quando perguntar, bloco de status, nenhuma assinatura de IA). Estado atual em `docs/STATE.md`.
