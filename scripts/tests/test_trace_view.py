@@ -156,6 +156,27 @@ class TraceViewTests(unittest.TestCase):
         self.assertIn("effort used low", tv.render_text(self.tree(lines)))
         self.assertEqual({"Step 8": ("low", "done"), "Step 7": ("medium", "running")}, got)
 
+    def test_typeless_helper_takes_no_typed_request(self):
+        # A refused Agent call leaves a request without subagent; a helper of the harness
+        # (SubagentStop only, no type, the effort of the session) is not that request.
+        lines = [
+            phase("05:00:00", "phase_session", model="claude-sonnet-9", effort="low",
+                  requested_model="sonnet", requested_effort="low"),
+            phase("05:01:00", "PreToolUse", model="opus", effort="medium", tool_use_id="u1",
+                  subagent_type="close-reviewer", description="Review"),
+            phase("05:01:03", "PreToolUse", model="sonnet", effort="medium", tool_use_id="u2",
+                  subagent_type="close-reviewer", description="Review"),
+            phase("05:01:03", "SubagentStart", agent_id="r2", agent_type="close-reviewer"),
+            phase("05:01:03", "PostToolUse", tool_use_id="u2", subagent_id="r2"),
+            phase("05:01:08", "SubagentStop", agent_id="h1", effort="low"),
+            phase("05:04:00", "SubagentStop", agent_id="r2", agent_type="close-reviewer",
+                  model="claude-sonnet-9", effort="medium"),
+        ]
+        events, _ = tv.load_events(lines)
+        table = tv.render_pairs(events, "16").splitlines()
+        self.assertEqual(["| sessão da fase | sonnet · low | claude-sonnet-9 · low |",
+                          "| subagente: reviewer — Review | sonnet · medium | claude-sonnet-9 · medium |"], table[2:])
+
     def test_session_with_only_session_end_is_ignored(self):
         lines = SAMPLE + [ev("03:30:00", "SessionEnd", "stray", branch=BR, issue="16")]
         plan = self.tree(lines)["children"][0]

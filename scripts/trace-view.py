@@ -147,7 +147,10 @@ def add_subagents(s):
         pick = linked.get(aid)
         if pick is None:
             # Without PostToolUse: the previous request still free, in order.
-            cands = [r for r in requests if id(r) not in used and r["_t"] <= first["_t"]]
+            # A request that names a type only fits a subagent of that type: a helper of
+            # the harness (no type) never takes the request of a refused Agent call.
+            cands = [r for r in requests if id(r) not in used and r["_t"] <= first["_t"]
+                     and r.get("subagent_type") in (None, "", sub["type"])]
             pick = next((r for r in cands if r.get("subagent_type") == sub["type"]), cands[0] if cands else None)
             if pick is not None:
                 used.add(id(pick))

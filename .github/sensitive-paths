@@ -31,5 +31,6 @@ scripts/close-phase.sh
 .github/workflows/ci.yml
 scripts/ci-gate.sh
 scripts/check-attribution.sh
+scripts/check-docs.sh
 scripts/lib/sensitive_paths.py
 .github/sensitive-paths

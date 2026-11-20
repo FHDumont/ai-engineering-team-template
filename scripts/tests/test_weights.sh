@@ -4,16 +4,27 @@
 # shellcheck source=scripts/tests/lib.sh
 source "$(dirname "$0")/lib.sh"
 
-# The five weights, each with a model and an effort.
-list="$("$SCRIPTS/weights.sh")"
-assert_eq "light medium reviewer strong triage" "$(echo "$list" | cut -d' ' -f1 | sort | paste -sd' ' -)" "the file has the five weights"
-assert_status 0 "the file passes its own check" "$SCRIPTS/weights.sh" --check
-# The defaults run on a plan that only has sonnet at low or medium effort.
-assert_eq "sonnet" "$(echo "$list" | cut -d' ' -f2 | sort -u | paste -sd' ' -)" "no default weight asks for a model above sonnet"
-assert_eq "" "$(echo "$list" | cut -d' ' -f3 | grep -vxE 'low|medium' || true)" "no default weight asks for an effort above medium"
-assert_eq "$(echo "$list" | sed -n 's/^reviewer //p')" "$("$SCRIPTS/weights.sh" reviewer)" "a weight prints its pair"
+# Shape of a weights file, whatever models it names: the five weights, each with a
+# model and a known effort.
+check_weights() { # check_weights <scripts dir> <which file>
+  local list
+  list="$("$1/weights.sh")"
+  assert_eq "light medium reviewer strong triage" "$(echo "$list" | cut -d' ' -f1 | sort | paste -sd' ' -)" "$2 has the five weights"
+  assert_status 0 "$2 passes its own check" "$1/weights.sh" --check
+  assert_eq "" "$(echo "$list" | grep -vxE '[a-z]+ [^ ]+ (low|medium|high|xhigh|max)' || true)" "every weight of $2 has a model and a known effort"
+  assert_eq "$(echo "$list" | sed -n 's/^reviewer //p')" "$("$1/weights.sh" reviewer)" "a weight of $2 prints its pair"
+}
+check_weights "$SCRIPTS" "the file"
 assert_status 1 "an unknown weight is refused" "$SCRIPTS/weights.sh" forte
 assert_status 2 "an unknown option is refused" "$SCRIPTS/weights.sh" --nope
+
+# A bigger plan edits only the file: with another model and effort in the five
+# lines, the same checks pass.
+mkdir -p "$TMP/big/lib"
+cp "$SCRIPTS/weights.sh" "$TMP/big/" && cp "$SCRIPTS/lib/common.sh" "$TMP/big/lib/"
+awk -F'\t' -v OFS='\t' '/^#/ || NF == 0 {print; next} {print $1, "opus", "medium"}' "$SCRIPTS/lib/weights.tsv" >"$TMP/big/lib/weights.tsv"
+check_weights "$TMP/big" "a file on a bigger plan"
+assert_eq "opus medium" "$("$TMP/big/weights.sh" light)" "the bigger plan gives its own pair"
 
 # A bigger plan raises a weight by editing the file; a broken file is refused.
 mkdir -p "$TMP/s/lib"

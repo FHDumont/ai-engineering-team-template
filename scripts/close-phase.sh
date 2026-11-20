@@ -38,7 +38,8 @@
 #:   default 15) exits 7 as CI missing; a check on an older SHA does not count.
 #:   Run it before and while waiting for CI; --merge runs it too.
 #: --merge: refuses with needs-owner-ok, a sensitive area label or a diff in
-#:   .github/sensitive-paths, unless --owner-ok (only after the owner's ok in a
+#:   .github/sensitive-paths (union of the base's list and the PR's; no readable
+#:   list on the base: refused), unless --owner-ok (only after the owner's ok in a
 #:   choice question). --owner-ok only counts with needs-owner-ok already on the
 #:   PR: without it the refusal puts the label (read back) and exits 5, with or
 #:   without the flag. Requires review/independent = success on HEAD and, in the
@@ -365,10 +366,18 @@ merge() {
   for a in $SENSITIVE_AREAS; do
     echo "$labels" | grep -qxF "$a" && reasons="$reasons $a"
   done
-  local base touched
+  local base touched globs
   base="$(echo "$info" | jq -r .baseRefName)"
   git fetch --quiet origin "$base"
-  touched="$(git diff --name-only "origin/$base...$sha" 2>/dev/null | python3 "$HERE/lib/sensitive_paths.py" "$ROOT/.github/sensitive-paths" || true)"
+  # The list is the union of the base's and the PR's: a PR cannot take itself out of
+  # the rule by dropping an entry, and an entry it adds already counts. Fails closed:
+  # no readable list on the base, no merge.
+  globs="$(mktemp)"
+  git show "origin/$base:.github/sensitive-paths" >"$globs" 2>/dev/null ||
+    { rm -f "$globs"; die "cannot read .github/sensitive-paths of origin/$base: merge blocked"; }
+  [ ! -f "$ROOT/.github/sensitive-paths" ] || { echo; cat "$ROOT/.github/sensitive-paths"; } >>"$globs"
+  touched="$(git diff --name-only "origin/$base...$sha" 2>/dev/null | python3 "$HERE/lib/sensitive_paths.py" "$globs" || true)"
+  rm -f "$globs"
   [ -z "$touched" ] || reasons="$reasons sensitive-paths($(echo "$touched" | paste -sd, -))"
   if [ -n "$reasons" ]; then
     # --owner-ok only counts with needs-owner-ok already on the PR: the label is the

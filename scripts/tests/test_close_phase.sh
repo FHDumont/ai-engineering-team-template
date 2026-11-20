@@ -59,7 +59,7 @@ handler() { # handler <comma-separated labels> <review state>
 case "\$*" in
   "pr list"*"--state open"*) echo 12 ;;
   "pr view 12 --json body"*) printf '%s\n' "\${FAKE_PR_BODY:-Resumo}" ;;
-  "pr view 12"*"labels,headRefOid,baseRefName"*) jq -cn --arg l "$1" --arg s "$SHA" '{labels: (\$l | split(",") | map(select(length>0)) | map({name: .})), headRefOid: \$s, baseRefName: "main"}' ;;
+  "pr view 12"*"labels,headRefOid,baseRefName"*) jq -cn --arg l "$1" --arg s "$SHA" --arg b "\${FAKE_BASE:-main}" '{labels: (\$l | split(",") | map(select(length>0)) | map({name: .})), headRefOid: \$s, baseRefName: \$b}' ;;
   "pr view 12"*"headRefOid --jq"*) echo "$SHA" ;;
   "issue view 5"*"labels"*) printf '%s\n' "\${FAKE_ISSUE_LABELS:-type:feature}" | tr ',' '\n' ;;
   "api repos/owner/repo/commits/$SHA/status"*) echo "$2" ;;
@@ -314,6 +314,44 @@ SHA="$(git -C "$repo" rev-parse HEAD)"
 handler "type:feature" success
 assert_status 5 "refuses merge touching sensitive paths" sh -c "cd '$repo' && '$CLOSE' --merge"
 assert_contains "$(last_output)" "src/auth/login.py" "names the sensitive path"
+
+# The list is the union of the base's and the PR's: a PR that drops an entry
+# from .github/sensitive-paths (and the entry of the list itself) still needs the ok
+# for the path it took out; an entry the PR adds already counts for the new path.
+commit_push() { # commit_push <subject> <file...>
+  local subject="$1"
+  shift
+  git -C "$repo" add "$@"; git -C "$repo" commit --quiet -m "$subject"
+  git -C "$repo" push --quiet origin feat/issue-5-x
+  SHA="$(git -C "$repo" rev-parse HEAD)"
+}
+grep -vxF -e '**/auth/**' -e '.github/sensitive-paths' "$REPO/.github/sensitive-paths" >"$repo/.github/sensitive-paths"
+commit_push "chore: drop entries from the list" .github/sensitive-paths
+handler "type:feature" success
+assert_status 5 "refuses merge of a PR that drops the entry of a path it touches" sh -c "cd '$repo' && '$CLOSE' --merge"
+assert_contains "$(last_output)" "src/auth/login.py" "the base list still covers the dropped path"
+assert_contains "$(last_output)" ".github/sensitive-paths" "the base list still covers the list itself"
+printf 'newzone/**\n' >>"$repo/.github/sensitive-paths"
+mkdir -p "$repo/newzone"; echo z >"$repo/newzone/a.txt"
+commit_push "chore: add an entry to the list" .github/sensitive-paths newzone/a.txt
+handler "type:feature" success
+assert_status 5 "refuses merge touching a path the PR itself made sensitive" sh -c "cd '$repo' && '$CLOSE' --merge"
+assert_contains "$(last_output)" "newzone/a.txt" "the PR list counts for the new path"
+# Fails closed: a base without a readable list blocks the merge, whatever the PR lists.
+git -C "$repo" switch --quiet -c nolist main
+git -C "$repo" rm --quiet .github/sensitive-paths; git -C "$repo" commit --quiet -m "chore: no list"
+git -C "$repo" push --quiet origin nolist
+git -C "$repo" switch --quiet feat/issue-5-x
+handler "type:feature" success
+assert_status 1 "refuses merge when the base has no readable list" env FAKE_BASE=nolist sh -c "cd '$repo' && '$CLOSE' --merge --owner-ok"
+assert_contains "$(last_output)" "cannot read .github/sensitive-paths of origin/nolist" "says the base list is unreadable"
+assert_not_contains "$(gh_calls)" "pr merge" "never merges without the base list"
+cp "$REPO/.github/sensitive-paths" "$repo/.github/sensitive-paths"
+git -C "$repo" rm --quiet newzone/a.txt
+commit_push "chore: restore the list" .github/sensitive-paths
+handler "type:feature" success
+# The repo's own list covers the docs checker the CI reads from the base.
+assert_eq "scripts/check-docs.sh" "$(echo scripts/check-docs.sh | python3 "$SCRIPTS/lib/sensitive_paths.py" "$REPO/.github/sensitive-paths")" "check-docs.sh is a sensitive path"
 
 # Publish the review: comment + status on the HEAD SHA + review_round in the trace,
 # only with a reviewer round of this session after the last push of the branch.
