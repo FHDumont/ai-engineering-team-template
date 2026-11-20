@@ -106,7 +106,16 @@ assert_contains "$need" "na barra lateral, dentro do agrupamento da sessão prin
 assert_contains "$out" "Replace TITULO with the exact title of this session" "says to put the exact title of the session"
 assert_contains "$out" "A child session not started yet (its card was not clicked)" "the heartbeat covers the card not clicked yet"
 assert_contains "$out" 'only repeat the same "Você precisa"' "the heartbeat only repeats the need while the card waits"
-assert_contains "$out" "every 8 minutes" "gives the interval of the heartbeat"
+assert_contains "$out" "every 4 minutes" "gives the interval of the heartbeat"
+assert_contains "$out" 'cron "*/4 * * * *"' "gives the cron of the heartbeat"
+# An end-step action denied by the app: the heartbeat text sends it to a choice
+# card and the session runs the action itself; the owner never runs a script.
+hb_text="$(grep -F -- "Manager heartbeat of phase #7:" <<<"$out" || true)"
+assert_contains "$hb_text" "denied by the app (scripts/deploy.sh, archiving a session)" "the heartbeat covers an end-step action denied by the app"
+assert_contains "$hb_text" 'choice card (AskUserQuestion) that starts with "Fase #n — título"' "the heartbeat sends a denied action to a choice card"
+assert_contains "$hb_text" '"Autorizar o deploy"' "the heartbeat names the option that authorizes"
+assert_contains "$hb_text" "run the action again yourself" "the heartbeat makes the session run the action after the ok"
+assert_contains "$hb_text" "never ask the owner to run a script or to archive in the sidebar" "the heartbeat never sends the owner to run a script"
 assert_contains "$out" "CronCreate" "names the Claude Code tool of the heartbeat"
 assert_contains "$out" "Você precisa" "says what to do when the tool does not exist"
 assert_contains "$out" "Manager heartbeat of phase #7:" "prints the heartbeat text with the phase"

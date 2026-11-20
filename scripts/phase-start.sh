@@ -11,7 +11,7 @@
 #: opens the phase never commits in the worktree), removes the loose copy of the
 #: spec from the main checkout and prints the exact start_session arguments of
 #: each phase, followed by the manager steps: create the manager heartbeat (a
-#: recurring agent task, every 8 minutes), open every session in this turn and
+#: recurring agent task, every 4 minutes), open every session in this turn and
 #: delete the heartbeat in the single end step. --no-check skips check-env.sh; --dry-run
 #: only checks and lists.
 set -euo pipefail
@@ -105,9 +105,9 @@ need="clique $cards na sessão \"TITULO\", na barra lateral, dentro do agrupamen
 cat <<STEPS
 
 Manager steps. Do all four, in this order:
-1. NOW, before any start_session, create the manager heartbeat: one recurring agent task, every 8 minutes, with the text below (in Claude Code: the CronCreate tool, cron "*/8 * * * *", recurring). Create it once, not once per phase. Do not wait for a session to open. The tool does not exist: write in "Você precisa" (scripts/status.sh --need) that the owner must write here when a phase ends.
+1. NOW, before any start_session, create the manager heartbeat: one recurring agent task, every 4 minutes, with the text below (in Claude Code: the CronCreate tool, cron "*/4 * * * *", recurring). Create it once, not once per phase. Do not wait for a session to open. The tool does not exist: write in "Você precisa" (scripts/status.sh --need) that the owner must write here when a phase ends.
    Heartbeat text, copy it as is:
-   Manager heartbeat of $label: read the state of the linked sessions and of the pull request of each open phase (scripts/status.sh --state trabalhando). A child session not started yet (its card was not clicked): only repeat the same "Você precisa" (the card, the exact title of this session and where it is in the sidebar) and end the turn. Otherwise do the next step: answer a child session that asked something, or, when every pull request is MERGED, run the integrate skill. Nothing changed: end the turn.
+   Manager heartbeat of $label: read the state of the linked sessions and of the pull request of each open phase (scripts/status.sh --state trabalhando). A child session not started yet (its card was not clicked): only repeat the same "Você precisa" (the card, the exact title of this session and where it is in the sidebar) and end the turn. Otherwise do the next step: answer a child session that asked something, or, when every pull request is MERGED, run the integrate skill. An action of the end step denied by the app (scripts/deploy.sh, archiving a session): open a choice card (AskUserQuestion) that starts with "Fase #n — título" and offers to authorize it (for example "Autorizar o deploy"), and with the ok of the owner run the action again yourself; never ask the owner to run a script or to archive in the sidebar. Nothing changed: end the turn.
 2. Open every session above in this same turn. start_session refused (the turn was not started by an owner message): call it again with initiation: own_initiative and the same fields. It becomes a card that the owner clicks.
 3. Only now, and only when a session became a card, stop with the command below. Replace TITULO with the exact title of this session, as the sidebar shows it. Change nothing else:
    scripts/status.sh --state esperando --need '$need'

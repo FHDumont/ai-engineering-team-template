@@ -109,7 +109,8 @@ assert_contains "$plan" "$where" "plan has the sentence that says where the sess
 assert_contains "$plan" "título exato" "plan asks for the exact title of the session"
 assert_contains "$plan" "cartão ainda não clicado" "plan covers the heartbeat with a card not clicked yet"
 assert_contains "$plan" "lê sessões ligadas e PRs e faz o próximo passo" "plan says what the heartbeat checks"
-assert_contains "$plan" "8 minutos" "plan gives the interval of the heartbeat"
+assert_contains "$plan" "4 minutos" "plan gives the interval of the heartbeat"
+assert_contains "$integrate" "4 minutos" "integrate gives the interval of the heartbeat"
 assert_contains "$integrate" "Apague o batimento" "integrate deletes the heartbeat in the end step"
 assert_contains "$integrate" "Nenhum script confere" "integrate says no lock checks the heartbeat"
 hb="$(printf '%s\n' "$design" | grep -F '**batimento**')"
@@ -121,6 +122,24 @@ assert_eq 1 "$(grep -c -F "$where" <<<"$design")" "the design has the sentence t
 assert_eq 1 "$(($(grep -n -F '**batimento**' <<<"$design" | cut -d: -f1) < $(grep -n -F 'abre todas as filhas do grupo' <<<"$design" | cut -d: -f1)))" "the design puts the heartbeat before the child sessions"
 assert_contains "$hb" "o aviso de fim da filha nem sempre chega" "the design gives the reason of the heartbeat"
 assert_eq "" "$(printf '%s\n' "$design" | grep -n 'Cron' || true)" "the design names no tool of one app for the heartbeat"
+assert_contains "$hb" "a cada 4 minutos" "the design gives the interval of the heartbeat"
+# The interval is 4 minutes everywhere: no text, script or test keeps the old one.
+# The old number is built here so that this file does not match its own search.
+was=8
+old_interval="$(cd "$REPO" && git grep -n -I -E "$was min|$was minutes|[*]/$was|every $was" -- . || true)"
+assert_eq "" "$old_interval" "no file keeps the old interval of the heartbeat"
+# End-step action denied by the app: one path, a choice card that authorizes and
+# the session itself runs the action again; the owner never runs a script.
+denied="$(printf '%s\n' "$integrate" | awk '/negada pelo app\. Caminho único/{p=1} /^[0-9]+\. /&&!/negada pelo app/{p=0} p')"
+assert_contains "$denied" "\`scripts/deploy.sh\`" "integrate covers the deploy denied by the app"
+assert_contains "$denied" "\`archive_session\`" "integrate covers the archiving denied by the app"
+assert_contains "$denied" "quadro de escolha (\`AskUserQuestion\`) que começa por \`Fase #n — título\`" "integrate sends a denied action to a choice card"
+assert_contains "$denied" '"Autorizar o deploy"' "integrate names the option that authorizes the deploy"
+assert_contains "$denied" "esta sessão roda a mesma ação de novo" "integrate makes the session run the action after the ok"
+assert_contains "$denied" '--state esperando --need "responder ao quadro' "integrate stops asking for the answer to the card"
+assert_contains "$denied" "Nunca peça ao dono que rode script nem que arquive pela barra lateral" "integrate never sends the owner to run a script"
+assert_contains "$integrate" "Negado pelo app: passo 4" "the deploy and the archiving point to the denied path"
+assert_not_contains "$integrate" "arquivar a sessão\` e pare" "a session the app does not archive has no second card"
 # Model and effort: one path. The pairs come from the weights file, the design no longer
 # states a ceiling of start_session as a fact, and the texts send a divergence to check-env.sh.
 execute="$(cat "$REPO/.claude/skills/execute/SKILL.md")"
