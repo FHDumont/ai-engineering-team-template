@@ -39,6 +39,10 @@
 # the same parser found, one finding per line:
 #   write<TAB><dir>   a git command outside the read-only list would run in <dir>
 #                     (cwd, cd/pushd, -C, --git-dir, --work-tree, GIT_DIR, GIT_WORK_TREE)
+#   push<TAB><dir><TAB><branch>  a git push run in <dir> would update <branch> on the
+#                     remote (refspec destination, or the current branch when there is
+#                     none); <branch> is * when it cannot be named (--all, --mirror,
+#                     --branches, a pattern, an unexpanded variable)
 #   forge<TAB><name>  the command sets or unsets a variable the phase locks read
 #   unreadable        a part that cites git/gh could not be read safely
 set -euo pipefail
@@ -331,6 +335,40 @@ def resolve(base, path):
     return path if os.path.isabs(path) else os.path.join(base, path)
 
 
+PUSH_VALUED = {"-o", "--push-option", "--repo", "--receive-pack", "--exec", "--recurse-submodules"}
+
+
+def push_destinations(rest, current):
+    """Branches a `git push` would update on the remote: the destination of each
+    refspec, or the current branch when there is none. "*" stands for every branch."""
+    dests, positional, j = [], [], 0
+    while j < len(rest):
+        a = rest[j]
+        if a in PUSH_VALUED:
+            j += 2; continue
+        if abbrev(a, "--all", 4) or abbrev(a, "--mirror", 4) or abbrev(a, "--branches", 4):
+            dests.append("*")
+        elif not a.startswith("-"):
+            positional.append(a)
+        j += 1
+    refspecs = positional[1:]  # the first one is the remote
+    if not refspecs and not dests:
+        refspecs = ["HEAD"]
+    for spec in refspecs:
+        dest = spec.lstrip("+").rsplit(":", 1)[-1]
+        if dest in ("HEAD", "@"):
+            dest = current
+        if "*" in dest or "$" in dest:
+            dest = "*"
+        elif dest.startswith("refs/heads/"):
+            dest = dest[len("refs/heads/"):]
+        elif dest.startswith("refs/"):
+            continue  # a tag or another namespace: not a branch
+        if dest:
+            dests.append(dest)
+    return dests
+
+
 def check_git(args, state, env):
     if any(k.startswith("GIT_CONFIG_KEY") and v.lower() == "core.hookspath" for k, v in env.items()):
         block("never disable or redirect the git hooks")
@@ -449,6 +487,10 @@ def check_git(args, state, env):
         return
 
     if sub == "push":
+        if COLLECT is not None:
+            current = state.switched or branch_of(target)
+            for dest in push_destinations(rest, current):
+                COLLECT.append("push\t%s\t%s" % (os.path.normpath(target), dest))
         for a in rest:
             if abbrev(a, "--force", 5) or abbrev(a, "--force-with-lease", 5) \
                     or abbrev(a, "--force-if-includes", 5) or abbrev(a, "--mirror", 4) \

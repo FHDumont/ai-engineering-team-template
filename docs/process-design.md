@@ -143,7 +143,7 @@ Diagrama das raias: [`docs/diagrams/process-flow.html`](diagrams/process-flow.ht
    - `end:auto-close`: a filha segue direto para o fecho.
    - `end:lab-test`: a filha para antes do fecho com `status.sh --state esperando --need "testar no lab …"`. O dono testa, itera pela sessão principal e diz "fechar fase". "Fechar fase" vale dito em qualquer sessão; quem fecha é a sessão da fase.
 9. **Fecho.** A filha fecha pelo `scripts/close-phase.sh` (§6.1), com a revisão independente (§10.2) e o merge pelo portão (§10).
-10. **Fim do grupo.** Depois do último merge do grupo, solo e paralelo, a sessão principal faz o passo único de fim, uma vez. Os passos e a ordem estão na skill `integrate`: `scripts/gen-docs.sh`, `scripts/deploy.sh`, arquivamento das sessões filhas, `scripts/end-check.sh`.
+10. **Fim do grupo.** Depois do último merge do grupo, solo e paralelo, a sessão principal faz o passo único de fim, uma vez. Os passos e a ordem estão na skill `integrate`: `scripts/gen-docs.sh`, `scripts/deploy.sh`, arquivamento das sessões filhas, `scripts/end-check.sh`. A spec do grupo sai da `main` aqui: o PR do `gen-docs.sh` remove cada spec de `docs/specs/` cujas issues citadas estão todas fechadas, a que o fecho das fases (§6.1) deixou.
 
 Espera acima de ~2 minutos: diga o que espera e onde (o run, o PR).
 
@@ -249,7 +249,7 @@ Todo script tem `--help`, um teste em `scripts/tests/` e saída curta em inglês
 | `scripts/close-phase.sh` | Fecha a fase (§6.1) | sessão filha |
 | `scripts/redo-phase.sh` | Refaz a fase cujo PR conflita com a `main` (§6.1, passo 3) | `close-phase.sh --check` |
 | `scripts/integrate-parallel.sh` | Só espera todas as fases do registro entrarem e faz um build; não faz deploy | sessão principal |
-| `scripts/gen-docs.sh` | Geração única de `CHANGELOG.md` e `ROADMAP.md`: PR só com os dois arquivos, `review/independent` publicado pelo script, merge por rebase lido de volta | sessão principal, no passo único de fim |
+| `scripts/gen-docs.sh` | Geração única de `CHANGELOG.md` e `ROADMAP.md` e remoção das specs cujas issues citadas estão todas fechadas: PR só com os dois arquivos e essas remoções, `review/independent` publicado pelo script, merge por rebase lido de volta. Outro arquivo, spec adicionada ou modificada, spec removida com issue aberta: sai 1 sem status e sem merge | sessão principal, no passo único de fim |
 | `scripts/gen-changelog.py` | `CHANGELOG.md` a partir dos PRs com merge, agrupado por `type:*` | `gen-docs.sh` |
 | `scripts/gen-roadmap.py` | `ROADMAP.md` das issues abertas por área e prioridade | `gen-docs.sh`, `end-check.sh` |
 | `scripts/deploy.sh` | O único deploy (§9.4) | sessão principal, no passo único de fim |
@@ -274,7 +274,7 @@ Roda só na sessão filha; na sessão que abriu a fase, `--prepare`, `--publish-
 
 1. **`--prepare --title … --body-file …`**
    - roda `validate.sh` e `check-docs.sh`;
-   - apaga, num commit da fase, cada spec que cita a issue da fase e não cita outra issue aberta;
+   - apaga, num commit da fase, cada spec que cita a issue da fase e não cita outra issue aberta; a spec que sobra na `main` depois do último merge sai no passo único de fim, pelo `gen-docs.sh`;
    - faz um `git push` (um run de CI; grava `phase_push` no trace);
    - abre o PR pelo `.github/pull_request_template.md`; PR já aberto é editado só se o título ou o corpo mudou;
    - copia as labels da issue para o PR e escreve a tabela de pares (§3, item 7);
@@ -313,7 +313,7 @@ Os hooks do agente saem 2 quando barram; os do git saem 1. Todo hook tem teste. 
 |---|---|---|
 | `.claude/hooks/block-dangerous-git.sh` | PreToolUse, Bash | A lista fechada abaixo |
 | `.claude/hooks/block-attribution.sh` | PreToolUse, Bash | `git commit`, `gh pr create\|edit\|comment\|review\|close` e `gh issue create\|comment\|edit\|close` cujo texto tem assinatura de IA abrindo uma linha |
-| `.claude/hooks/block-phase-commit.sh` | PreToolUse, Bash | Todo comando git fora da lista de leitura (`status`, `log`, `diff`, `show`, `fetch`…) que rodaria em `.worktrees/issue-<n>`, quando a sessão é a que gravou o `phase_opened` da issue. Para qualquer sessão: comando que define ou apaga `CLAUDE_CODE_SESSION_ID` ou `PROCESS_EVENTS_FILE`, e escrita à mão em `.process/events.jsonl`. Falha fechado: sem `session_id`, sem trace ou com linha do trace que não é JSON, a escrita no worktree é barrada |
+| `.claude/hooks/block-phase-commit.sh` | PreToolUse, Bash | Todo comando git fora da lista de leitura (`status`, `log`, `diff`, `show`, `fetch`…) que rodaria em `.worktrees/issue-<n>`, quando a sessão é a que gravou o `phase_opened` da issue; e, para essa mesma sessão, `git push` da branch da fase a partir de qualquer diretório, o checkout principal incluído (destino da refspec, branch atual quando não há refspec, `--all`, `--mirror`, `--branches` ou padrão). Para qualquer sessão: comando que define ou apaga `CLAUDE_CODE_SESSION_ID` ou `PROCESS_EVENTS_FILE`, e escrita à mão em `.process/events.jsonl`. Falha fechado: sem `session_id`, sem trace ou com linha do trace que não é JSON, a escrita no worktree e o push da branch de fase são barrados |
 | `.claude/hooks/block-phase-edit.sh` | PreToolUse, Edit, Write, NotebookEdit | A edição de arquivo em `.worktrees/issue-<n>` pela sessão que gravou o `phase_opened` da issue; falha fechado igual. Para qualquer sessão: `.process/events.jsonl` |
 | `.claude/hooks/block-agent-pair.sh` | PreToolUse, Agent | A chamada de `Agent` sem `model` ou sem `effort`; a do `close-reviewer` e a do `triage` com par diferente do peso em `scripts/lib/weights.tsv` |
 | `.claude/hooks/block-card-title.sh` | PreToolUse, AskUserQuestion | Com fase aberta, o quadro cuja pergunta não começa por `Fase #<n> — <título>`; na sessão da fase, o número é o da fase dela |
@@ -374,7 +374,7 @@ A tabela é a árvore de arquivos do método. Caminho sem `<…>` precisa existi
 | `docs/BOTS.md` | caminho B, ≤450 palavras |
 | `docs/process-design.md` | este documento |
 | `docs/diagrams/process-flow.html` | diagrama das raias |
-| `docs/specs/<AAAA-MM-DD>-<grupo>.md` | spec em curso; sai no fecho da última fase aberta que ela cita |
+| `docs/specs/<AAAA-MM-DD>-<grupo>.md` | spec em curso; sai no fecho da última fase aberta que ela cita e, se sobrar, no PR do `gen-docs.sh` |
 | `docs/adr/INDEX.md` | uma linha por ADR: número, título, vigente ou substituída |
 | `docs/adr/TEMPLATE.md` | modelo de ADR |
 | `docs/adr/ADR-<NNN>-<título>.md` | ADRs vigentes |

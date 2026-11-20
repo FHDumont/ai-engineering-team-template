@@ -10,9 +10,15 @@
 # cd/pushd, -C, --git-dir, --work-tree, GIT_DIR, GIT_WORK_TREE), through wrappers, blocks,
 # nested shells, eval and line continuations.
 #
+# It also stops that session from pushing the branch of the phase from any directory, the
+# main checkout included: a git push whose refspec destination (or current branch, when it
+# names none) is a branch of the phase (issue-<n> in its name), and --all, --mirror,
+# --branches or a pattern while such a branch exists. Only the child session pushes it.
+#
 # Blocks with exit 2. Fails closed: a git write in a phase worktree is blocked when the hook
 # cannot tell who opened the phase (no session_id, no trace, a trace line that is not JSON,
-# no phase_opened of the issue, not a git checkout) or cannot read the command.
+# no phase_opened of the issue, not a git checkout) or cannot read the command; the same
+# holds for a push of a phase branch.
 # For every session it also blocks a command that sets or unsets CLAUDE_CODE_SESSION_ID or
 # PROCESS_EVENTS_FILE, or that writes .process/events.jsonl: the locks read them.
 set -euo pipefail
@@ -53,6 +59,29 @@ while IFS= read -r dir; do
   esac
 done <<EOF
 $(printf '%s\n' "$findings" | sed -n 's/^write	//p')
+EOF
+
+# A push of the branch of a phase, from any directory (the main checkout included).
+while IFS='	' read -r dir dest; do
+  [ -n "$dir" ] || continue
+  if [ "$dest" = "*" ]; then
+    branches="$(git -C "$dir" for-each-ref --format='%(refname:short)' refs/heads 2>/dev/null || true)"
+  else
+    branches="$dest"
+  fi
+  while IFS= read -r branch; do
+    issue="$(printf '%s\n' "$branch" | sed -n -E 's/.*issue-([0-9]+).*/\1/p')"
+    [ -n "$issue" ] || continue
+    case "$(phase_opener_state "$issue" "$sid" "$dir")" in
+      other) ;;
+      opener) deny "this session opened phase #$issue and must not push its branch ($branch) from any directory; the child session pushes it (process-design §4.3)" ;;
+      *) deny "cannot tell which session opened phase #$issue (session id, .process/events.jsonl of the main checkout and its phase_opened event are required): no push of its branch ($branch)" ;;
+    esac
+  done <<EOF
+$branches
+EOF
+done <<EOF
+$(printf '%s\n' "$findings" | sed -n 's/^push	//p')
 EOF
 [ "$unreadable" = 0 ] || deny "could not parse this git/gh command safely; simplify the quoting"
 exit 0
