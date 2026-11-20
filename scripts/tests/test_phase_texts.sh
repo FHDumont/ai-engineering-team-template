@@ -1,0 +1,125 @@
+#!/usr/bin/env bash
+# The texts describe one path for the phase: child session only, how it is opened,
+# what happens when start_session is refused, and who closes it.
+# shellcheck source=scripts/tests/lib.sh
+source "$(dirname "$0")/lib.sh"
+
+plan="$(cat "$REPO/.claude/skills/plan/SKILL.md")"
+close="$(cat "$REPO/.claude/skills/close-phase/SKILL.md")"
+design="$(cat "$REPO/docs/process-design.md")"
+
+# The announced subagent is gone from every text and script.
+for f in AGENTS.md docs/process-design.md docs/STATE.md scripts/close-phase.sh \
+  .claude/skills/plan/SKILL.md .claude/skills/execute/SKILL.md .claude/skills/close-phase/SKILL.md; do
+  assert_not_contains "$(cat "$REPO/$f")" "subagent-phases" "$f does not cite .process/subagent-phases"
+  assert_not_contains "$(cat "$REPO/$f")" "anunciad" "$f has no announced subagent"
+done
+
+# plan: exact start_session fields, every child in the turn of "executar", one path when refused.
+for field in 'initiation: "user_asked"' 'context: "fresh"' 'use_worktree: false' '`background`' '`title`'; do
+  assert_contains "$plan" "$field" "plan names the start_session field $field"
+done
+assert_contains "$plan" "mesmo turno" "plan opens every child session in the turn of the request"
+assert_contains "$plan" 'initiation: "own_initiative"' "plan says what to do when start_session is refused"
+assert_contains "$plan" "--state esperando" "plan stops waiting for the owner after a refusal"
+assert_not_contains "$plan" "Tentar de novo" "plan has no second path after a refusal"
+assert_contains "$design" 'initiation: "own_initiative"' "the design has the same path for a refused start_session"
+assert_not_contains "$design" "Tentar de novo" "the design has no second path after a refusal"
+
+# close-phase: the session that opened the phase forwards and stops; the owner's ok is asked in the phase session.
+assert_contains "$close" "repasse e pare" "close-phase has the forward-and-stop step"
+assert_contains "$close" "saída 9" "close-phase names the exit code of the opening session"
+assert_contains "$close" "não atravessa sessões" "close-phase says the owner's ok does not cross sessions"
+
+# Conflict: one path, redo-phase.sh, in every text; nobody is asked and no rebase is offered.
+integration="$(cat "$REPO/.claude/skills/integrate/integration.md")"
+for name in .claude/skills/close-phase/SKILL.md .claude/skills/integrate/SKILL.md .claude/skills/integrate/integration.md docs/process-design.md; do
+  text="$(cat "$REPO/$name")"
+  assert_contains "$text" "redo-phase.sh" "$name names redo-phase.sh for a conflicting PR"
+  assert_contains "$text" "gen-docs.sh" "$name names gen-docs.sh for the generated files"
+  assert_not_contains "$text" "rebase sobre" "$name offers no rebase onto main"
+  assert_not_contains "$text" "com cherry-pick** e PR novo" "$name has no choice of ways out"
+  assert_not_contains "$text" "conflito de comportamento" "$name sends no conflict to a choice card"
+done
+assert_not_contains "$close" "Quadro ao dono: **rebase" "close-phase does not ask the owner about a conflict"
+assert_not_contains "$close" "regera" "close-phase does not regenerate files in the phase"
+assert_not_contains "$design" "Regera \`CHANGELOG.md\`" "the design does not regenerate files in the phase"
+assert_contains "$close" "posterior ao último push" "close-phase says a review needs a round after the last push"
+assert_contains "$integration" "só espera" "integration says integrate-parallel.sh only waits"
+# Deploy: one path, scripts/deploy.sh by the main session; no text sends the phase or
+# close-phase.sh --merge to dispatch it.
+for name in .claude/skills/close-phase/SKILL.md .claude/skills/integrate/SKILL.md .claude/skills/integrate/integration.md \
+  docs/process-design.md docs/STATE.md app/README.md; do
+  text="$(cat "$REPO/$name")"
+  assert_contains "$text" "deploy.sh" "$name names deploy.sh for the deploy"
+  assert_not_contains "$text" "dispara na fase solo" "$name has no deploy by the solo phase"
+  assert_not_contains "$text" "dispara uma vez o" "$name has no dispatch by close-phase.sh --merge"
+  assert_not_contains "$text" "dispara o deploy único" "$name has no dispatch outside deploy.sh"
+  assert_not_contains "$text" 'ou `close-phase.sh --merge`' "$name has no second dispatcher"
+done
+assert_contains "$close" "A fase não faz deploy" "close-phase says the phase never deploys"
+assert_contains "$design" 'tem `phase_session` no trace' "the design lists the phase-session refusal of deploy.sh"
+
+# End of the phase: one text for who asks, how a card starts and the end step.
+agents="$(cat "$REPO/AGENTS.md")"
+execute="$(cat "$REPO/.claude/skills/execute/SKILL.md")"
+integrate="$(cat "$REPO/.claude/skills/integrate/SKILL.md")"
+assert_contains "$agents" 'começa por `Fase #n — título`' "AGENTS says how every card starts"
+assert_contains "$agents" "Só a principal pergunta" "AGENTS says only the main session asks"
+assert_contains "$agents" "não atravessa sessões" "AGENTS says the owner's ok does not cross sessions"
+assert_not_contains "$agents" "Pergunta só a sessão que precisa da resposta" "AGENTS has no second rule for who asks"
+assert_contains "$execute" "mande à gerenciadora" "execute sends a doubt to the manager"
+assert_not_contains "$execute" "Pergunta ao dono: só quem precisa" "execute does not ask the owner for information"
+assert_not_contains "$execute" "Grande: quadro de escolha ao dono" "execute sends a large finding to the manager"
+assert_contains "$execute" 'Fase #<n> — <título>:' "execute says how its only card starts"
+assert_not_contains "$close" "faça um quadro de escolha ao dono" "close-phase sends the third round to the manager"
+assert_contains "$close" 'esta sessão, que roda o `--merge`, pede o ok nela mesma' "the session that runs --merge asks for the merge ok"
+assert_contains "$close" 'Fase #<n> — <título>:' "close-phase says how the merge card starts"
+assert_contains "$close" "--abort --discard" "close-phase describes the safe abort"
+assert_contains "$close" "end-check.sh --issue" "close-phase says pronto runs end-check.sh"
+assert_contains "$design" "block-card-title.sh" "the design lists the card hook"
+assert_contains "$design" "end-check.sh" "the design lists end-check.sh"
+# The end step is one text, in the integrate skill, the same for a solo and a parallel group;
+# the other texts point to it.
+assert_eq "scripts/gen-docs.sh scripts/deploy.sh archive_session scripts/end-check.sh" \
+  "$(printf '%s\n' "$integrate" | grep -oE 'scripts/gen-docs\.sh|scripts/deploy\.sh|archive_session|scripts/end-check\.sh' | awk '!seen[$0]++' | paste -sd' ' -)" \
+  "integrate has the end step in order: gen-docs.sh, deploy.sh, archiving, end-check.sh"
+assert_contains "$integrate" "solo ou paralelo" "the end step is the same for a solo and a parallel group"
+assert_contains "$integrate" "tente de novo uma vez" "the main session retries the archiving by itself"
+assert_contains "$integrate" "sessão fixada ou em uso" "a pinned or busy session becomes a card"
+assert_contains "$integrate" '--state esperando --need "arquivar a sessão' "the session left open shows in Você precisa"
+for name in AGENTS.md .claude/skills/plan/SKILL.md .claude/skills/close-phase/SKILL.md docs/process-design.md docs/STATE.md; do
+  assert_contains "$(cat "$REPO/$name")" 'skill `integrate`' "$name points to the end step of the integrate skill"
+done
+for name in .claude/skills/close-phase/SKILL.md .claude/skills/integrate/SKILL.md .claude/skills/integrate/integration.md docs/process-design.md; do
+  text="$(cat "$REPO/$name")"
+  assert_not_contains "$text" "só após duas recusas" "$name has no archiving by the owner after two refusals"
+  assert_not_contains "$text" "o script chamou" "$name has no deploy by integrate-parallel.sh"
+  assert_not_contains "$text" '`integrate-parallel.sh` o chama' "$name has no deploy called by integrate-parallel.sh"
+  assert_not_contains "$text" "chama o \`scripts/deploy.sh\`" "$name has no script that calls deploy.sh"
+  assert_not_contains "$text" "sai do registro à mão" "$name edits no registry by hand"
+done
+# Model and effort: one path. The pairs come from the weights file, the design no longer
+# states a ceiling of start_session as a fact, and the texts send a divergence to check-env.sh.
+execute="$(cat "$REPO/.claude/skills/execute/SKILL.md")"
+sec3="$(printf '%s\n' "$design" | awk '/^## 3\. /{p=1; print; next} /^## /{p=0} p')"
+assert_contains "$sec3" "scripts/lib/weights.tsv" "section 3 names the weights file"
+assert_contains "$sec3" "o app não garante" "section 3 says the app does not guarantee the pair"
+assert_contains "$sec3" "phase_pair_mismatch" "section 3 says what a divergence records"
+assert_contains "$sec3" "trace-view.py --pairs" "section 3 says the script writes the PR table"
+for name in docs/process-design.md docs/STATE.md AGENTS.md .claude/skills/plan/SKILL.md .claude/skills/execute/SKILL.md \
+  .claude/skills/close-phase/SKILL.md .claude/skills/triage/SKILL.md .github/pull_request_template.md; do
+  text="$(cat "$REPO/$name")"
+  assert_eq "" "$(printf '%s\n' "$text" | grep -nwiE 'teto|opus|sonnet|haiku' || true)" "$name states no ceiling and names no model"
+  assert_not_contains "$text" "108962" "$name cites no documented limit of start_session"
+  assert_not_contains "$text" "forte+" "$name has no weight outside the file"
+done
+assert_not_contains "$plan" "suba o par (quadro) ou abra" "plan has one path for a spec pair above the session's"
+assert_not_contains "$plan" "get_session" "plan does not read the pair back by hand"
+assert_contains "$plan" "check-env.sh" "plan leaves the check of the real pair to check-env.sh"
+assert_contains "$execute" "nenhuma etapa começa" "execute stops before the first step on a divergence"
+assert_contains "$execute" "par da principal" "execute has the one path for a pair above the main session's"
+assert_contains "$execute" "close-phase.sh --prepare" "execute leaves the PR table to the script"
+assert_not_contains "$execute" "nunca da memória" "execute fills no PR table by hand"
+assert_contains "$close" "o \`--prepare\` escreve nela a tabela" "close-phase leaves the pair section to the script"
+finish

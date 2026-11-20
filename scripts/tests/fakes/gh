@@ -1,0 +1,18 @@
+#!/usr/bin/env bash
+# Fake gh of the tests: records the call and delegates to the handler of the test.
+# The handler is a piece of Bash loaded here, with "$@" = the gh arguments.
+#
+# It knows how to fail: FAKE_GH_FAIL is an extended regex matched against the
+# whole call ("$*"). A call that matches prints FAKE_GH_FAIL_MSG (default
+# "gh: forced failure") on stderr and exits FAKE_GH_FAIL_STATUS (default 1)
+# without running the handler. The handler may also `exit <n>` by itself.
+printf '%s\n' "$*" >>"${FAKE_GH_LOG:?FAKE_GH_LOG not set}"
+if [ -n "${FAKE_GH_FAIL:-}" ] && printf '%s' "$*" | grep -qE -- "$FAKE_GH_FAIL"; then
+  echo "${FAKE_GH_FAIL_MSG:-gh: forced failure}" >&2
+  exit "${FAKE_GH_FAIL_STATUS:-1}"
+fi
+if [ -n "${FAKE_GH_HANDLER:-}" ] && [ -f "$FAKE_GH_HANDLER" ]; then
+  # shellcheck disable=SC1090
+  source "$FAKE_GH_HANDLER"
+fi
+exit 0

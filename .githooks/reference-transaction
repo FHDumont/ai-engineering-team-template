@@ -1,0 +1,26 @@
+#!/usr/bin/env bash
+# reference-transaction: runs on every ref update, whatever the command (commit,
+# cherry-pick, revert, merge, rebase, am, reset, update-ref, pull). Refuses to move a
+# phase branch, or HEAD of a phase worktree, when the session is the one that opened
+# the phase (phase-guard.sh). Creating and deleting a branch pass: phase-start.sh
+# creates it and the cleanup deletes it.
+set -euo pipefail
+[ "${1:-}" = prepared ] || exit 0
+[ -n "${CLAUDE_CODE_SESSION_ID:-}" ] || exit 0
+# shellcheck source=.githooks/phase-guard.sh
+source "$(dirname "$0")/phase-guard.sh"
+here_issue="$(git rev-parse --show-toplevel 2>/dev/null | sed -n -E 's#.*/\.worktrees/issue-([0-9]+)(-r[0-9]+)?$#\1#p' || true)"
+while read -r _ new ref; do
+  case "$new" in ref:*) continue ;; esac
+  [ -n "${new//0/}" ] || continue
+  case "$ref" in
+    refs/heads/*) issue="$(printf '%s\n' "$ref" | sed -n -E 's/.*issue-([0-9]+).*/\1/p')" ;;
+    HEAD) issue="$here_issue" ;;
+    *) continue ;;
+  esac
+  [ -n "$issue" ] || continue
+  current="$(git rev-parse --quiet --verify "$ref" 2>/dev/null || true)"
+  [ -n "$current" ] && [ "$current" != "$new" ] || continue
+  phase_guard "$issue" reference-transaction || exit 1
+done
+exit 0

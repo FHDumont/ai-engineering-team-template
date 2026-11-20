@@ -1,0 +1,7 @@
+#!/usr/bin/env bash
+# pre-rebase: refuses a rebase by the session that opened the phase (phase-guard.sh).
+set -euo pipefail
+# shellcheck source=.githooks/phase-guard.sh
+source "$(dirname "$0")/phase-guard.sh"
+phase_guard "$(phase_guard_issue)" pre-rebase || exit 1
+exit 0

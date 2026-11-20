@@ -1,0 +1,9 @@
+#!/usr/bin/env bash
+# commit-msg: refuses a commit message with an AI signature (scripts/check-attribution.sh).
+set -euo pipefail
+root="$(git rev-parse --show-toplevel)"
+if ! "$root/scripts/check-attribution.sh" --text-file "$1" >/dev/null; then
+  echo "commit-msg: remove the AI attribution from the commit message" >&2
+  "$root/scripts/check-attribution.sh" --text-file "$1" >&2 || true
+  exit 1
+fi

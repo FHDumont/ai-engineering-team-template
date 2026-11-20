@@ -1,0 +1,35 @@
+#!/usr/bin/env bash
+# Tests for search-history, measure-session and the --help of every script.
+# shellcheck source=scripts/tests/lib.sh
+source "$(dirname "$0")/lib.sh"
+
+# Every script has --help, exits 0 and prints something.
+for s in "$SCRIPTS"/*.sh "$SCRIPTS"/*.py; do
+  out="$("$s" --help 2>&1)" && rc=0 || rc=$?
+  assert_eq 0 "$rc" "$(basename "$s") --help exits 0"
+  [ -n "$out" ] && ok || bad "$(basename "$s") --help prints usage"
+  # --help is part of the code: in English.
+  assert_contains "$(printf '%s' "$out" | tr '[:upper:]' '[:lower:]')" "usage" "$(basename "$s") --help shows usage in English"
+  assert_not_contains "$out" "Uso:" "$(basename "$s") --help has no Portuguese usage"
+done
+
+repo="$(make_repo)"
+mkdir -p "$repo/docs/adr/archive"
+echo "Estado: usamos rebase" >"$repo/docs/STATE.md"
+echo "| [ADR-001](ADR-001-x.md) | Rebase | vigente |" >"$repo/docs/adr/INDEX.md"
+echo "Decidimos usar rebase" >"$repo/docs/adr/archive/ADR-000-old.md"
+git -C "$repo" add docs; git -C "$repo" commit --quiet -m "docs: decide rebase only"
+out="$(REPO_ROOT="$repo" "$SCRIPTS/search-history.sh" rebase --local)"
+assert_contains "$out" "docs/STATE.md:1" "finds in STATE first"
+assert_contains "$out" "archive/ADR-000-old.md" "searches archived ADRs"
+assert_contains "$out" "docs: decide rebase only" "searches git log"
+assert_eq "== state + adr index" "$(echo "$out" | head -1)" "cheapest source first"
+
+cat >"$TMP/session.jsonl" <<'J'
+{"type":"user","message":{"role":"user","content":"executar a issue"}}
+{"type":"assistant","message":{"role":"assistant","content":[{"type":"tool_use","name":"Bash"},{"type":"tool_use","name":"AskUserQuestion"}],"usage":{"input_tokens":100,"output_tokens":20}}}
+{"type":"user","message":{"role":"user","content":[{"type":"tool_result","content":"um dois três"}]}}
+J
+out="$("$SCRIPTS/measure-session.py" "$TMP/session.jsonl" --json)"
+assert_eq '1 2 1 3 100' "$(echo "$out" | jq -r '.[0] | [.user_messages, .tool_calls, .choice_questions, .words_read, .input_tokens] | map(tostring) | join(" ")')" "counts touches, tools, choices, words, tokens"
+finish

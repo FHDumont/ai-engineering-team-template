@@ -1,0 +1,15 @@
+#!/usr/bin/env bash
+# pre-commit: refuses a commit on main in any tool (Claude, Cursor, terminal).
+# Installed by scripts/check-env.sh via core.hooksPath=.githooks.
+set -euo pipefail
+branch="$(git branch --show-current 2>/dev/null || true)"
+case "$branch" in
+  main|master)
+    echo "pre-commit: never commit on $branch; open a phase branch with scripts/phase-start.sh" >&2
+    exit 1 ;;
+esac
+# The session that opened the phase never commits in it (phase-guard.sh).
+# shellcheck source=.githooks/phase-guard.sh
+source "$(dirname "$0")/phase-guard.sh"
+phase_guard "$(phase_guard_issue)" pre-commit || exit 1
+exit 0
