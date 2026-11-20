@@ -10,7 +10,10 @@
 #: branch and the worktree, commits the spec on the branch (the session that
 #: opens the phase never commits in the worktree), removes the loose copy of the
 #: spec from the main checkout and prints the exact start_session arguments of
-#: each phase. --no-check skips check-env.sh; --dry-run only checks and lists.
+#: each phase, followed by the manager steps: open every session in this turn,
+#: create the manager heartbeat (a recurring agent task, every 8 minutes) and
+#: delete it in the single end step. --no-check skips check-env.sh; --dry-run
+#: only checks and lists.
 set -euo pipefail
 HERE="$(cd "$(dirname "$0")" && pwd)"
 # shellcheck source=scripts/lib/common.sh
@@ -86,5 +89,20 @@ for n in "${issues[@]}"; do
   echo "  background: at least 80 characters (goal, group and end mode of the phase)"
   i=$((i + 1))
 done
-echo
-echo "open every session above in this same turn; if start_session is refused (the turn was not started by an owner message), call it again with initiation: own_initiative and the same fields, then stop with scripts/status.sh --state esperando"
+# The manager only acts when something wakes it, and the end notice of a child
+# session does not always arrive: the heartbeat is what wakes it. No lock checks
+# that the heartbeat exists; these lines are the instruction.
+if [ ${#issues[@]} -eq 1 ]; then
+  label="phase #${issues[0]}"
+else
+  label="phases $(printf '#%s ' "${issues[@]}" | sed 's/ $//')"
+fi
+cat <<STEPS
+
+Manager steps. Do all three, in this order:
+1. Open every session above in this same turn. start_session refused (the turn was not started by an owner message): call it again with initiation: own_initiative and the same fields, then stop with scripts/status.sh --state esperando.
+2. Right after the first session opens, create the manager heartbeat: one recurring agent task, every 8 minutes, with the text below (in Claude Code: the CronCreate tool, cron "*/8 * * * *", recurring). Create it once, not once per phase. The tool does not exist: write in "Você precisa" (scripts/status.sh --need) that the owner must write here when a phase ends.
+   Heartbeat text, copy it as is:
+   Manager heartbeat of $label: read the state of the linked sessions and of the pull request of each open phase (scripts/status.sh --state trabalhando), then do the next step: answer a child session that asked something, or, when every pull request is MERGED, run the integrate skill. Nothing changed: end the turn.
+3. Delete the heartbeat in the single end step (integrate skill), before scripts/end-check.sh (in Claude Code: the CronDelete tool).
+STEPS

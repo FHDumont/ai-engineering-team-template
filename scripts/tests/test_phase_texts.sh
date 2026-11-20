@@ -99,6 +99,18 @@ for name in .claude/skills/close-phase/SKILL.md .claude/skills/integrate/SKILL.m
   assert_not_contains "$text" "chama o \`scripts/deploy.sh\`" "$name has no script that calls deploy.sh"
   assert_not_contains "$text" "sai do registro à mão" "$name edits no registry by hand"
 done
+# Manager heartbeat: plan creates it and says what it reads, integrate deletes
+# it in the end step, the design has the rule and the reason and names no app tool.
+assert_contains "$plan" "**Batimento:** aberta a primeira filha" "plan creates the heartbeat after the first child session"
+assert_contains "$plan" "lê sessões ligadas e PRs e faz o próximo passo" "plan says what the heartbeat checks"
+assert_contains "$plan" "8 minutos" "plan gives the interval of the heartbeat"
+assert_contains "$integrate" "Apague o batimento" "integrate deletes the heartbeat in the end step"
+assert_contains "$integrate" "Nenhum script confere" "integrate says no lock checks the heartbeat"
+hb="$(printf '%s\n' "$design" | grep -F '**batimento**')"
+assert_eq 1 "$(printf '%s\n' "$hb" | grep -c .)" "the design states the heartbeat rule in one place"
+assert_contains "$hb" "o apaga no passo único de fim" "the design says when the heartbeat goes away"
+assert_contains "$hb" "o aviso de fim da filha nem sempre chega" "the design gives the reason of the heartbeat"
+assert_eq "" "$(printf '%s\n' "$design" | grep -n 'Cron' || true)" "the design names no tool of one app for the heartbeat"
 # Model and effort: one path. The pairs come from the weights file, the design no longer
 # states a ceiling of start_session as a fact, and the texts send a divergence to check-env.sh.
 execute="$(cat "$REPO/.claude/skills/execute/SKILL.md")"

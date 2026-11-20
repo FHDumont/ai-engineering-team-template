@@ -143,7 +143,7 @@ Diagrama das raias: [`docs/diagrams/process-flow.html`](diagrams/process-flow.ht
    - `end:auto-close`: a filha segue direto para o fecho.
    - `end:lab-test`: a filha para antes do fecho com `status.sh --state esperando --need "testar no lab …"`. O dono testa, itera pela sessão principal e diz "fechar fase". "Fechar fase" vale dito em qualquer sessão; quem fecha é a sessão da fase.
 9. **Fecho.** A filha fecha pelo `scripts/close-phase.sh` (§6.1), com a revisão independente (§10.2) e o merge pelo portão (§10).
-10. **Fim do grupo.** Depois do último merge do grupo, solo e paralelo, a sessão principal faz o passo único de fim, uma vez. Os passos e a ordem estão na skill `integrate`: `scripts/gen-docs.sh`, `scripts/deploy.sh`, arquivamento das sessões filhas, `scripts/end-check.sh`. A spec do grupo sai da `main` aqui: o PR do `gen-docs.sh` remove cada spec de `docs/specs/` cujas issues citadas estão todas fechadas, a que o fecho das fases (§6.1) deixou.
+10. **Fim do grupo.** Depois do último merge do grupo, solo e paralelo, a sessão principal faz o passo único de fim, uma vez. Os passos e a ordem estão na skill `integrate`: `scripts/gen-docs.sh`, `scripts/deploy.sh`, arquivamento das sessões filhas, remoção do batimento (§4.3), `scripts/end-check.sh`. A spec do grupo sai da `main` aqui: o PR do `gen-docs.sh` remove cada spec de `docs/specs/` cujas issues citadas estão todas fechadas, a que o fecho das fases (§6.1) deixou.
 
 Espera acima de ~2 minutos: diga o que espera e onde (o run, o PR).
 
@@ -180,6 +180,7 @@ A sessão que o dono abre é a de planejamento. Depois de abrir as fases ela vir
 2. A fase só abre por `scripts/phase-start.sh <n>`. Ele sai 1, sem criar nada, em três casos: issue fechada; nenhuma spec em `docs/specs` cita `#n`; a spec não tem a linha do par. Com spec, ele grava `phase_opened` no trace, cria branch e worktree (`.worktrees/issue-<n>`), commita a spec na branch e imprime os argumentos do `start_session`.
 3. A gerenciadora abre todas as filhas do grupo no mesmo turno do "executar", um `start_session` por fase, com os campos: `initiation: "user_asked"`, `context: "fresh"`, `use_worktree: false`, `title`, `prompt`, `background`, `model` e `effort` da spec.
 4. O app recusou o `start_session` (turno sem mensagem do dono): a gerenciadora repete a chamada com `initiation: "own_initiative"`, que vira um cartão que o dono abre com um clique, e para em `esperando você`. A fase nunca roda na gerenciadora nem num subagente dela.
+5. Aberta a primeira filha, a gerenciadora cria o **batimento**, uma tarefa recorrente do agente que a cada 8 minutos lê o estado das sessões ligadas e dos PRs das fases abertas e faz o próximo passo, e o apaga no passo único de fim, porque ela só age quando algo a acorda e o aviso de fim da filha nem sempre chega (instrução impressa pelo `phase-start.sh`, sem trava que a confira).
 
 **O que cada sessão faz.**
 
