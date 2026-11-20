@@ -4,12 +4,12 @@
 #: Usage (in the workflow, job `ci` with if: always()):
 #:   NEEDS='${{ toJSON(needs) }}' ci-gate.sh
 #:
-#: `changes` and `policy` must succeed. Code jobs (lint, tests, workflows) are
-#: required according to the `changes` outputs:
-#:   lint and tests <- code (everything that is not a doc); tests <- app;
-#:   workflows <- workflows.
-#: `code` only waives lint and tests when it is exactly "false": a missing
-#: output proves nothing and requires both. A required job must succeed in this
+#: `changes`, `policy` and `tests` must succeed on every PR (the tests read
+#: AGENTS.md, the skills and the design, so a docs-only PR runs them too). The
+#: other jobs are required according to the `changes` outputs:
+#:   lint <- code (everything that is not a doc); workflows <- workflows.
+#: `code` only waives lint when it is exactly "false": a missing output proves
+#: nothing and requires lint. A required job must succeed in this
 #: run (skipped, cancelled or failed fails the gate). CI only runs on code
 #: events (opened, synchronize, reopened, ready_for_review). The workflow reads
 #: this script from the base commit of the PR. Exits 1 on failure.
@@ -33,11 +33,9 @@ check() { # check <job>
 check changes
 check policy
 
-required=""
+required="tests"
 [ "$(output code)" = false ] || required="lint tests"
-[ "$(output app)" = true ] && [ -z "$required" ] && required="tests"
 [ "$(output workflows)" = true ] && required="$required workflows"
-[ -n "$required" ] || echo "ok: no code jobs required (docs only)"
 
 for job in $required; do
   check "$job"

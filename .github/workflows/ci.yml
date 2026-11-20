@@ -6,9 +6,10 @@
 # runner; without it, ubuntu-latest (GitHub-hosted).
 #
 # The verifiers that decide the gate (scripts/ci-gate.sh,
-# scripts/check-attribution.sh, scripts/lib/sensitive_paths.py and
-# .github/sensitive-paths) are read from the base commit of the PR, checked out
-# at base/: a PR cannot weaken the check that judges it.
+# scripts/check-attribution.sh, scripts/check-docs.sh,
+# scripts/lib/sensitive_paths.py and .github/sensitive-paths) are read from the
+# base commit of the PR, checked out at base/: a PR cannot weaken the check
+# that judges it.
 name: "CI"
 run-name: "CI · PR #${{ github.event.pull_request.number }} · ${{ github.event.pull_request.title }}"
 
@@ -52,7 +53,8 @@ jobs:
           has() { echo "$files" | grep -qE "$1" && echo true || echo false; }
           # By exclusion: a doc is a file in docs/ or a .md, except the issue
           # templates (read by the scripts). Everything else is code and runs
-          # lint and tests, whatever its folder.
+          # lint, whatever its folder. The tests job runs on every PR: tests
+          # read AGENTS.md, the skills and the design.
           nondocs="$(echo "$files" | grep -vE '(^docs/|\.md$)' || true)"
           templates="$(echo "$files" | grep -E '^\.github/ISSUE_TEMPLATE/' || true)"
           if [ -z "$nondocs" ] && [ -z "$templates" ]; then code=false; else code=true; fi
@@ -110,8 +112,9 @@ jobs:
           else
             echo "no sensitive paths"
           fi
+      # The checker of the base judges the docs of the PR.
       - name: "Check docs limits"
-        run: scripts/check-docs.sh
+        run: REPO_ROOT="$PWD" base/scripts/check-docs.sh
 
   lint:
     name: "Lint"
@@ -130,7 +133,6 @@ jobs:
   tests:
     name: "Tests"
     needs: changes
-    if: (needs.changes.outputs.code == 'true' || needs.changes.outputs.app == 'true')
     runs-on: ${{ fromJSON(vars.CI_RUNS_ON || '"ubuntu-latest"') }}
     timeout-minutes: 15
     permissions:

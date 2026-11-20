@@ -11,13 +11,16 @@ needs() { # needs <code> <app> <workflows> <lint> <tests> <workflows-result> [po
 }
 gate() { NEEDS="$1" "$GATE"; }
 
-assert_status 0 "docs-only PR passes with jobs skipped" gate "$(needs false false false skipped skipped skipped)"
+# A docs-only PR still runs the tests job: tests read AGENTS.md, the skills and the design.
+assert_status 1 "docs-only PR fails when tests are skipped" gate "$(needs false false false skipped skipped skipped)"
+assert_status 0 "docs-only PR passes with tests run and lint skipped" gate "$(needs false false false skipped success skipped)"
+assert_status 1 "docs-only PR fails when tests fail" gate "$(needs false false false skipped failure skipped)"
 assert_status 0 "code PR passes when lint and tests pass" gate "$(needs true false false success success skipped)"
 assert_status 1 "fails when tests fail" gate "$(needs true false false success failure skipped)"
 assert_status 1 "fails when a required job is skipped" gate "$(needs true false false skipped skipped skipped)"
 assert_status 1 "fails when lint is skipped" gate "$(needs true false false skipped success skipped)"
-assert_status 1 "fails when policy fails" gate "$(needs false false false skipped skipped skipped failure)"
-assert_status 1 "fails when workflows job is cancelled" gate "$(needs false false true skipped skipped cancelled)"
+assert_status 1 "fails when policy fails" gate "$(needs false false false skipped success skipped failure)"
+assert_status 1 "fails when workflows job is cancelled" gate "$(needs false false true skipped success cancelled)"
 # The app output alone (a doc inside app/) requires the tests job, which builds the app.
 assert_status 0 "app PR requires only tests" gate "$(needs false true false skipped success skipped)"
 assert_status 1 "app PR fails when tests are skipped" gate "$(needs false true false skipped skipped skipped)"

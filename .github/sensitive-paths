@@ -27,3 +27,9 @@ Cargo.lock
 # Gate: deploy workflows and the phase close
 .github/workflows/deploy-*.yml
 scripts/close-phase.sh
+# Gate: the CI, the verifiers it reads from the base and this list
+.github/workflows/ci.yml
+scripts/ci-gate.sh
+scripts/check-attribution.sh
+scripts/lib/sensitive_paths.py
+.github/sensitive-paths

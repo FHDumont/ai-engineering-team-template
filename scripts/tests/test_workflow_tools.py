@@ -1,6 +1,7 @@
 """Tests of check-workflows.py, sensitive_paths.py and the steps of ci.yml."""
 
 import importlib.util
+import json
 import os
 import shutil
 import subprocess
@@ -156,6 +157,16 @@ class SensitivePathsTests(unittest.TestCase):
         paths = [".github/workflows/deploy-example.yml", "scripts/close-phase.sh", "scripts/status.sh"]
         self.assertEqual(sp.sensitive(paths, globs), paths[:2])
 
+    def test_gate_verifiers_sensitive(self):
+        # A PR that changes the CI workflow, a verifier of the gate or the list
+        # itself needs the owner's ok.
+        globs = sp.load_globs(os.path.join(ROOT, ".github", "sensitive-paths"))
+        paths = [".github/workflows/ci.yml", "scripts/ci-gate.sh", "scripts/check-attribution.sh",
+                 "scripts/lib/sensitive_paths.py", ".github/sensitive-paths"]
+        self.assertEqual(sp.sensitive(paths, globs), paths)
+        for rel in paths:
+            self.assertTrue(os.path.isfile(os.path.join(ROOT, rel)), rel)
+
     def test_double_star(self):
         r = sp.glob_to_regex("**/auth/**")
         self.assertTrue(r.match("a/b/auth/c/d"))
@@ -227,6 +238,24 @@ class CiStepsTests(unittest.TestCase):
         out = self.detect({"docs/x.md": "x\n", "README.md": "x\n"})
         self.assertEqual((out["code"], out["docs_only"], out["app"]), ("false", "true", "false"))
 
+    def test_docs_only_pr_runs_the_tests(self):
+        # The tests read AGENTS.md, the skills and the design: a PR that only
+        # changes them still runs the tests job, and the gate requires it.
+        out = self.detect({"AGENTS.md": "x\n", ".claude/skills/plan/SKILL.md": "x\n",
+                           "docs/process-design.md": "x\n"})
+        self.assertEqual((out["code"], out["docs_only"]), ("false", "true"))
+        wf = cw.load(os.path.join(ROOT, ".github", "workflows", "ci.yml"))
+        tests = wf["jobs"]["tests"]
+        self.assertNotIn("if", tests, "the tests job must run on every PR")
+        self.assertIn("scripts/validate.sh --tests", [s.get("run") for s in tests["steps"]])
+        self.assertEqual(wf["jobs"]["lint"]["if"], "needs.changes.outputs.code == 'true'")
+        gate = os.path.join(ROOT, "scripts", "ci-gate.sh")
+        for result, status in (("skipped", 1), ("success", 0)):
+            needs = {"changes": {"result": "success", "outputs": out}, "policy": {"result": "success"},
+                     "lint": {"result": "skipped"}, "tests": {"result": result}, "workflows": {"result": "skipped"}}
+            r = subprocess.run([gate], env=dict(os.environ, NEEDS=json.dumps(needs)), text=True, capture_output=True)
+            self.assertEqual(r.returncode, status, r.stdout + r.stderr)
+
     def test_filter_issue_template_is_code(self):
         out = self.detect({".github/ISSUE_TEMPLATE/bug.md": "x\n"})
         self.assertEqual((out["code"], out["docs_only"]), ("true", "false"))
@@ -258,6 +287,22 @@ class CiStepsTests(unittest.TestCase):
         self.assertEqual(r.returncode, 0, r.stderr)
         self.assertIn("scripts/close-phase.sh", r.stdout)
         self.assertIn("labels[]=needs-owner-ok", open(log).read())
+
+    def test_docs_checker_is_read_from_the_base(self):
+        os.makedirs(os.path.join(self.repo, "scripts", "lib"), exist_ok=True)
+        shutil.copy(os.path.join(ROOT, "scripts", "check-docs.sh"), os.path.join(self.repo, "scripts"))
+        shutil.copy(os.path.join(ROOT, "scripts", "lib", "common.sh"), os.path.join(self.repo, "scripts", "lib"))
+        git(self.repo, "add", "scripts")
+        git(self.repo, "commit", "--quiet", "-m", "chore: checker")
+        self.base = git(self.repo, "rev-parse", "HEAD")
+        # The PR replaces the checker by one that always passes and breaks a doc rule.
+        head = self.commit({"scripts/check-docs.sh": "#!/usr/bin/env bash\nexit 0\n",
+                            "CLAUDE.md": "read AGENTS.md\n"})
+        os.chmod(os.path.join(self.repo, "scripts", "check-docs.sh"), 0o755)
+        self.base_checkout()
+        r = self.run_step("policy", "Check docs limits", head)
+        self.assertEqual(r.returncode, 1, r.stdout + r.stderr)
+        self.assertIn('CLAUDE.md must contain only "@AGENTS.md"', r.stdout)
 
     def test_attribution_checker_is_read_from_the_base(self):
         shutil.copy(os.path.join(ROOT, "scripts", "check-attribution.sh"), os.path.join(self.repo, "scripts"))
