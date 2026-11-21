@@ -201,4 +201,12 @@ done
 for f in .claude/skills/execute/SKILL.md .claude/skills/close-phase/SKILL.md .claude/skills/ask-bot/SKILL.md .claude/agents/close-reviewer.md; do
   assert_contains "$(cat "$REPO/$f")" "mktemp" "$f says to use mktemp for temporary texts"
 done
+# lab-test stop (#46): the session runs the script checks itself; the owner is never asked to.
+assert_contains "$execute" "rode nesta sessão cada verificação que é script" "execute runs the script checks in the session at lab-test"
+for f in .claude/skills/*/SKILL.md; do
+  lab="$(grep 'lab-test' "$REPO/$f" || true)"
+  assert_not_contains "$lab" "rode scripts/" "$f lab-test text never asks the owner to run scripts/"
+  case "$lab" in *"rode o scripts"*|*"rode o \`scripts"*) bad "$f lab-test text asks the owner to run a script" ;; *) ok ;; esac
+done
+
 finish
