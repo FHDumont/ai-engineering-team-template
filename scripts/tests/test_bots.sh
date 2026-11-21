@@ -193,6 +193,26 @@ assert_contains "$(last_output)" "nothing posted" "retry error is clear"
 assert_status 1 "retry stops without a secret provider" env FAKE_SECURITY_MISSING=1 "$SCRIPTS/ask-bot.sh" --retry 20260117100100-1 --issue 3 --timeout 0
 assert_not_contains "$(gh_calls)" "issue comment" "retry without a provider posts nothing"
 
+# Authorship header: the question and the follow-up start with De, Para, Pedido, Responde a.
+rm -f "$TMP/posted"
+AUTHOR_FROM="filha #34" "$SCRIPTS/ask-bot.sh" bot-a 3 "Opinião?" --timeout 0 >/dev/null 2>&1 || true
+first_line="$(head -1 "$TMP/posted")"
+assert_contains "$first_line" "> **De:** filha #34 · **Para:** bot-a · **Pedido:** pergunta " "question opens with the header"
+assert_contains "$first_line" "**Responde a:** —" "a new question replies to nothing"
+assert_contains "$(cat "$TMP/posted")" "<!-- ask:bot-a:" "question keeps the ask marker"
+: >"$FAKE_GH_LOG"; : >"$PROCESS_EVENTS_FILE"; rm -f "$FAKE_CURL_COUNT" "$TMP/posted"
+assert_status 0 "append posts, notifies and waits (the fixture has the reply)" env AUTHOR_FROM="gerenciadora" "$SCRIPTS/ask-bot.sh" --append 20260117100100-1 "Mais um detalhe" --issue 3 --timeout 0
+assert_eq "1" "$(grep -c '^issue comment' "$FAKE_GH_LOG")" "append posts one comment"
+assert_eq "1" "$(cat "$FAKE_CURL_COUNT")" "append notifies once"
+assert_contains "$(head -1 "$TMP/posted")" "**De:** gerenciadora · **Para:** bot-a" "append opens with the header"
+assert_contains "$(head -1 "$TMP/posted")" "**Responde a:** u1" "append replies to the question"
+assert_contains "$(cat "$TMP/posted")" "<!-- ask-append:bot-a:20260117100100-1 -->" "append has its own marker"
+assert_not_contains "$(cat "$TMP/posted")" "<!-- ask:bot-a:" "append never opens a second question"
+assert_contains "$(cat "$FAKE_CURL_LOG")" '"ask_id":"20260117100100-1"' "append notifies with the original ask id"
+assert_contains "$(cat "$PROCESS_EVENTS_FILE")" '"append":"1"' "append event has append=1"
+assert_status 1 "append without the question fails" "$SCRIPTS/ask-bot.sh" --append 20260117100177-7 "x" --issue 3 --timeout 0
+assert_contains "$(last_output)" "nothing posted" "append error is clear"
+
 # summarize-thread: creates, then edits in place.
 printf '[[%s]]' "$(for i in $(seq 1 10); do printf '{"id":%d,"body":"c%d"},' "$i" "$i"; done | sed 's/,$//')" >"$TMP/comments.json"
 assert_status 0 "needs summary after 10 comments" "$SCRIPTS/summarize-thread.sh" 3 --check
