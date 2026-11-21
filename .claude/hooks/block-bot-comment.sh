@@ -6,9 +6,10 @@
 #  - the text has no authorship header line (scripts/lib/author.sh): the owner, the
 #    manager, the children and the bots share one account, and a comment without the
 #    header is read as the owner's;
-#  - the text asks a bot outside scripts/ask-bot.sh: it carries an <!-- ask:...: -->
-#    marker, or its header addresses a bot slug in "Para" (a loose comment never
-#    notifies the bot). Bot slugs come from .github/bots.tsv (BOTS_FILE overrides).
+#  - the text cites a bot of .github/bots.tsv (slug or name, any case; BOTS_FILE
+#    overrides) or carries an <!-- ask:...: --> marker: a loose comment never
+#    notifies the bot, so the request goes through scripts/ask-bot.sh (--append
+#    for new information on an open question).
 # The text is the command, its arguments and the files named by --body-file/-F; a
 # heredoc stays in the command, so it is seen too.
 set -euo pipefail
@@ -46,18 +47,27 @@ done
 source "$here/../../scripts/lib/author.sh"
 if ! printf '%s' "$text" | has_author_header; then
   echo "blocked by block-bot-comment: a comment from an agent starts with the authorship header (AGENTS.md rule 6):" >&2
-  echo '> **De:** <quem> · **Para:** <quem> · **Pedido:** <o quê> · **Responde a:** <ref ou —>' >&2
+  echo '**De:** <papel> · **Para:** <papel> · **Pedido:** <ask_id ou o quê> · **Responde a:** <link ou —>' >&2
   echo "scripts/lib/author.sh: author_header; no header means the owner wrote it" >&2
   exit 2
 fi
 
 bots="${BOTS_FILE:-}"
 [ -n "$bots" ] || bots="$(git -C "$cwd" rev-parse --show-toplevel 2>/dev/null || echo "$here/../..")/.github/bots.tsv"
-slugs=""
-[ ! -f "$bots" ] || slugs="$(grep -vE '^\s*(#|$)' "$bots" | cut -f1)"
-to="$(printf '%s' "$text" | grep -oE '^> \*\*De:\*\* .+ · \*\*Para:\*\* [^·]+' | head -1 | sed -E 's/.*\*\*Para:\*\* //; s/ +$//')"
-if printf '%s' "$text" | grep -qF '<!-- ask:' || { [ -n "$to" ] && printf '%s\n' "$slugs" | grep -qxF -- "$to"; }; then
-  echo "blocked by block-bot-comment: a request to a bot goes through scripts/ask-bot.sh <bot> <issue> \"text\" (a loose comment never notifies the bot)" >&2
+if [ -f "$bots" ]; then
+  while IFS=$'\t' read -r slug name _; do
+    case "$slug" in ''|'#'*) continue ;; esac
+    for term in "$slug" "$name"; do
+      [ -n "$term" ] || continue
+      if printf '%s' "$text" | grep -qiF -- "$term"; then
+        echo "blocked by block-bot-comment: the comment cites the bot \"$term\"; a request to a bot goes through scripts/ask-bot.sh <bot> <issue> \"text\" (--append for new information on an open question); a loose comment never notifies the bot" >&2
+        exit 2
+      fi
+    done
+  done <"$bots"
+fi
+if printf '%s' "$text" | grep -qF '<!-- ask:'; then
+  echo "blocked by block-bot-comment: <!-- ask: markers come only from scripts/ask-bot.sh" >&2
   exit 2
 fi
 exit 0

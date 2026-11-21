@@ -6,8 +6,8 @@ HOOK="$REPO/.claude/hooks/block-bot-comment.sh"
 
 run() { jq -cn --arg c "$1" --arg d "$REPO" '{tool_input: {command: $c}, cwd: $d}' | "$HOOK"; }
 
-h='> **De:** filha #34 · **Para:** dono · **Pedido:** aviso · **Responde a:** —'
-hb='> **De:** filha #34 · **Para:** bot-a · **Pedido:** pergunta · **Responde a:** —'
+h='**De:** fase #34 · **Para:** dono · **Pedido:** aviso · **Responde a:** —'
+hb='**De:** fase #34 · **Para:** bot-a · **Pedido:** pergunta · **Responde a:** —'
 assert_status 2 "blocks an issue comment without the header" run 'gh issue comment 3 --body "oi"'
 assert_status 2 "blocks a PR comment without the header" run 'gh pr comment 3 --body "oi"'
 assert_status 2 "blocks close --comment without the header" run 'gh issue close 3 --comment "fim"'
@@ -22,6 +22,13 @@ assert_status 2 "blocks a request to a bot even with the header" run "gh issue c
 
 pergunta\""
 assert_contains "$(last_output)" "ask-bot.sh" "points to ask-bot.sh"
+assert_status 2 "blocks a body citing the bot slug" run "gh issue comment 3 --body \"$h
+
+@bot-a faça X\""
+assert_contains "$(last_output)" "ask-bot.sh" "points to ask-bot.sh for a cited slug"
+assert_status 2 "blocks a body citing the bot name in any case" run "gh pr comment 3 --body \"$h
+
+peça ao bot a sobre isso\""
 assert_status 2 "blocks a hand-made ask marker" run "gh issue comment 3 --body \"$h
 
 x <!-- ask:bot-a:20260101000000-1 -->\""

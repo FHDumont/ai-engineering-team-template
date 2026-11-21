@@ -201,16 +201,24 @@ err="$(FAKE_COMMENTS="$TMP/loose.json" "$SCRIPTS/wait-reply.sh" 3 20260117100100
 assert_contains "$err" "has no authorship header" "wait-reply warns about a loose question"
 assert_contains "$err" "ask-bot.sh --retry 20260117100100-1 --issue 3" "the warning names the fix"
 cat >"$TMP/headed.json" <<'J'
-[[{"created_at":"2026-01-17T10:01:00Z","html_url":"q","body":"> **De:** a · **Para:** bot-a · **Pedido:** p · **Responde a:** —\n\nP\n\n<!-- ask:bot-a:20260117100100-1 -->"}]]
+[[{"created_at":"2026-01-17T10:01:00Z","html_url":"q","body":"**De:** a · **Para:** bot-a · **Pedido:** p · **Responde a:** —\n\nP\n\n<!-- ask:bot-a:20260117100100-1 -->"}]]
 J
 err="$(FAKE_COMMENTS="$TMP/headed.json" "$SCRIPTS/wait-reply.sh" 3 20260117100100-1 --timeout 0 --interval 0 2>&1 >/dev/null || true)"
 assert_not_contains "$err" "warning" "no warning for a question with the header"
+# Late warning: no reply after --warn-after, suggests --retry and keeps waiting (exit 3 at the timeout).
+rc=0
+err="$(FAKE_COMMENTS="$TMP/headed.json" "$SCRIPTS/wait-reply.sh" 3 20260117100100-1 --timeout 0 --interval 0 --warn-after 0 2>&1 >/dev/null)" || rc=$?
+assert_eq "3" "$rc" "still times out after the late warning"
+assert_contains "$err" "no reply to 20260117100100-1 on #3 after 0s" "late warning says the bot did not react"
+assert_contains "$err" "ask-bot.sh --retry 20260117100100-1 --issue 3" "late warning suggests --retry"
+err="$(FAKE_COMMENTS="$TMP/headed.json" "$SCRIPTS/wait-reply.sh" 3 20260117100100-1 --timeout 0 --interval 0 2>&1 >/dev/null || true)"
+assert_not_contains "$err" "no reply to" "no late warning before --warn-after (default 180s)"
 
 # Authorship header: the question and the follow-up start with De, Para, Pedido, Responde a.
 rm -f "$TMP/posted"
-AUTHOR_FROM="filha #34" "$SCRIPTS/ask-bot.sh" bot-a 3 "Opinião?" --timeout 0 >/dev/null 2>&1 || true
+AUTHOR_FROM="fase #34" "$SCRIPTS/ask-bot.sh" bot-a 3 "Opinião?" --timeout 0 >/dev/null 2>&1 || true
 first_line="$(head -1 "$TMP/posted")"
-assert_contains "$first_line" "> **De:** filha #34 · **Para:** bot-a · **Pedido:** pergunta " "question opens with the header"
+assert_contains "$first_line" "**De:** fase #34 · **Para:** bot-a · **Pedido:** 2026" "question opens with the header"
 assert_contains "$first_line" "**Responde a:** —" "a new question replies to nothing"
 assert_contains "$(cat "$TMP/posted")" "<!-- ask:bot-a:" "question keeps the ask marker"
 : >"$FAKE_GH_LOG"; : >"$PROCESS_EVENTS_FILE"; rm -f "$FAKE_CURL_COUNT" "$TMP/posted"
@@ -222,7 +230,7 @@ assert_contains "$(head -1 "$TMP/posted")" "**Responde a:** u1" "append replies 
 assert_contains "$(cat "$TMP/posted")" "<!-- ask-append:bot-a:20260117100100-1 -->" "append has its own marker"
 assert_not_contains "$(cat "$TMP/posted")" "<!-- ask:bot-a:" "append never opens a second question"
 assert_contains "$(cat "$FAKE_CURL_LOG")" '"ask_id":"20260117100100-1"' "append notifies with the original ask id"
-assert_contains "$(cat "$PROCESS_EVENTS_FILE")" '"append":"1"' "append event has append=1"
+assert_eq "1" "$(jq -s '[.[] | select(.event == "bot_append" and .ask_id == "20260117100100-1")] | length' "$PROCESS_EVENTS_FILE")" "append records bot_append"
 assert_status 1 "append without the question fails" "$SCRIPTS/ask-bot.sh" --append 20260117100177-7 "x" --issue 3 --timeout 0
 assert_contains "$(last_output)" "nothing posted" "append error is clear"
 

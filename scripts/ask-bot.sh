@@ -24,7 +24,7 @@
 #: second question. Every comment this script posts starts with the authorship header
 #: (De, Para, Pedido, Responde a; scripts/lib/author.sh): without it the bot and the
 #: owner cannot tell who wrote what. A bare "gh issue comment" to a bot is never seen.
-#: Records bot_ask events (retry=1 on --retry) in the trace; wait-reply.sh records bot_reply.
+#: Records bot_append on --append and bot_ask events (retry=1 on --retry) in the trace; wait-reply.sh records bot_reply.
 #: If the session drops, resume only the wait with: wait-reply.sh <issue> <id>.
 set -euo pipefail
 HERE="$(cd "$(dirname "$0")" && pwd)"
@@ -78,13 +78,13 @@ if [ "$1" = "--append" ]; then
   [ -n "$found" ] || die "no question comment with <!-- ask:<bot>:$id --> on #$issue (nothing posted)"
   bot="${found%% *}" qurl="${found#* }"
   require_secret "$bot"
-  body="$(printf '%s\n\n%s\n\n<!-- ask-append:%s:%s -->' "$(author_header "$bot" "complemento da pergunta $id" "$qurl")" "$text" "$bot" "$id")"
+  body="$(printf '%s\n\n%s\n\n<!-- ask-append:%s:%s -->' "$(author_header "$bot" "$id" "$qurl")" "$text" "$bot" "$id")"
   url="$(post_comment "$issue" "$body")"
   cid="${url##*#issuecomment-}"
   gh api "repos/$repo/issues/comments/$cid" --jq .body 2>/dev/null | grep -qF "<!-- ask-append:$bot:$id -->" ||
     die "follow-up not confirmed on read back (comment $cid of #$issue has no marker); the bot was not notified"
   echo "appended to $bot question on #$issue (id $id): $url"
-  trace_event bot_ask "bot=$bot" "ask_id=$id" "issue=$issue" "comment=$url" append=1
+  trace_event bot_append "bot=$bot" "ask_id=$id" "issue=$issue" "comment=$url"
 elif [ "$1" = "--retry" ]; then
   [ $# -ge 2 ] || die "usage: ask-bot.sh --retry <ask_id> [--issue N]" 2
   id="$2"; shift 2
@@ -121,7 +121,7 @@ else
   require_secret "$bot"
 
   id="$(date +%Y%m%d%H%M%S)-$$"
-  body="$(printf '%s\n\n%s\n\n<!-- ask:%s:%s -->' "$(author_header "$bot" "pergunta $id")" "$text" "$bot" "$id")"
+  body="$(printf '%s\n\n%s\n\n<!-- ask:%s:%s -->' "$(author_header "$bot" "$id")" "$text" "$bot" "$id")"
   repo="$(repo_slug)"
   url="$(printf '%s' "$body" | gh issue comment "$issue" --repo "$repo" --body-file - | tail -1)" ||
     die "question not posted on #$issue: gh issue comment failed (the bot was not notified)"
