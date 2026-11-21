@@ -18,7 +18,7 @@
 #: creating anything and says who holds them. The slot frees itself when the worktree
 #: is gone. Warns, without blocking, when the machine load is high.
 #: A failure after the branch and the worktree exist (spec not committed, check-env.sh
-#: refusing, the board not writable) undoes them (worktree and local branch), says so
+#: refusing) undoes them (worktree and local branch), says so
 #: and frees the slot: the same opening works again with no cleanup by hand.
 set -euo pipefail
 HERE="$(cd "$(dirname "$0")" && pwd)"
@@ -148,9 +148,12 @@ fi
 if [ "$check" = 1 ]; then
   (cd "$path" && "$path/scripts/check-env.sh")
 fi
+# The phase is open from here on: a board that refuses the write leaves it open (the
+# message says so), as the owner can fix the board and nothing of the phase is lost.
+made_wt=0
 board=0
 project_set_status "$issue" "In Progress" || board=1
 # Filter of the "Fase atual" view: the group of this phase plus the one of the parallel phases already active.
 project_refresh_phase_filter "$main_root" "$issue" "" || board=1
-[ "$board" = 0 ] || die "phase #$issue not opened: the board was not updated (cause and fix above); what was created is undone"
+[ "$board" = 0 ] || die "phase #$issue is open at $path, but the board was not updated (cause and fix above)"
 echo "$path"
