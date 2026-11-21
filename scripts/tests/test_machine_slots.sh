@@ -11,7 +11,7 @@ mkdir -p "$SLOTS/validate" "$SLOTS/fase"
 repo="$(make_repo)"
 mkdir -p "$repo/scripts/lib" "$repo/scripts/tests"
 cp "$SCRIPTS/validate.sh" "$SCRIPTS/machine-slots.sh" "$repo/scripts/"
-cp "$SCRIPTS/lib/common.sh" "$SCRIPTS/lib/slots.sh" "$SCRIPTS/lib/machine-limits.env.example" "$repo/scripts/lib/"
+cp "$SCRIPTS/lib/common.sh" "$SCRIPTS/lib/slots.sh" "$SCRIPTS/lib/progress.sh" "$SCRIPTS/lib/machine-limits.env.example" "$repo/scripts/lib/"
 RUNS="$TMP/runs"
 cat >"$repo/scripts/tests/test_probe.sh" <<P
 #!/usr/bin/env bash
@@ -104,7 +104,7 @@ export SC_LOG="$TMP/shellcheck.log" PATH="$TMP/bin:$PATH"
 lrepo="$(make_repo)"
 mkdir -p "$lrepo/scripts/lib"
 cp "$SCRIPTS/validate.sh" "$lrepo/scripts/"
-cp "$SCRIPTS/lib/common.sh" "$SCRIPTS/lib/slots.sh" "$SCRIPTS/lib/machine-limits.env.example" "$lrepo/scripts/lib/"
+cp "$SCRIPTS/lib/common.sh" "$SCRIPTS/lib/slots.sh" "$SCRIPTS/lib/progress.sh" "$SCRIPTS/lib/machine-limits.env.example" "$lrepo/scripts/lib/"
 printf '#!/usr/bin/env bash\necho BAD\n' >"$lrepo/old_bad.sh"
 git -C "$lrepo" add scripts old_bad.sh
 git -C "$lrepo" commit --quiet -m "chore: scripts"
