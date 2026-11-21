@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # session-setup-check.sh: SessionStart hook. Once per session, when the repository
-# is not configured for the method (scripts/setup-repo.sh --check exits 7), it adds to the context that the setup is
-# pending and that the first step is the setup skill.
+# is not configured for the method (scripts/setup-repo.sh --check exits 7), it adds to
+# the context that the setup is pending and that the first step is the setup skill.
 # It only warns; the lock is scripts/phase-start.sh. It never blocks or delays a
 # session: without jq, gh, a remote or network, or when the check takes longer
 # than SETUP_CHECK_TIMEOUT seconds (default 5), it says nothing. Always exits 0.
