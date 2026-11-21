@@ -90,3 +90,42 @@ Suposições: identificar processos pelo `cwd` (lsof) em vez de gravar PIDs no `
 
 1. Limpeza no `--cleanup` e `scripts/sessions.sh`, com testes. `modelo: sonnet · esforço: medium · motivo: peso medium de scripts/lib/weights.tsv`
 2. Mensagem de fim e textos das skills e do desenho. `modelo: sonnet · esforço: low · motivo: peso light de scripts/lib/weights.tsv`
+
+## Achados do claude-runs-painel (onda 3)
+
+Os achados #17 a #20 entraram no grupo com o ok do dono, antes das issues de atualização nos repos que usam o template. #18, #19 e #20 em paralelo (arquivos separados); #17 depois da #8 (mesmo `phase-start.sh`) e da #18 (a mesma linha de dependência faltando). Decisão do dono na #17: a suíte de testes roda só no fim e na CI, não na abertura.
+
+## Fase #18 — dependência faltando no validate.sh
+
+Arquivos previstos: `scripts/validate.sh`, `scripts/tests/test_validate.sh`. Não toca `scripts/check-env.sh` (a checagem de ambiente da abertura é da #17), `scripts/phase-start.sh`, `scripts/new-phase.sh` nem `scripts/open-parallel.sh`.
+
+Pronto quando: o da issue #18, só no `validate.sh` (que no fim roda pelo `close-phase.sh --prepare`); a linha do `check-env.sh` fica com a #17.
+
+1. Linha de dependência faltando no `validate.sh`, com teste. `modelo: sonnet · esforço: medium · motivo: peso medium de scripts/lib/weights.tsv`
+
+## Fase #19 — arquivo temporário único por fase
+
+Arquivos previstos: `.claude/skills/execute/SKILL.md`, `.claude/skills/close-phase/SKILL.md`, `.claude/skills/ask-bot/SKILL.md`, `.claude/agents/`, `scripts/tests/test_phase_texts.sh`. Mexe só nas linhas de arquivo temporário das skills; a #11 mexe na mensagem de fim delas, e conflito de texto vai pelo `redo-phase.sh`.
+
+Pronto quando: o da issue #19.
+
+1. Textos das skills e agentes e o teste de textos. `modelo: sonnet · esforço: low · motivo: peso light de scripts/lib/weights.tsv`
+
+## Fase #20 — chaves parecidas no erro do secret.sh
+
+Arquivos previstos: `scripts/lib/secret.sh`, `scripts/tests/test_secret.sh`.
+
+Pronto quando: o da issue #20.
+
+1. Nomes das chaves `BOT_WEBHOOK_*` no erro, sem valores, com teste. `modelo: sonnet · esforço: low · motivo: peso light de scripts/lib/weights.tsv`
+
+## Fase #17 — abertura sem suíte e sem sobra (depois da #8 e da #18)
+
+Decisão do dono: teste só no fim. A abertura lê o check `CI` do commit base da `main` e faz uma checagem rápida de ambiente; o `check-env.sh` confere o par e o ambiente, sem `validate.sh --tests`; a suíte fica no `close-phase.sh --prepare` e na CI.
+
+Arquivos previstos: `scripts/phase-start.sh`, `scripts/new-phase.sh`, `scripts/open-parallel.sh`, `scripts/check-env.sh`, `scripts/tests/test_phase_start.sh`, `scripts/tests/test_phase_scripts.sh`, `docs/process-design.md` §4.3.
+
+Pronto quando: o da issue #17.
+
+1. CI do commit base e checagem de ambiente no lugar da suíte, na abertura e no `check-env.sh`, com testes. `modelo: sonnet · esforço: medium · motivo: peso medium de scripts/lib/weights.tsv`
+2. Desfazer o que a abertura criou quando ela falha, com testes. `modelo: sonnet · esforço: medium · motivo: peso medium de scripts/lib/weights.tsv`
