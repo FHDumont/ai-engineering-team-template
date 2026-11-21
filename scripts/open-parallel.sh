@@ -10,6 +10,8 @@
 #: a line of one of the issues asked for. Never leaves half a group: when one
 #: phase fails to open, the ones already opened are undone (close-phase.sh
 #: --abort --discard), which takes their lines out of the registry.
+#: Needs one machine-wide "fase" slot per issue (new-phase.sh): without enough free
+#: slots it exits 75 before creating anything and says who holds them.
 set -euo pipefail
 HERE="$(cd "$(dirname "$0")" && pwd)"
 # shellcheck source=scripts/lib/common.sh
@@ -41,6 +43,11 @@ if [ -s "$registry" ]; then
   done <"$registry"
   [ -z "$left" ] ||
     die "$registry has leftover lines ($(echo $left)): run scripts/close-phase.sh --cleanup in the main checkout, or close-phase.sh --abort in the phase worktree"
+fi
+
+# Enough phase slots for the whole group, before anything is created.
+if [ "$dry" = 0 ]; then
+  "$HERE/machine-slots.sh" --check fase "${#issues[@]}" || exit $?
 fi
 
 # Every issue must pass the guards of new-phase.sh (open, with a spec) before any phase opens.

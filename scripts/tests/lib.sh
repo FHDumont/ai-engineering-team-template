@@ -13,6 +13,9 @@ trap 'rm -rf "$TMP"' EXIT
 export PROCESS_EVENTS_FILE="$TMP/events.jsonl"
 # No test depends on the bots of this repository: every one reads the fixture.
 export BOTS_FILE="$TESTS_DIR/fixtures/bots.tsv"
+# No test touches the slots, limits and history of the machine.
+export AI_METHOD_CACHE="$TMP/ai-method-cache" AI_METHOD_CONFIG="$TMP/ai-method-config"
+export AI_METHOD_POLL_SECONDS=1 AI_METHOD_SLOTS_VALIDATE=20 AI_METHOD_SLOTS_FASE=20
 # No test inherits the session of whoever runs it: each one names its own.
 unset CLAUDE_CODE_SESSION_ID
 FAILS=0

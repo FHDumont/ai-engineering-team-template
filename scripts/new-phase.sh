@@ -13,10 +13,16 @@
 #: docs/specs/*.md of the main checkout must cite #<n>. A spec that is not on the
 #: branch yet is committed here, on the phase branch. The entry point of the
 #: method is phase-start.sh, which calls this script.
+#: Takes a machine-wide "fase" slot first (limit AI_METHOD_SLOTS_FASE, default 3, in
+#: ~/.config/ai-method/machine-limits.env): with none free it exits 75 before
+#: creating anything and says who holds them. The slot frees itself when the worktree
+#: is gone. Warns, without blocking, when the machine load is high.
 set -euo pipefail
 HERE="$(cd "$(dirname "$0")" && pwd)"
 # shellcheck source=scripts/lib/common.sh
 source "$HERE/lib/common.sh"
+# shellcheck source=scripts/lib/slots.sh
+source "$HERE/lib/slots.sh"
 
 [ $# -gt 0 ] || { print_help "$0"; exit 2; }
 case "$1" in -h|--help) print_help "$0"; exit 0 ;; esac
@@ -72,6 +78,15 @@ if [ "$dry" = 1 ]; then
   exit 0
 fi
 [ ! -e "$path" ] || die "worktree already exists: $path"
+slots_load_limits
+if ! slots_try fase "$issue" "$path"; then
+  echo "error: no free phase slot (limit $AI_METHOD_SLOTS_FASE); held by:" >&2
+  slots_holders fase >&2
+  exit 75
+fi
+# A slot of a phase that did not open goes back at once.
+trap '[ -d "$path" ] || slots_release' EXIT
+slots_load_report | grep '^warn:' || true
 git fetch --quiet origin main
 # Marks the session that opened the phase (planning): the close-phase.sh gate only
 # accepts as the child session a session different from this one.
