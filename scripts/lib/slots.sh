@@ -18,7 +18,7 @@ slots_home() { printf '%s\n' "${AI_METHOD_CACHE:-$HOME/.cache/ai-method}"; }
 # Loads the limits: creates the file from the .example on the first run, then reads
 # NAME=value lines that the environment does not set, then fills the defaults.
 slots_load_limits() {
-  local dir="${AI_METHOD_CONFIG:-$HOME/.config/ai-method}" f line name val
+  local dir="${AI_METHOD_CONFIG:-$HOME/.config/ai-method}" f line name val cpus
   f="$dir/machine-limits.env"
   if [ ! -f "$f" ] && [ -f "$SLOTS_LIB_DIR/machine-limits.env.example" ]; then
     mkdir -p "$dir" 2>/dev/null && cp "$SLOTS_LIB_DIR/machine-limits.env.example" "$f" 2>/dev/null || true
@@ -33,6 +33,12 @@ slots_load_limits() {
   : "${AI_METHOD_SLOTS_VALIDATE:=2}" "${AI_METHOD_SLOTS_FASE:=3}"
   : "${AI_METHOD_WAIT_TIMEOUT_SECONDS:=1200}" "${AI_METHOD_POLL_SECONDS:=2}"
   : "${AI_METHOD_WARN_LOAD1:=8}" "${AI_METHOD_WARN_FREE_MEM_MB:=1024}" "${AI_METHOD_WARN_SWAP_MB:=2048}"
+  if [ -z "${AI_METHOD_TEST_JOBS:-}" ]; then
+    cpus="$(getconf _NPROCESSORS_ONLN 2>/dev/null || echo 1)"
+    AI_METHOD_TEST_JOBS=$(( cpus / AI_METHOD_SLOTS_VALIDATE ))
+    [ "$AI_METHOD_TEST_JOBS" -ge 1 ] || AI_METHOD_TEST_JOBS=1
+  fi
+  export AI_METHOD_TEST_JOBS
   : "${AI_METHOD_LINT_BASE:=main}" "${AI_METHOD_IDLE_HOURS:=4}"
 }
 

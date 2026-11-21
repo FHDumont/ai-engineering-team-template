@@ -76,4 +76,24 @@ assert_contains "$(last_output)" "missing dependency: module left-pad (folder we
 assert_status 1 "the CI run still fails" env -u PROCESS_VALIDATE_RUNNING CI=true "$dep/scripts/validate.sh" --tests
 case "$(last_output)" in *"missing dependency"*) bad "the CI output has no dependency line" ;; *) ok ;; esac
 
+# Tests run in parallel: AI_METHOD_TEST_JOBS at once, each one in its own folder, and the
+# report keeps the order. Two tests that wait for each other only pass when concurrent.
+par="$(make_repo)"
+mkdir -p "$par/scripts/lib" "$par/scripts/tests"
+cp "$SCRIPTS/validate.sh" "$par/scripts/validate.sh"
+cp "$SCRIPTS/lib/common.sh" "$SCRIPTS/lib/slots.sh" "$SCRIPTS/lib/progress.sh" "$SCRIPTS/lib/machine-limits.env.example" "$par/scripts/lib/"
+for n in a b; do
+  cat >"$par/scripts/tests/test_$n.sh" <<P
+#!/usr/bin/env bash
+touch "$TMP/started-$n"
+for i in \$(seq 1 50); do [ -e "$TMP/started-$([ $n = a ] && echo b || echo a)" ] && exit 0; sleep 0.1; done
+echo "no peer: test_$n ran alone"; exit 1
+P
+done
+assert_status 0 "two tests wait for each other: they run in parallel" env -u PROCESS_VALIDATE_RUNNING AI_METHOD_TEST_JOBS=2 "$par/scripts/validate.sh" --tests
+assert_contains "$(last_output)" "tests: 2 passed, 0 failed" "the parallel run counts every test"
+rm -f "$TMP"/started-*
+assert_status 1 "with one job the same tests run in series and fail" env -u PROCESS_VALIDATE_RUNNING AI_METHOD_TEST_JOBS=1 "$par/scripts/validate.sh" --tests
+assert_contains "$(last_output)" "FAIL scripts/tests/test_a.sh" "a failing test is reported by name"
+
 finish
