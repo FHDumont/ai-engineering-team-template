@@ -18,6 +18,7 @@ bin="$TMP/bin"; mkdir -p "$bin"
 cat >"$bin/claude" <<'F'
 #!/usr/bin/env bash
 printf '%s\n' "$PWD" "$@" >"$FAKE_CLAUDE_ARGS"
+printf '%s\n' "${CLAUDE_CODE_PRINT_BG_WAIT_CEILING_MS:-unset}" >"$FAKE_CLAUDE_ARGS.env"
 echo "child running"
 sleep 5
 F
@@ -25,6 +26,7 @@ chmod +x "$bin/claude"
 export FAKE_CLAUDE_ARGS="$TMP/claude.args"
 
 assert_status 0 "--help works" "$repo/scripts/start-headless.sh" --help
+assert_contains "$(last_output)" 'claude -p "<answer>" --resume' "the resume text puts the prompt right after -p"
 assert_status 2 "needs an issue number" sh -c "cd '$repo' && scripts/start-headless.sh"
 assert_status 2 "refuses a phase without worktree" sh -c "cd '$repo' && PATH='$bin:$PATH' scripts/start-headless.sh 7"
 assert_contains "$(last_output)" "phase-start.sh" "says to open the phase first"
@@ -51,6 +53,9 @@ assert_contains "$args" "issue #7" "prompt names the issue"
 assert_contains "$(tr '\n' ' ' <"$FAKE_CLAUDE_ARGS")" "--model sonnet --effort medium" "passes the pair of the spec"
 assert_contains "$(tr '\n' ' ' <"$FAKE_CLAUDE_ARGS")" "--session-id" "passes the session id"
 assert_contains "$(cat "$wt/.process/headless.log")" "child running" "log is in the worktree"
+assert_eq "0" "$(cat "$FAKE_CLAUDE_ARGS.env")" "claude -p waits for background tasks (ceiling 0)"
+assert_eq "-p" "$(sed -n 2p "$FAKE_CLAUDE_ARGS")" "-p is the first argument"
+assert_contains "$(sed -n 3p "$FAKE_CLAUDE_ARGS")" "execute skill" "the prompt comes right after -p"
 ev="$(events | jq -c 'select(.event == "phase_headless")')"
 pid="$(jq -r .pid <<<"$ev")"
 assert_eq "7" "$(jq -r .issue <<<"$ev")" "event carries the issue"
