@@ -11,6 +11,18 @@ if [ -n "${FAKE_GH_FAIL:-}" ] && printf '%s' "$*" | grep -qE -- "$FAKE_GH_FAIL";
   echo "${FAKE_GH_FAIL_MSG:-gh: forced failure}" >&2
   exit "${FAKE_GH_FAIL_STATUS:-1}"
 fi
+# The check "CI" of the base commit (phase-start.sh): FAKE_CI is green (default), red,
+# running or absent.
+case "$*" in
+  "api repos/$GH_REPO/commits/"*"/check-runs"*)
+    case "${FAKE_CI:-green}" in
+      green) echo '{"check_runs":[{"name":"lint","status":"completed","conclusion":"failure"},{"name":"CI","status":"completed","conclusion":"success","started_at":"2026-01-02T00:00:00Z","html_url":"https://github.com/owner/repo/actions/runs/2"}]}' ;;
+      red) echo '{"check_runs":[{"name":"CI","status":"completed","conclusion":"failure","started_at":"2026-01-02T00:00:00Z","html_url":"https://github.com/owner/repo/actions/runs/3"}]}' ;;
+      running) echo '{"check_runs":[{"name":"CI","status":"in_progress","conclusion":null,"started_at":"2026-01-02T00:00:00Z","html_url":"https://github.com/owner/repo/actions/runs/4"}]}' ;;
+      absent) echo '{"check_runs":[{"name":"lint","status":"completed","conclusion":"success"}]}' ;;
+    esac
+    exit 0 ;;
+esac
 # FAKE_SETUP (set by fake_setup of lib.sh) answers the four reads of
 # `setup-repo.sh --check` before the handler of the test: ok (configured),
 # nolabels, noprotection, offer (an unanswered offer), freeplan (no branch protection,

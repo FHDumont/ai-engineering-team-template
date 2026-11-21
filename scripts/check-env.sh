@@ -1,14 +1,20 @@
 #!/usr/bin/env bash
 #: check-env.sh: pre-flight check of the environment before a phase starts.
 #:
-#: Usage: check-env.sh [--no-tests]
+#: Usage: check-env.sh
 #:
-#: Checks: dependencies (git, gh, jq, python3; shellcheck is a warning), branch
-#: other than main, git hooks installed (core.hooksPath=.githooks; installs it
-#: if missing), a bot secret provider (scripts/lib/secret.sh; it only checks,
-#: prints nothing and never triggers a password manager authorization) when the phase
-#: spec cites bots, and tests passing
-#: (scripts/validate.sh --tests). Exits 1 on the first problem that blocks work.
+#: Checks: tools of the method (git, gh, jq, python3, shellcheck: a missing one
+#: is named with the command that installs it), the declared dependencies of the
+#: product (requirements*.txt and package.json files tracked in git: a missing
+#: package or an absent node_modules is named with its folder and the install
+#: command), branch other than main, git hooks installed (core.hooksPath=.githooks;
+#: installs it if missing) and a bot secret provider (scripts/lib/secret.sh; it
+#: only checks, prints nothing and never triggers a password manager
+#: authorization) when the phase spec cites bots. It never runs the test suite:
+#: opening a phase relies on the green "CI" check of the base commit of main
+#: (phase-start.sh) and the suite runs at the end (close-phase.sh --prepare) and in
+#: CI; running it at every opening costs minutes and machine load for no new fact.
+#: Exits 1 on the first problem that blocks work.
 #: On a phase branch (issue-<n> in its name) some docs/specs/*.md must cite #<n>.
 #: Session pair: in a Claude session (CLAUDE_CODE_SESSION_ID) of a phase branch it
 #: reads the real model and effort of the session and compares them with the pair
@@ -18,9 +24,9 @@
 #: gate stays closed). The phase_session event carries model, effort,
 #: requested_model and requested_effort. It then prints, per step pair of the
 #: spec, whether the step runs in this session (same pair) or in a subagent.
-#: "Spec cites bots": some docs/specs/*.md mentions the branch's issue (#N) and
-#: has "ask-bot", a "Bots" section/line, or a bot slug from .github/bots.tsv
-#: in backticks.
+#: "Spec cites bots": some docs/specs/*.md cites the branch's issue (#N) and, in the
+#: text of that phase (not in the sections of other phases of the same spec), has
+#: "ask-bot", a "Bots" section/line, or a bot slug from .github/bots.tsv in backticks.
 set -euo pipefail
 HERE="$(cd "$(dirname "$0")" && pwd)"
 # shellcheck source=scripts/lib/common.sh
@@ -28,17 +34,54 @@ source "$HERE/lib/common.sh"
 # shellcheck source=scripts/lib/secret.sh
 source "$HERE/lib/secret.sh"
 
-run_tests=1
 while [ $# -gt 0 ]; do
   case "$1" in
     -h|--help) print_help "$0"; exit 0 ;;
-    --no-tests) run_tests=0; shift ;;
     *) die "unknown option: $1 (see --help)" 2 ;;
   esac
 done
 
 require_cmd git gh jq python3
-command -v shellcheck >/dev/null 2>&1 || echo "warn: shellcheck missing (lint runs only in CI)"
+command -v shellcheck >/dev/null 2>&1 ||
+  die "missing tool of the method: shellcheck (install: brew install shellcheck, or apt-get install shellcheck)"
+echo "ok: tools of the method"
+
+# Declared dependencies of the product, read without running anything of it.
+check_declared_deps() {
+  local f dir missing
+  while IFS= read -r f; do
+    [ -f "$f" ] || continue
+    dir="$(dirname "$f")"
+    missing="$(python3 -I - "$f" <<'PY'
+import re, sys
+from importlib import metadata
+for line in open(sys.argv[1], encoding="utf-8"):
+    line = line.split("#", 1)[0].strip()
+    if not line or line.startswith("-"):
+        continue
+    name = re.split(r"[<>=!~;\[ ]", line, 1)[0]
+    if not name:
+        continue
+    try:
+        metadata.version(name)
+    except metadata.PackageNotFoundError:
+        print(name)
+PY
+)"
+    if [ -n "$missing" ]; then
+      die "missing dependency: $(echo "$missing" | paste -sd' ' -) (folder $dir): pip install -r $f"
+    fi
+  done <<<"$(git ls-files 'requirements*.txt' '*/requirements*.txt')"
+  while IFS= read -r f; do
+    [ -f "$f" ] || continue
+    dir="$(dirname "$f")"
+    jq -e '(.dependencies // {}) + (.devDependencies // {}) | length > 0' "$f" >/dev/null 2>&1 || continue
+    [ -d "$dir/node_modules" ] ||
+      die "missing dependency: node_modules (folder $dir): $([ "$dir" = . ] || echo "cd $dir && ")npm install"
+  done <<<"$(git ls-files package.json '*/package.json')"
+  echo "ok: declared dependencies"
+}
+check_declared_deps
 
 branch="$(current_branch)"
 [ -n "$branch" ] || die "detached HEAD: switch to a phase branch"
@@ -121,8 +164,10 @@ spec_cites_bots() {
   slugs="$(bot_slugs | paste -sd'|' -)"
   for spec in "$HERE"/../docs/specs/*.md; do
     [ -f "$spec" ] || continue
-    grep -q -E "#$issue([^0-9]|$)" "$spec" || continue
-    if grep -q -E "ask-bot|^#+ .*Bots|\*\*Bots|\`($slugs)\`" "$spec"; then return 0; fi
+    spec_cites "$spec" "$issue" || continue
+    # Only the text of this phase: the sections whose heading names other issues are not read.
+    if awk -v re="#$issue([^0-9]|\$)" '/^## / { other = ($0 !~ re && $0 ~ /#[0-9]/) } !other' "$spec" |
+       grep -q -E "ask-bot|^#+ .*Bots|\*\*Bots|\`($slugs)\`"; then return 0; fi
   done
   return 1
 }
@@ -137,9 +182,4 @@ if spec_cites_bots; then
   else
     die "no bot secret provider configured (the spec cites bots)"
   fi
-fi
-
-if [ "$run_tests" = 1 ]; then
-  "$HERE/validate.sh" --tests >/dev/null || die "tests fail: run scripts/validate.sh --tests"
-  echo "ok: tests pass"
 fi
