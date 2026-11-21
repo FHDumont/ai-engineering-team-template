@@ -20,6 +20,9 @@
 #: ~/.cache/ai-method/history.tsv (see machine-slots.sh --report). The limits are in
 #: ~/.config/ai-method/machine-limits.env.
 #:
+#: Progress (for the owner and the dashboard, never printed): each step goes to
+#: ~/.cache/ai-method/progress/<repo>-<issue>.jsonl (scripts/progress.sh reads it).
+#:
 #: Never runs from inside its own tests: it sets PROCESS_VALIDATE_RUNNING=1 in the
 #: environment and, called again with the mark, exits 3 at once.
 set -euo pipefail
@@ -28,6 +31,8 @@ HERE="$(cd "$(dirname "$0")" && pwd)"
 source "$HERE/lib/common.sh"
 # shellcheck source=scripts/lib/slots.sh
 source "$HERE/lib/slots.sh"
+# shellcheck source=scripts/lib/progress.sh
+source "$HERE/lib/progress.sh"
 ROOT="$(cd "$HERE/.." && pwd)"
 cd "$ROOT"
 
@@ -109,6 +114,7 @@ run_validate() {
   local fail=0 files pyfiles passed failed t out cands scope=""
   if [ "$lint" = 1 ]; then
     require_cmd shellcheck python3
+    progress_step "shellcheck and python syntax"
     cands="$(lint_candidates)"
     [ "$incremental" = 0 ] || scope=", incremental"
     files="$(printf '%s\n' "$cands" | bash_files)"
@@ -134,9 +140,13 @@ for f in sys.argv[1:]:
   fi
 
   if [ "$tests" = 1 ]; then
-    passed=0 failed=0
+    passed=0 failed=0 n_done=0 n_total=0
+    for t in scripts/tests/test_*.sh .claude/hooks/tests/test_*.sh scripts/tests/test_*.py; do
+      [ -e "$t" ] && n_total=$((n_total + 1))
+    done
     for t in scripts/tests/test_*.sh .claude/hooks/tests/test_*.sh; do
       [ -e "$t" ] || continue
+      n_done=$((n_done + 1)); progress_step "tests $(basename "$t")" "$n_done" "$n_total"
       if out="$(bash "$t" 2>&1)"; then
         passed=$((passed + 1))
       else
@@ -147,6 +157,7 @@ for f in sys.argv[1:]:
     done
     for t in scripts/tests/test_*.py; do
       [ -e "$t" ] || continue
+      n_done=$((n_done + 1)); progress_step "tests $(basename "$t")" "$n_done" "$n_total"
       if out="$(python3 "$t" 2>&1)"; then
         passed=$((passed + 1))
       else
@@ -202,6 +213,7 @@ finish_run() {
   if [ "$started" = 1 ]; then
     { printf '%s\t%s\t%s\n' "$(now_epoch)" "$rc" "$args"; cat "$log"; } >"$resultf.tmp" 2>/dev/null && mv "$resultf.tmp" "$resultf"
   fi
+  progress_end "$rc"
   rm -f "$log"
   slots_release
   rm -rf "$lockdir"
@@ -211,6 +223,7 @@ trap finish_run EXIT
 slots_wait validate "$(issue_from_branch "$(current_branch)")" "$ROOT" || exit $?
 slots_load_report | grep '^warn:' || true
 t0="$(now_epoch)"
+progress_start validate.sh "$(issue_from_branch "$(current_branch)")"
 started=1
 set +e
 run_validate 2>&1 | tee "$log"
