@@ -9,11 +9,11 @@ Método: `docs/process-design.md`. Estado em `docs/STATE.md`; decisões em `docs
 
 ## Idioma
 
-Código, comentários, identificadores, nomes de arquivos, labels, workflows/jobs/checks, `--help`, saída dos scripts e commits (Conventional Commits) em inglês. Docs, issues, PRs e comentários neles em português.
+Código, comentários, identificadores, nomes de arquivos, labels, workflows/jobs/checks, `--help`, saída dos scripts e commits (Conventional Commits) em inglês. Docs, issues, PRs e seus comentários em português.
 
 ## Regras
 
-1. O dono nunca roda script nem mexe em configuração. O setup do método é pré-aprovado: rode `scripts/setup-repo.sh` sozinho quando algo sair do padrão.
+1. O dono nunca roda script nem mexe em configuração. Setup pré-aprovado e obrigatório: sem `scripts/setup-repo.sh --check` limpo nenhuma fase abre; rode `scripts/setup-repo.sh` em qualquer desvio.
 2. Toda decisão do dono é um quadro de escolha (`AskUserQuestion`) que começa por `Fase #n — título`, uma pergunta por decisão; nunca pedir número de item. Só a principal pergunta; a filha manda a dúvida e pede só o ok da ação sensível que executa (merge `needs-owner-ok`, `--abort --discard`), que não atravessa sessões. "Fechar fase" vale em qualquer sessão; a da fase fecha.
 3. Toda parada e mensagem final de turno termina com o bloco de `scripts/status.sh` (Estado, Você precisa, Próximo passo); cole a saída como está, fora de bloco de código. Estados: `trabalhando`, `esperando você` (ação do dono), `pronto` (`end-check.sh` limpo).
 4. Paralelo é o preferido; skills carregam só na etapa (`triage`, `plan`, `execute`, `close-phase`, `integrate`, `ask-bot`, `setup`).

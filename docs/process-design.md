@@ -39,7 +39,7 @@ Onde cada regra está descrita: 1 e 2 na §4.3; 3 na §9.4; 4 na §6.1; 5 na §2
 
 ## 2. Regras para todo agente
 
-1. **O dono do repo nunca roda script nem mexe em configuração do repo.** O setup do método (labels, proteção de branch, configurações) é pré-aprovado: o agente roda `scripts/setup-repo.sh` sozinho sempre que algo sair do padrão.
+1. **O dono do repo nunca roda script nem mexe em configuração do repo.** O setup do método (labels, proteção de branch, configurações) é pré-aprovado: o agente roda `scripts/setup-repo.sh` sozinho sempre que algo sair do padrão. **O setup é obrigatório:** nada do método funciona antes dele. A conferência é uma só, `scripts/setup-repo.sh --check`: lê uma vez as labels, os ajustes do repo, a proteção da `main` e as ofertas (§8.3) e sai 0 só com tudo conferido e nenhuma oferta sem resposta. Faltou algo, sai 7 com uma linha `missing:` por parte e a frase a dizer, "configurar o repo" (skill `setup`); plano sem proteção de branch, sai 6 com a mensagem da §10.1. Travas: o `scripts/phase-start.sh` roda a conferência antes de tudo e recusa sem criar nada (nenhuma opção a pula, nem `--no-check`); o `scripts/open-issue.sh` dá a mesma mensagem quando o `gh` recusa a issue por falta das labels; o hook `session-setup-check.sh` avisa o agente no início da sessão (§6.2).
 2. **Idioma** conforme a §1.
 3. **Toda decisão do dono é um quadro de escolha** (`AskUserQuestion`), uma pergunta por decisão, que começa por `Fase #n — título`. O hook `block-card-title.sh` barra o quadro sem esse começo quando há fase aberta. Nunca peça ao dono para digitar o número de um item.
    - Só a sessão principal pergunta. A sessão filha manda a dúvida por mensagem e recebe `respondido: <decisão>`.
@@ -233,7 +233,7 @@ Todo script tem `--help`, um teste em `scripts/tests/` e saída curta em inglês
 
 | Script | O que faz | Quem chama |
 |---|---|---|
-| `scripts/setup-repo.sh` | Idempotente: sincroniza as labels do `.github/labels.tsv`, aplica a proteção e as configurações do repo (§10.1) e as lê de volta; `--offers`, `--project` e `--decline` na §8.3 | o agente, em qualquer desvio do padrão |
+| `scripts/setup-repo.sh` | Idempotente: sincroniza as labels do `.github/labels.tsv`, aplica a proteção e as configurações do repo (§10.1) e as lê de volta; `--check` é a conferência do setup obrigatório (§2, regra 1); `--offers`, `--project` e `--decline` na §8.3 | o agente, em qualquer desvio do padrão |
 | `scripts/setup-runner.sh` | Registra o runner próprio (§9.3) | sessão principal |
 | `scripts/init-env.sh` | Cria o `.env` fora do repo só com as chaves vazias; nunca lê nem escreve valores | skill `setup` |
 | `scripts/triage.sh` | Issues abertas em JSON curto: número, título, labels; marca as sem label | agente `triage` |
@@ -319,6 +319,7 @@ Os hooks do agente saem 2 quando barram; os do git saem 1. Todo hook tem teste. 
 | `.claude/hooks/block-agent-pair.sh` | PreToolUse, Agent | A chamada de `Agent` sem `model` ou sem `effort`; a do `close-reviewer` e a do `triage` com par diferente do peso em `scripts/lib/weights.tsv` |
 | `.claude/hooks/block-card-title.sh` | PreToolUse, AskUserQuestion | Com fase aberta, o quadro cuja pergunta não começa por `Fase #<n> — <título>`; na sessão da fase, o número é o da fase dela |
 | `.claude/hooks/prompt-phase-entry.sh` | UserPromptSubmit | Nada: põe no contexto de "executar #<n>" o caminho único (skill `plan`, depois `phase-start.sh`) |
+| `.claude/hooks/session-setup-check.sh` | SessionStart | Nada: com o setup pendente (`setup-repo.sh --check` sai 7 ou 6), põe no contexto, uma vez por sessão, que o primeiro passo é a skill `setup`. Sem `gh`, sem remoto, sem rede ou passados 5 segundos, não diz nada. Conferência limpa fica em `.process/setup-ok` e as sessões seguintes não leem o GitHub de novo (a trava do `phase-start.sh` confere sempre) |
 | `.claude/hooks/trace-event.sh` | SessionStart, SubagentStart, SubagentStop, Stop, SessionEnd, Pre e PostToolUse do Agent | Nada: grava o trace (§6.3) |
 | `.githooks/pre-commit` | git | Commit na `main`; commit da sessão que abriu a fase |
 | `.githooks/pre-merge-commit` | git | Merge feito pela sessão que abriu a fase |
