@@ -43,7 +43,7 @@ opened() { # opened <opener model> <opener effort>: the trace as phase-start.sh 
   jq -cn --arg m "$1" --arg e "$2" '{ts: "2026-01-01T00:00:00Z", event: "phase_opened", session_id: "manager", issue: "7", model: $m, effort: $e}' >"$PROCESS_EVENTS_FILE"
 }
 check() { # check <session id> <effort>
-  env CLAUDE_CODE_SESSION_ID="$1" CLAUDE_EFFORT="$2" sh -c "cd '$wt' && scripts/check-env.sh --no-tests"
+  env CLAUDE_CODE_SESSION_ID="$1" CLAUDE_EFFORT="$2" sh -c "cd '$wt' && scripts/check-env.sh"
 }
 session_event() { # session_event <session id> <event> <jq expression>
   jq -r --arg s "$1" --arg e "$2" "select(.event == \$e and .session_id == \$s) | $3" "$PROCESS_EVENTS_FILE"
@@ -84,7 +84,7 @@ assert_status 1 "a third pair is still refused" check wrong low
 opened unknown unknown
 assert_status 1 "check-env refuses a session without a transcript" check ghost high
 assert_contains "$(last_output)" "cannot read the real pair" "says the pair was not read"
-assert_status 1 "check-env refuses a session without an effort" env -u CLAUDE_EFFORT CLAUDE_CODE_SESSION_ID=child sh -c "cd '$wt' && scripts/check-env.sh --no-tests"
+assert_status 1 "check-env refuses a session without an effort" env -u CLAUDE_EFFORT CLAUDE_CODE_SESSION_ID=child sh -c "cd '$wt' && scripts/check-env.sh"
 
 # new-phase.sh records the pair of the opening session in phase_opened.
 cat >"$TMP/handler.sh" <<'H'
