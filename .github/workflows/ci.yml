@@ -1,6 +1,8 @@
-# The single CI of the repository (design §9.2). Runs only on PRs and only on
-# code events: one run per round. Editing the title, body or labels of the PR
-# starts no run. The "CI" job is the aggregator required by the protection of
+# The single CI of the repository (design §9.2). Runs on PRs, on code events
+# only (one run per round; editing the title, body or labels of the PR starts
+# no run), and on push to main, to test the sum of PRs merged in a row. On
+# main the tests job skips when the tree is the head of a merged PR whose CI
+# was green, or when only inert docs changed; policy (a PR matter) does not run. The "CI" job is the aggregator required by the protection of
 # main, together with the review/independent status. `runs-on` reads the
 # CI_RUNS_ON variable (JSON: a string or a list of labels) for a self-hosted
 # runner; without it, ubuntu-latest (GitHub-hosted).
@@ -11,18 +13,21 @@
 # base commit of the PR, checked out at base/: a PR cannot weaken the check
 # that judges it.
 name: "CI"
-run-name: "CI · PR #${{ github.event.pull_request.number }} · ${{ github.event.pull_request.title }}"
+run-name: "CI · ${{ github.event_name == 'push' && format('main · {0}', github.event.head_commit.message) || format('PR #{0} · {1}', github.event.pull_request.number, github.event.pull_request.title) }}"
 
 on:
   pull_request:
     types: [opened, synchronize, reopened, ready_for_review]
+  push:
+    branches: [main]
 
 permissions: {}
 
-# A new push cancels the previous run of the same PR.
+# A new push cancels the previous run of the same PR; a run of main is never
+# cancelled (phase-start.sh waits for the run of the base commit).
 concurrency:
-  group: ci-${{ github.event.pull_request.number }}
-  cancel-in-progress: true
+  group: ci-${{ github.event.pull_request.number || github.sha }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   changes:
@@ -32,11 +37,13 @@ jobs:
     permissions:
       contents: read
       checks: read
+      pull-requests: read
     outputs:
       code: ${{ steps.detect.outputs.code }}
       workflows: ${{ steps.detect.outputs.workflows }}
       app: ${{ steps.detect.outputs.app }}
       docs_only: ${{ steps.detect.outputs.docs_only }}
+      event: ${{ steps.detect.outputs.event }}
       run_tests: ${{ steps.detect.outputs.run_tests }}
     steps:
       - name: "Checkout"
@@ -46,8 +53,9 @@ jobs:
       - name: "Detect changed paths"
         id: detect
         env:
-          BASE_SHA: ${{ github.event.pull_request.base.sha }}
-          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          EVENT_NAME: ${{ github.event_name }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
           GH_TOKEN: ${{ github.token }}
         run: |
           # Files of the PR (since the merge-base), one per line.
@@ -81,17 +89,38 @@ jobs:
               if [ "${done_ok:-0}" -gt 0 ]; then run_tests=false; echo "tests already passed on $c, code unchanged since"; break; fi
             done
           fi
+          workflows="$(has '^\.github/workflows/')"
+          # On main: the tree of this commit is the head of a merged PR whose CI was green and
+          # whose Tests did not fail (success, or skipped by the rules above): everything was
+          # already verified on that very tree, so lint, workflows and tests run for nothing.
+          # Only the sum of PRs merged in a row (a tree no PR ever had) is tested here.
+          if [ "${EVENT_NAME:-pull_request}" = push ] && [ "$run_tests$code$workflows" != falsefalsefalse ]; then
+            tree="$(git rev-parse "$HEAD_SHA^{tree}")"
+            for ph in $(gh api "repos/$GITHUB_REPOSITORY/commits/$HEAD_SHA/pulls" --jq '.[] | select(.merged_at != null) | .head.sha' 2>/dev/null || true); do
+              [ "$(gh api "repos/$GITHUB_REPOSITORY/git/commits/$ph" --jq .tree.sha 2>/dev/null || true)" = "$tree" ] || continue
+              ok="$(gh api "repos/$GITHUB_REPOSITORY/commits/$ph/check-runs?per_page=100" --jq '[.check_runs[] | select(.name == "CI" and .conclusion == "success")] | length' 2>/dev/null || echo 0)"
+              bad="$(gh api "repos/$GITHUB_REPOSITORY/commits/$ph/check-runs?per_page=100" --jq '[.check_runs[] | select(.name == "Tests" and (.conclusion == "failure" or .conclusion == "cancelled"))] | length' 2>/dev/null || echo 1)"
+              if [ "${ok:-0}" -gt 0 ] && [ "${bad:-1}" = 0 ]; then
+                run_tests=false code=false workflows=false
+                echo "same tree as the head $ph of a merged PR with green CI: nothing to run"
+                break
+              fi
+            done
+          fi
           {
             echo "code=$code"
-            echo "workflows=$(has '^\.github/workflows/')"
+            echo "workflows=$workflows"
             echo "run_tests=$run_tests"
             echo "app=$(has '^(app/|\.github/workflows/deploy-example\.yml)')"
+            echo "event=${EVENT_NAME:-pull_request}"
             if [ "$code" = true ]; then echo "docs_only=false"; else echo "docs_only=true"; fi
           } >>"$GITHUB_OUTPUT"
           cat "$GITHUB_OUTPUT"
 
   policy:
     name: "Policy"
+    # A matter of the PR (its commits, body and paths): main only receives what passed it.
+    if: github.event_name == 'pull_request'
     runs-on: ${{ fromJSON(vars.CI_RUNS_ON || '"ubuntu-latest"') }}
     timeout-minutes: 5
     permissions:
@@ -229,7 +258,7 @@ jobs:
       - name: "Checkout the gate from the base"
         uses: actions/checkout@v4
         with:
-          ref: ${{ github.event.pull_request.base.sha }}
+          ref: ${{ github.event.pull_request.base.sha || github.event.before }}
           path: base
           persist-credentials: false
           sparse-checkout: scripts

@@ -28,7 +28,6 @@ assert_status 1 "app PR fails when tests fail" gate "$(needs false true false sk
 # A run whose changes job has no outputs at all cannot prove anything: code jobs are required.
 assert_status 1 "fails when the changes outputs are missing" gate '{"changes": {"result": "success", "outputs": {}}, "policy": {"result": "success"}, "lint": {"result": "skipped"}, "tests": {"result": "skipped"}, "workflows": {"result": "skipped"}}'
 assert_status 1 "fails when NEEDS is missing" env -u NEEDS "$GATE"
-finish
 
 # run_tests=false (only inert docs, or code already tested on an earlier commit): tests may be skipped.
 assert_status 0 "inert docs PR passes with tests skipped" gate "$(needs false false false skipped skipped skipped success false)"
@@ -36,3 +35,11 @@ assert_status 1 "inert docs PR still fails when policy fails" gate "$(needs fals
 assert_status 1 "run_tests=true requires the tests" gate "$(needs false false false skipped skipped skipped success true)"
 assert_status 0 "code already tested: lint runs, tests skipped" gate "$(needs true false false success skipped skipped success false)"
 assert_status 1 "code already tested: lint still required" gate "$(needs true false false skipped skipped skipped success false)"
+
+# Push to main (output event "push"): policy does not run and is not required; on a PR it is.
+needs_push() { needs "$@" | jq -c '.changes.outputs.event = "push"'; }
+assert_status 0 "push to main passes with policy skipped and the tests skipped by run_tests=false" gate "$(needs_push false false false skipped skipped skipped skipped false)"
+assert_status 0 "push to main passes with the suite run on the sum" gate "$(needs_push true false false success success skipped skipped true)"
+assert_status 1 "push to main still fails when the tests fail" gate "$(needs_push true false false success failure skipped skipped true)"
+assert_status 1 "a PR still requires policy" gate "$(needs false false false skipped skipped skipped skipped false)"
+finish
