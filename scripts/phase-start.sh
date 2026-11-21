@@ -20,6 +20,13 @@
 #: Before anything else it runs setup-repo.sh --check: on a repository that is not
 #: configured for the method it refuses with what is missing and the sentence to
 #: say ("configurar o repo"), creating nothing. No option skips this, not even --no-check.
+#: It never runs the test suite: it reads from GitHub the check "CI" of the base commit
+#: (origin/main) before creating any branch or worktree, and refuses, creating
+#: nothing, when it is red, still running or absent, naming the run. The merge gate
+#: already requires a green CI on main; the suite runs at the end (close-phase.sh
+#: --prepare) and in CI. The environment is checked by check-env.sh (tools and
+#: declared dependencies, no tests). A failure in the middle of the opening undoes
+#: what the scripts created (new-phase.sh, open-parallel.sh).
 set -euo pipefail
 HERE="$(cd "$(dirname "$0")" && pwd)"
 # shellcheck source=scripts/lib/common.sh
@@ -43,6 +50,18 @@ require_cmd git gh jq python3
 
 main_root="$(git worktree list --porcelain | sed -n '1s/^worktree //p')"
 cd "$main_root"
+
+# The base of every branch is origin/main: its CI check must be green before anything is created.
+git fetch --quiet origin main || die "cannot fetch origin/main: nothing was created"
+base="$(git rev-parse origin/main)"
+ci="$(gh api "repos/$(repo_slug)/commits/$base/check-runs?per_page=100" 2>/dev/null |
+  jq -r '[.check_runs[]? | select(.name == "CI")] | sort_by(.started_at // "") | last
+    | if . == null then "absent" else "\(.status)/\(.conclusion // "none") \(.html_url // "")" end' 2>/dev/null || true)"
+case "$ci" in
+  completed/success*) echo "ok: CI of the base commit ${base:0:9} is green" ;;
+  ""|absent) die "no check 'CI' on the base commit ${base:0:9} of main: no phase opens; wait for the run of main or start it (gh workflow run), then open again; nothing was created" ;;
+  *) die "check 'CI' of the base commit ${base:0:9} of main is ${ci%% *} (${ci#* }): no phase opens on a red or unfinished base; fix main or wait for the run, then open again; nothing was created" ;;
+esac
 
 # Everything is checked before anything opens: issue open and spec (new-phase.sh --dry-run), then the pair.
 pairs=()

@@ -36,10 +36,44 @@ assert_eq "feat/issue-7-listar-issues-por-area" "$(git -C "$path" branch --show-
 assert_status 1 "refuses an existing worktree" sh -c "cd '$repo' && scripts/new-phase.sh 7 --no-check"
 
 # check-env: fails on main; on the branch it installs the hooks.
-assert_status 1 "check-env fails on main" sh -c "cd '$repo' && scripts/check-env.sh --no-tests"
+assert_status 1 "check-env fails on main" sh -c "cd '$repo' && scripts/check-env.sh"
 assert_contains "$(last_output)" "never run on main" "explains"
-assert_status 0 "check-env passes on the phase branch" sh -c "cd '$path' && scripts/check-env.sh --no-tests"
+assert_status 0 "check-env passes on the phase branch" sh -c "cd '$path' && scripts/check-env.sh"
 assert_eq ".githooks" "$(git -C "$path" config core.hooksPath)" "installs core.hooksPath"
+
+# check-env never runs the suite, and names what the environment lacks with the command.
+printf '#!/usr/bin/env bash\necho "validate was called" >>"%s"\nexit 1\n' "$TMP/validate.log" >"$path/scripts/validate.sh"
+assert_status 0 "check-env passes without running the suite (a failing validate.sh does not matter)" sh -c "cd '$path' && scripts/check-env.sh"
+assert_eq "" "$(cat "$TMP/validate.log" 2>/dev/null || true)" "check-env never calls validate.sh"
+assert_status 2 "check-env has no option anymore" sh -c "cd '$path' && scripts/check-env.sh --no-tests"
+git -C "$path" checkout --quiet -- scripts/validate.sh
+# A PATH with every system tool but shellcheck (and the ones the script needs).
+mkdir -p "$TMP/nosc"
+for d in /usr/bin /bin /usr/local/bin /opt/homebrew/bin; do
+  [ -d "$d" ] || continue
+  for t in "$d"/*; do [ "${t##*/}" = shellcheck ] || ln -sf "$t" "$TMP/nosc/${t##*/}" 2>/dev/null || true; done
+done
+ln -sf "$TMP/bin/gh" "$TMP/nosc/gh"
+assert_status 1 "check-env names a missing shellcheck" env PATH="$TMP/nosc" sh -c "cd '$path' && scripts/check-env.sh"
+assert_contains "$(last_output)" "missing tool of the method: shellcheck" "says which tool is missing"
+assert_contains "$(last_output)" "brew install shellcheck" "gives the install command"
+rm -rf "$TMP/nosc"
+# Declared dependencies of the product: folder and command, nothing is run.
+mkdir -p "$path/app"
+printf 'no-such-package-xyz==1.0\n' >"$path/app/requirements.txt"
+git -C "$path" add app/requirements.txt
+assert_status 1 "check-env names a missing python package" sh -c "cd '$path' && scripts/check-env.sh"
+assert_contains "$(last_output)" "missing dependency: no-such-package-xyz (folder app): pip install -r app/requirements.txt" "names package, folder and command"
+git -C "$path" rm --quiet -f app/requirements.txt
+mkdir -p "$path/app"
+printf '{"dependencies":{"left-pad":"1.0.0"}}\n' >"$path/app/package.json"
+git -C "$path" add app/package.json
+assert_status 1 "check-env names an absent node_modules" sh -c "cd '$path' && scripts/check-env.sh"
+assert_contains "$(last_output)" "folder app): cd app && npm install" "names the folder and the npm command"
+mkdir -p "$path/app/node_modules"
+assert_status 0 "check-env passes once node_modules exists" sh -c "cd '$path' && scripts/check-env.sh"
+git -C "$path" rm --quiet -f app/package.json
+rm -rf "$path/app"
 
 # check-env: a spec that cites bots requires a secret provider; a spec without bots does not.
 # Fake security and op: no test touches the real credential store or password manager.
@@ -52,23 +86,23 @@ F
 printf '#!/usr/bin/env bash\necho "op was called: $*" >>"$FAKE_OP_LOG"\nexit 1\n' >"$TMP/bin/op"
 chmod +x "$TMP/bin/security" "$TMP/bin/op"
 export FAKE_OP_LOG="$TMP/op.log" PROCESS_ENV_FILE="$TMP/none.env"
-assert_status 0 "check-env skips the provider when the spec has no bots" sh -c "cd '$path' && scripts/check-env.sh --no-tests"
+assert_status 0 "check-env skips the provider when the spec has no bots" sh -c "cd '$path' && scripts/check-env.sh"
 printf '# Spec\n\nFase da issue #7.\n\nPergunta ao bot `bot-b` com ask-bot.sh.\n' >"$path/docs/specs/a.md"
-assert_status 0 "check-env passes with an env provider" env BOT_WEBHOOK_BOT_B_URL=https://h.example sh -c "cd '$path' && scripts/check-env.sh --no-tests"
+assert_status 0 "check-env passes with an env provider" env BOT_WEBHOOK_BOT_B_URL=https://h.example sh -c "cd '$path' && scripts/check-env.sh"
 assert_contains "$(last_output)" "bot secret provider configured" "reports the provider ok"
 assert_not_contains "$(last_output)" "h.example" "does not print the secret"
-assert_status 1 "check-env fails when the spec cites bots and there is no provider" sh -c "cd '$path' && scripts/check-env.sh --no-tests"
+assert_status 1 "check-env fails when the spec cites bots and there is no provider" sh -c "cd '$path' && scripts/check-env.sh"
 assert_contains "$(last_output)" "no secret provider configured" "explains the missing provider"
 assert_eq "" "$(cat "$FAKE_OP_LOG" 2>/dev/null || true)" "check-env never calls op"
 printf '# Spec\n\nFase da issue #8, `bot-b`.\n' >"$path/docs/specs/a.md"
-assert_status 0 "check-env ignores specs of other issues" sh -c "cd '$path' && scripts/check-env.sh --no-tests"
+assert_status 0 "check-env ignores specs of other issues" sh -c "cd '$path' && scripts/check-env.sh"
 # Only the header and the phase's own section count; a skill path is not a bot call.
 printf '# Spec\n\n## Fase #7\n\nSem bots.\n\n## Fase #8\n\nPergunta ao bot `bot-b`.\n\n## Fase #9\n\nVer .claude/skills/ask-bot/SKILL.md\n' >"$path/docs/specs/a.md"
-assert_status 0 "check-env ignores bots cited in another phase's section" sh -c "cd '$path' && scripts/check-env.sh --no-tests"
+assert_status 0 "check-env ignores bots cited in another phase's section" sh -c "cd '$path' && scripts/check-env.sh"
 printf '# Spec\n\nFase #7: ver .claude/skills/ask-bot/SKILL.md\n' >"$path/docs/specs/a.md"
-assert_status 0 "check-env ignores an ask-bot/ file path" sh -c "cd '$path' && scripts/check-env.sh --no-tests"
+assert_status 0 "check-env ignores an ask-bot/ file path" sh -c "cd '$path' && scripts/check-env.sh"
 printf '# Spec\n\n## Fase #7\n\nPergunta ao bot `bot-b`.\n' >"$path/docs/specs/a.md"
-assert_status 1 "check-env still fails when the phase's own section cites a bot" sh -c "cd '$path' && scripts/check-env.sh --no-tests"
+assert_status 1 "check-env still fails when the phase's own section cites a bot" sh -c "cd '$path' && scripts/check-env.sh"
 rm -f "$path/docs/specs/a.md"
 
 out="$(cd "$repo" && scripts/open-parallel.sh 8 9 --dry-run 2>&1 || true)"

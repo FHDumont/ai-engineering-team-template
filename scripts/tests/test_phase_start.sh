@@ -49,6 +49,36 @@ assert_eq "" "$(git -C "$repo" branch --list '*issue-*')" "no branch is created 
 assert_not_contains "$(events)" "phase_opened" "no phase_opened without a spec"
 rm "$repo/docs/specs/eight.md" "$repo/docs/specs/other.md"
 
+# The check CI of the base commit of main decides before anything is created: red, still
+# running or absent refuse, name the run, and leave no branch, worktree, registry or phase_opened.
+spec seven.md 7
+for ci in red running absent; do
+  assert_status 1 "phase-start refuses a base with CI $ci" env FAKE_CI=$ci sh -c "cd '$repo' && scripts/phase-start.sh 7 --no-check"
+  assert_contains "$(last_output)" "no phase opens" "says why ($ci)"
+  assert_contains "$(last_output)" "nothing was created" "says nothing was created ($ci)"
+  assert_eq "" "$(ls "$repo/.worktrees" 2>/dev/null || true)" "no worktree with CI $ci"
+  assert_eq "" "$(git -C "$repo" branch --list '*issue-*')" "no branch with CI $ci"
+  assert_not_contains "$(events)" "phase_opened" "no phase_opened with CI $ci"
+done
+assert_status 1 "a red base refuses the group too" env FAKE_CI=red sh -c "cd '$repo' && scripts/phase-start.sh 7 8 --no-check"
+assert_eq "" "$(ls "$repo/.worktrees" 2>/dev/null || true)" "the group creates nothing on a red base"
+assert_contains "$(last_output)" "actions/runs/3" "names the run of the red CI"
+assert_status 1 "a red base refuses --dry-run" env FAKE_CI=red sh -c "cd '$repo' && scripts/phase-start.sh 7 --dry-run"
+rm "$repo/docs/specs/seven.md"
+
+# Opening never runs the suite: with check-env.sh active the output has the environment
+# lines and no test result, and the opening does not wait for any test run.
+spec seven.md 7
+assert_status 0 "phase-start opens with a green base, check-env included" env CLAUDE_CODE_SESSION_ID=manager sh -c "cd '$repo' && scripts/phase-start.sh 7"
+assert_contains "$(last_output)" "CI of the base commit" "says the CI of the base was read"
+assert_contains "$(last_output)" "ok: tools of the method" "the check-env of the opening checks the environment"
+assert_not_contains "$(last_output)" "tests pass" "the opening does not run the suite"
+assert_not_contains "$(last_output)" "passed" "the opening prints no test result"
+git -C "$repo" worktree remove --force "$repo/.worktrees/issue-7"
+git -C "$repo" branch -D feat/issue-7-listar-issues >/dev/null
+rm -rf "$AI_METHOD_CACHE"; : >"$PROCESS_EVENTS_FILE"
+git -C "$repo" status --porcelain | grep -q . && git -C "$repo" checkout --quiet -- . || true
+
 # Closed issue: refused even with a spec.
 spec nine.md 9
 assert_status 1 "phase-start refuses a closed issue" sh -c "cd '$repo' && scripts/phase-start.sh 9 --no-check"
@@ -134,19 +164,19 @@ assert_contains "$out" "linked sessions" "the heartbeat reads the linked session
 assert_contains "$out" "pull request of each open phase" "the heartbeat reads the PRs of the open phases"
 assert_contains "$out" "do the next step" "the heartbeat does the next step"
 assert_contains "$out" "Delete the heartbeat, if it was created, in the single end step" "says to delete the heartbeat at the end"
-assert_status 0 "check-env accepts the phase branch with its spec" sh -c "cd '$wt' && scripts/check-env.sh --no-tests"
+assert_status 0 "check-env accepts the phase branch with its spec" sh -c "cd '$wt' && scripts/check-env.sh"
 # phase_session is the mark of the session that works on the phase, never of the one that opened it.
-assert_status 0 "check-env runs for the opening session" env CLAUDE_CODE_SESSION_ID=manager sh -c "cd '$wt' && scripts/check-env.sh --no-tests"
+assert_status 0 "check-env runs for the opening session" env CLAUDE_CODE_SESSION_ID=manager sh -c "cd '$wt' && scripts/check-env.sh"
 assert_eq "" "$(events | jq -r 'select(.event == "phase_session" and .session_id == "manager") | .issue')" "no phase_session for the session that opened the phase"
 # The child session runs in the pair of the spec (its transcript and CLAUDE_EFFORT say so).
 mkdir -p "$TMP/claude/projects/p"
 echo '{"type":"assistant","message":{"model":"claude-sonnet-1"}}' >"$TMP/claude/projects/p/child.jsonl"
-assert_status 0 "check-env runs for the child session" env CLAUDE_CODE_SESSION_ID=child CLAUDE_EFFORT=low CLAUDE_CONFIG_DIR="$TMP/claude" sh -c "cd '$wt' && scripts/check-env.sh --no-tests"
+assert_status 0 "check-env runs for the child session" env CLAUDE_CODE_SESSION_ID=child CLAUDE_EFFORT=low CLAUDE_CONFIG_DIR="$TMP/claude" sh -c "cd '$wt' && scripts/check-env.sh"
 assert_eq "7" "$(events | jq -r 'select(.event == "phase_session" and .session_id == "child") | .issue')" "records phase_session for the child session"
 
 # check-env: a phase branch without a spec for its issue is refused.
 git -C "$repo" worktree add --quiet -b feat/issue-55-nospec "$repo/.worktrees/issue-55" origin/main
-assert_status 1 "check-env refuses a phase branch without a spec" sh -c "cd '$repo/.worktrees/issue-55' && scripts/check-env.sh --no-tests"
+assert_status 1 "check-env refuses a phase branch without a spec" sh -c "cd '$repo/.worktrees/issue-55' && scripts/check-env.sh"
 assert_contains "$(last_output)" "no spec" "check-env says the spec is missing"
 
 # phase_opened is recorded before the worktree exists: it is there even when the worktree fails.
