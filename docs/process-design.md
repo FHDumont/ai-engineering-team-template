@@ -267,6 +267,7 @@ Todo script tem `--help`, um teste em `scripts/tests/` e saída curta em inglês
 | `scripts/deploy.sh` | O único deploy (§9.4) | sessão principal, no passo único de fim |
 | `scripts/validate.sh` | Lint e todos os testes; único lugar onde roda o shellcheck. Pega vaga `validate` (fila com "waiting for a validate slot"), um por worktree (o segundo espera e devolve o resultado do primeiro); `--lint` sozinho fora da CI olha só os arquivos alterados contra a `main`, `--full` e a CI olham tudo | agentes, CI |
 | `scripts/machine-slots.sh` | Vagas da máquina (§6.4): `--status` (vagas, quem ocupa, carga), `--check <classe> [n]` (sai 75 sem vaga), `--report [--days N]` (mediana e p90 de espera e duração por classe e repositório) | agentes, `open-parallel.sh` |
+| `scripts/sessions.sh` | Sessões e MCPs da máquina (§6.4): `--list` (por repo: tipo, PID, idade, CPU, RAM, MCPs), `--stale` (sessões do app não arquivadas e paradas há mais de N horas, para o dono arquivar), `--close-idle` (só headless paradas; nunca `claude` filho do `Claude.app`) | agentes, `close-phase.sh --cleanup` |
 | `scripts/check-docs.sh` | Limites de palavras (`AGENTS.md` 300–500, `docs/STATE.md` ≤500, `docs/BOTS.md` ≤450, skill `plan` ≤400); `CLAUDE.md` só com `@AGENTS.md`; uma linha por ADR no índice; nenhuma seção de histórico; este desenho contra o repositório: tabela das regras-base, tabela de scripts, tabela de hooks e tabela de arquivos; nenhum nome só de um repositório (lista das notas dele, quando existem) neste desenho, no `AGENTS.md` nem nas skills; nenhum formulário de issue em YAML (§8.2) | CI, `close-phase.sh` |
 | `scripts/check-workflows.py` | Padrão dos workflows (§9) além do `actionlint` | CI |
 | `scripts/check-attribution.sh` | Reprova assinatura de IA abrindo uma linha nos commits e no corpo do PR | CI `policy`, `close-phase.sh --merge`, `.githooks/commit-msg` |
@@ -389,6 +390,9 @@ O histórico `~/.cache/ai-method/history.tsv` (espera e duração de cada valida
 | `AI_METHOD_WARN_FREE_MEM_MB` | 1024 | MB | memória livre abaixo disso avisa |
 | `AI_METHOD_WARN_SWAP_MB` | 2048 | MB | swap em uso acima disso avisa |
 | `AI_METHOD_LINT_BASE` | main | ref do git | base do lint incremental do `validate.sh --lint` |
+| `AI_METHOD_IDLE_HOURS` | 4 | horas | sessão parada há mais que isso: `sessions.sh --close-idle` encerra a headless e o fim da fase lista as do app não arquivadas |
+
+Fim da fase e processos: o `close-phase.sh --cleanup` encerra os processos cujo diretório atual está no worktree (servidor de teste, watcher, `validate.sh`) e a filha headless do trace (`phase_headless`, conferida pelo id da sessão na linha de comando) com os MCPs dela; nunca um `claude` filho do `Claude.app` nem a própria sessão que roda o script. A sessão do app só o dono libera: a mensagem de fim manda **Arquivar** (menu ⋯ → Archive), nunca deletar (o histórico some) nem só fechar a aba (o processo segue), e lista as outras sessões do repo não arquivadas e paradas há mais de `AI_METHOD_IDLE_HOURS` (`sessions.sh --stale`).
 
 ## 7. Arquivos
 
