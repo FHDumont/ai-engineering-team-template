@@ -39,6 +39,8 @@
 #:   CLOSE_PHASE_CI_TIMEOUT s (default 180, read every CLOSE_PHASE_CI_POLL,
 #:   default 15) exits 7 as CI missing; a check on an older SHA does not count.
 #:   Run it before and while waiting for CI; --merge runs it too.
+#: --prepare, --check and --merge --wait record their steps in
+#:   ~/.cache/ai-method/progress/ (scripts/progress.sh), never in the output.
 #: --merge: refuses with needs-owner-ok, a sensitive area label or a diff in
 #:   .github/sensitive-paths (union of the base's list and the PR's; no readable
 #:   list on the base: refused), unless --owner-ok (only after the owner's ok in a
@@ -86,6 +88,8 @@ set -euo pipefail
 HERE="$(cd "$(dirname "$0")" && pwd)"
 # shellcheck source=scripts/lib/common.sh
 source "$HERE/lib/common.sh"
+# shellcheck source=scripts/lib/progress.sh
+source "$HERE/lib/progress.sh"
 ROOT="$(cd "$HERE/.." && pwd)"
 
 mode="" title="" body_file="" issue="" review_file="" verdict="" round="" owner_ok=0 wait=0 discard=0
@@ -151,6 +155,11 @@ validated_head() {
 
 # validate.sh once per HEAD: a second --prepare on the same commit (a retry after a
 # failed push or PR edit) does not run the suite again; a green run is recorded.
+# The long modes record their steps for the owner and the dashboard (process-design §6.4).
+case "$mode" in
+  prepare|check|merge) progress_start close-phase.sh "$issue"; trap 'progress_end $?' EXIT ;;
+esac
+
 run_validate() {
   if validated_head; then
     echo "skipped validate.sh: HEAD $(git rev-parse --short HEAD) already validated green in this phase"
@@ -166,7 +175,9 @@ run_validate() {
 prepare() {
   [ -n "$body_file" ] && [ -f "$body_file" ] || die "--body-file is required (fill .github/pull_request_template.md)"
   "$HERE/check-attribution.sh" --text-file "$body_file" >/dev/null || die "PR body has AI attribution"
+  progress_step "validate.sh"
   run_validate
+  progress_step "check-docs.sh"
   "$HERE/check-docs.sh" || die "check-docs.sh failed"
   git fetch --quiet origin main
   git diff --quiet && git diff --cached --quiet || die "uncommitted changes: commit each step first"
@@ -189,10 +200,12 @@ prepare() {
   local n
   n="$(pr_number)"
   [ -n "$n" ] || [ -n "$title" ] || die "--title is required to open the PR"
+  progress_step "pushing the branch"
   git push --quiet -u origin "$branch"
   trace_event phase_push sha="$(git rev-parse HEAD)"
   echo "pushed $branch (one push for this round)"
 
+  progress_step "opening or updating the PR"
   if [ -z "$n" ]; then
     gh pr create --repo "$repo" --base main --head "$branch" --title "$title" --body-file "$body_file" >/dev/null
     n="$(pr_number)"
@@ -304,6 +317,7 @@ spec_details() { # spec_details <body file> <spec path> <file with the spec text
 check_pr() { # check_pr [PR number]
   local n info m s sha reads=0 tries="${CLOSE_PHASE_MERGEABLE_TRIES:-5}"
   n="${1:-$(pr_number)}"; [ -n "$n" ] || die "no open PR for $branch"
+  progress_step "reading the PR state"
   while :; do
     reads=$((reads + 1))
     info="$(gh pr view "$n" --repo "$repo" --json mergeable,mergeStateStatus,headRefOid)"
@@ -324,6 +338,7 @@ check_pr() { # check_pr [PR number]
   fi
   # CI on the HEAD SHA; a check on an older SHA does not count.
   local count waited=0 timeout="${CLOSE_PHASE_CI_TIMEOUT:-180}" poll="${CLOSE_PHASE_CI_POLL:-15}"
+  progress_step "waiting for CI on HEAD" 0 "$timeout"
   while :; do
     count="$(gh api "repos/$repo/commits/$sha/check-runs" --jq '.total_count')"
     [ "${count:-0}" -gt 0 ] && break
@@ -333,6 +348,7 @@ check_pr() { # check_pr [PR number]
       exit 7
     fi
     sleep "$poll"; waited=$((waited + poll))
+    progress_step "waiting for CI on HEAD" "$waited" "$timeout"
     [ "$poll" -gt 0 ] || waited="$timeout"
   done
   echo "ok: PR #$n mergeable ($s), $count check(s) on HEAD ${sha:0:12}"
@@ -502,10 +518,12 @@ Ok do dono do repo registrado (quadro de escolha) para:$reasons." >/dev/null
 
   if [ "$wait" = 1 ]; then
     local tries=0
+    progress_step "waiting for the merge" 0 120
     until [ "$(gh pr view "$n" --repo "$repo" --json state --jq .state)" = MERGED ]; do
       tries=$((tries + 1))
       [ "$tries" -le 120 ] || die "PR #$n not merged after 60 minutes"
       sleep "${CLOSE_PHASE_MERGE_POLL:-30}"
+      progress_step "waiting for the merge" "$tries" 120
     done
     echo "PR #$n merged"
     cleanup
