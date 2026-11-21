@@ -17,6 +17,9 @@
 #: ~/.config/ai-method/machine-limits.env): with none free it exits 75 before
 #: creating anything and says who holds them. The slot frees itself when the worktree
 #: is gone. Warns, without blocking, when the machine load is high.
+#: A failure after the branch and the worktree exist (spec not committed, check-env.sh
+#: refusing, the board not writable) undoes them (worktree and local branch), says so
+#: and frees the slot: the same opening works again with no cleanup by hand.
 set -euo pipefail
 HERE="$(cd "$(dirname "$0")" && pwd)"
 # shellcheck source=scripts/lib/common.sh
@@ -84,8 +87,26 @@ if ! slots_try fase "$issue" "$path"; then
   slots_holders fase >&2
   exit 75
 fi
-# A slot of a phase that did not open goes back at once.
-trap '[ -d "$path" ] || slots_release' EXIT
+# What this script created goes back when a step fails: the worktree, the local
+# branch, the temporary index and, when the phase did not open, the slot. Nothing
+# is left for a cleanup by hand and the next opening works.
+made_wt=0 index=""
+undo_open() {
+  local rc=$?
+  trap - EXIT
+  if [ "$rc" != 0 ]; then
+    if [ "$made_wt" = 1 ]; then
+      git -C "$main_root" worktree remove --force "$path" >/dev/null 2>&1 || rm -rf "$path"
+      git -C "$main_root" worktree prune
+      git -C "$main_root" branch -D "$branch" >/dev/null 2>&1 || true
+      echo "undone: removed the worktree $path and the branch $branch (the opening of #$issue failed)" >&2
+    fi
+  fi
+  [ -z "$index" ] || rm -rf "$(dirname "$index")"
+  [ -d "$path" ] || slots_release
+  exit "$rc"
+}
+trap undo_open EXIT
 slots_load_report | grep '^warn:' || true
 git fetch --quiet origin main
 # Marks the session that opened the phase (planning): the close-phase.sh gate only
@@ -112,8 +133,9 @@ done <<<"$specs"
 if [ ${#added[@]} -gt 0 ]; then
   start="$(git commit-tree "$(GIT_INDEX_FILE="$index" git write-tree)" -p "$base" -m "docs(specs): add the spec of issue #$issue")"
 fi
-rm -rf "$(dirname "$index")"
+rm -rf "$(dirname "$index")"; index=""
 git worktree add --quiet -b "$branch" "$path" "$start"
+made_wt=1
 git -C "$path" branch --quiet --unset-upstream 2>/dev/null || true
 if [ ${#added[@]} -gt 0 ]; then
   # Read back: the branch holds exactly the spec that was approved.
@@ -130,5 +152,5 @@ board=0
 project_set_status "$issue" "In Progress" || board=1
 # Filter of the "Fase atual" view: the group of this phase plus the one of the parallel phases already active.
 project_refresh_phase_filter "$main_root" "$issue" "" || board=1
-[ "$board" = 0 ] || die "phase #$issue is open at $path, but the board was not updated (cause and fix above)"
+[ "$board" = 0 ] || die "phase #$issue not opened: the board was not updated (cause and fix above); what was created is undone"
 echo "$path"
