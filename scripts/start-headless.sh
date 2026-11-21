@@ -5,7 +5,7 @@
 #:
 #: For the manager when the app refuses start_session (Remote Control): the phase
 #: must already be open (phase-start.sh). It reads the pair "modelo/esforço" of the
-#: spec, then starts in the background, inside .worktrees/issue-<n>:
+#: spec in the worktree of the phase (the spec may exist only on its branch), then starts in the background, inside .worktrees/issue-<n>:
 #:   claude -p <execute prompt> --session-id <uuid> --model <m> --effort <e>
 #: with the log in .worktrees/issue-<n>/.process/headless.log (outside git) and
 #: records phase_headless in the trace (pid, child_session, log, model, effort).
@@ -52,7 +52,9 @@ command -v claude >/dev/null 2>&1 || die "claude is not installed: use the card 
 main_root="$(git worktree list --porcelain | sed -n '1s/^worktree //p')"
 wt="$main_root/.worktrees/issue-$issue"
 [ -d "$wt" ] || die "no worktree for #$issue: open the phase with scripts/phase-start.sh first" 2
-specs="$(specs_citing "$issue" "$main_root")"
+# The spec lives on the branch of the phase (phase-start.sh commits it there and removes the
+# loose copy of the main checkout): read it from the worktree.
+specs="$(specs_citing "$issue" "$wt" | sed "s#^#$wt/#")"
 # shellcheck disable=SC2086
 pair="$(spec_pairs "$issue" $specs | head -1)" && [ -n "$pair" ] || die "no 'modelo: ... · esforço: ...' pair in the spec of #$issue" 2
 model="${pair% *}" effort="${pair#* }"

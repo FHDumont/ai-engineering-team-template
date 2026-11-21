@@ -60,6 +60,15 @@ for ci in red running absent; do
   assert_eq "" "$(git -C "$repo" branch --list '*issue-*')" "no branch with CI $ci"
   assert_not_contains "$(events)" "phase_opened" "no phase_opened with CI $ci"
 done
+# #32: a failure of the GitHub API is not an absent check: the message says the check was not read.
+assert_status 1 "phase-start refuses when the API fails reading the check CI" env FAKE_GH_FAIL='commits/.*/check-runs' FAKE_GH_FAIL_MSG='gh: network down' sh -c "cd '$repo' && scripts/phase-start.sh 7 --no-check"
+assert_contains "$(last_output)" "could not read the check 'CI'" "says it did not read the check"
+assert_contains "$(last_output)" "network down" "carries the error of gh"
+assert_not_contains "$(last_output)" "no check 'CI' on the base" "does not say the check is absent"
+assert_eq "" "$(ls "$repo/.worktrees" 2>/dev/null || true)" "no worktree when the API fails"
+assert_status 1 "an absent check keeps its own message" env FAKE_BASE_CI=absent sh -c "cd '$repo' && scripts/phase-start.sh 7 --no-check"
+assert_contains "$(last_output)" "no check 'CI' on the base commit" "absent check message is unchanged"
+assert_not_contains "$(last_output)" "could not read" "absent is not reported as a read failure"
 assert_status 1 "a red base refuses the group too" env FAKE_BASE_CI=red sh -c "cd '$repo' && scripts/phase-start.sh 7 8 --no-check"
 assert_eq "" "$(ls "$repo/.worktrees" 2>/dev/null || true)" "the group creates nothing on a red base"
 assert_contains "$(last_output)" "actions/runs/3" "names the run of the red CI"
