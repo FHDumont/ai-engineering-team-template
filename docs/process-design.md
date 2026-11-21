@@ -265,7 +265,8 @@ Todo script tem `--help`, um teste em `scripts/tests/` e saída curta em inglês
 | `scripts/gen-changelog.py` | `CHANGELOG.md` a partir dos PRs com merge, agrupado por `type:*` | `gen-docs.sh` |
 | `scripts/gen-roadmap.py` | `ROADMAP.md` das issues abertas por área e prioridade | `gen-docs.sh`, `end-check.sh` |
 | `scripts/deploy.sh` | O único deploy (§9.4) | sessão principal, no passo único de fim |
-| `scripts/validate.sh` | Lint e todos os testes; único lugar onde roda o shellcheck | agentes, CI |
+| `scripts/validate.sh` | Lint e todos os testes; único lugar onde roda o shellcheck. Pega vaga `validate` (fila com "waiting for a validate slot"), um por worktree (o segundo espera e devolve o resultado do primeiro); `--lint` sozinho fora da CI olha só os arquivos alterados contra a `main`, `--full` e a CI olham tudo | agentes, CI |
+| `scripts/machine-slots.sh` | Vagas da máquina (§6.4): `--status` (vagas, quem ocupa, carga), `--check <classe> [n]` (sai 75 sem vaga), `--report [--days N]` (mediana e p90 de espera e duração por classe e repositório) | agentes, `open-parallel.sh` |
 | `scripts/check-docs.sh` | Limites de palavras (`AGENTS.md` 300–500, `docs/STATE.md` ≤500, `docs/BOTS.md` ≤450, skill `plan` ≤400); `CLAUDE.md` só com `@AGENTS.md`; uma linha por ADR no índice; nenhuma seção de histórico; este desenho contra o repositório: tabela das regras-base, tabela de scripts, tabela de hooks e tabela de arquivos; nenhum nome só de um repositório (lista das notas dele, quando existem) neste desenho, no `AGENTS.md` nem nas skills; nenhum formulário de issue em YAML (§8.2) | CI, `close-phase.sh` |
 | `scripts/check-workflows.py` | Padrão dos workflows (§9) além do `actionlint` | CI |
 | `scripts/check-attribution.sh` | Reprova assinatura de IA abrindo uma linha nos commits e no corpo do PR | CI `policy`, `close-phase.sh --merge`, `.githooks/commit-msg` |
@@ -370,6 +371,23 @@ O hook `trace-event.sh` acrescenta uma linha JSON por evento em `.process/events
 `scripts/trace-view.py` gera `.process/tree.html`; com `--text`, a árvore em texto; com `--pairs <issue>`, a tabela pedido × usado do PR. O `effort` do `SubagentStart` vem sempre "medium"; o valor pedido está no `PreToolUse` do Agent.
 
 ---
+
+### 6.4 Limites da máquina
+
+Todos os projetos, bots e pessoas da máquina dividem as mesmas vagas, em `~/.cache/ai-method/slots/` (um diretório por vaga, criado com `mkdir`; guarda repositório, issue, PID e início). Duas classes: `validate` (execuções do `validate.sh`) e `fase` (fases abertas por `new-phase.sh` e `open-parallel.sh`; sem vaga, saem 75 sem criar nada e dizem quem ocupa). Vaga de PID morto ou de worktree que não existe mais se libera sozinha; a vaga de fase vale enquanto o worktree existe, e a duração dela entra no histórico quando a vaga é liberada (limite superior da duração real). Carga (load1, memória livre, swap) só avisa, em `machine-slots.sh --status` e no início da fase; o portão de carga é a issue #12.
+
+O histórico `~/.cache/ai-method/history.tsv` (espera e duração de cada validação e fase) alimenta `scripts/machine-slots.sh --report`, para comparar antes e depois de uma mudança. Os limites ficam em `~/.config/ai-method/machine-limits.env`, criado na primeira execução de `scripts/lib/machine-limits.env.example` (cada parâmetro comentado lá); variável do ambiente vence o arquivo.
+
+| Parâmetro | Padrão | Unidade | Efeito |
+|---|---|---|---|
+| `AI_METHOD_SLOTS_VALIDATE` | 2 | execuções | `validate.sh` ao mesmo tempo na máquina; o próximo espera na fila |
+| `AI_METHOD_SLOTS_FASE` | 3 | fases | fases abertas ao mesmo tempo; sem vaga, `new-phase.sh` e `open-parallel.sh` saem 75 |
+| `AI_METHOD_WAIT_TIMEOUT_SECONDS` | 1200 | segundos | espera máxima por vaga ou pela execução do mesmo worktree; depois, `validate.sh` sai 4 |
+| `AI_METHOD_POLL_SECONDS` | 2 | segundos | pausa entre duas olhadas na fila |
+| `AI_METHOD_WARN_LOAD1` | 8 | load de 1 min | acima disso avisa (não bloqueia) |
+| `AI_METHOD_WARN_FREE_MEM_MB` | 1024 | MB | memória livre abaixo disso avisa |
+| `AI_METHOD_WARN_SWAP_MB` | 2048 | MB | swap em uso acima disso avisa |
+| `AI_METHOD_LINT_BASE` | main | ref do git | base do lint incremental do `validate.sh --lint` |
 
 ## 7. Arquivos
 
