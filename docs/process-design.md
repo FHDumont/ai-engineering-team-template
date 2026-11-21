@@ -392,6 +392,7 @@ O histórico `~/.cache/ai-method/history.tsv` (espera e duração de cada valida
 | Parâmetro | Padrão | Unidade | Efeito |
 |---|---|---|---|
 | `AI_METHOD_SLOTS_VALIDATE` | 2 | execuções | `validate.sh` ao mesmo tempo na máquina; o próximo espera na fila |
+| `AI_METHOD_TEST_JOBS` | CPUs ÷ `SLOTS_VALIDATE` (mín. 1) | testes | testes de um `validate.sh` ao mesmo tempo, cada um na sua pasta temporária; 1 roda em série; a CI usa o mesmo padrão |
 | `AI_METHOD_SLOTS_FASE` | 3 | fases | fases abertas ao mesmo tempo; sem vaga, `new-phase.sh` e `open-parallel.sh` saem 75 |
 | `AI_METHOD_WAIT_TIMEOUT_SECONDS` | 1200 | segundos | espera máxima por vaga ou pela execução do mesmo worktree; depois, `validate.sh` sai 4 |
 | `AI_METHOD_POLL_SECONDS` | 2 | segundos | pausa entre duas olhadas na fila |

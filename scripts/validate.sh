@@ -20,6 +20,10 @@
 #: ~/.cache/ai-method/history.tsv (see machine-slots.sh --report). The limits are in
 #: ~/.config/ai-method/machine-limits.env.
 #:
+#: Tests run in parallel, each in its own temporary folder: AI_METHOD_TEST_JOBS at once
+#: (default: CPUs divided by AI_METHOD_SLOTS_VALIDATE, at least 1; 1 = in series). The
+#: report keeps the fixed order of the tests.
+#:
 #: Progress (for the owner and the dashboard, never printed): each step goes to
 #: ~/.cache/ai-method/progress/<repo>-<issue>.jsonl (scripts/progress.sh reads it).
 #:
@@ -140,32 +144,44 @@ for f in sys.argv[1:]:
   fi
 
   if [ "$tests" = 1 ]; then
-    passed=0 failed=0 n_done=0 n_total=0
+    local list=() n_total rdir pid n_seen=0 line runner alive
     for t in scripts/tests/test_*.sh .claude/hooks/tests/test_*.sh scripts/tests/test_*.py; do
-      [ -e "$t" ] && n_total=$((n_total + 1))
+      [ -e "$t" ] && list+=("$t")
     done
-    for t in scripts/tests/test_*.sh .claude/hooks/tests/test_*.sh; do
-      [ -e "$t" ] || continue
-      n_done=$((n_done + 1)); progress_step "tests $(basename "$t")" "$n_done" "$n_total"
-      if out="$(bash "$t" 2>&1)"; then
+    n_total=${#list[@]}
+    passed=0 failed=0
+    # Each test runs in the background, up to AI_METHOD_TEST_JOBS at once, with its own
+    # temporary folder (tests/lib.sh makes one per run); output and exit code go to
+    # files and are reported afterwards, in the fixed order of the list. Each finished
+    # test appends its name to done.log, which feeds the progress.
+    rdir="$(mktemp -d "${TMPDIR:-/tmp}/validate-tests.XXXXXX")"
+    : >"$rdir/done.log"
+    # shellcheck disable=SC2016  # the runner is a script for the child shell
+    runner='n="$(printf %s "$2" | tr / _)"
+      case "$2" in *.py) python3 "$2" >"$1/$n.out" 2>&1 ;; *) bash "$2" >"$1/$n.out" 2>&1 ;; esac
+      echo $? >"$1/$n.rc"; basename "$2" >>"$1/done.log"'
+    printf '%s\0' "${list[@]}" | xargs -0 -n1 -P "$AI_METHOD_TEST_JOBS" bash -c "$runner" _ "$rdir" &
+    pid=$!
+    while :; do
+      alive=1; kill -0 "$pid" 2>/dev/null || alive=0
+      while IFS= read -r line; do
+        n_seen=$((n_seen + 1)); progress_step "tests $line" "$n_seen" "$n_total"
+      done < <(sed -n "$((n_seen + 1)),\$p" "$rdir/done.log")
+      [ "$alive" = 1 ] || break
+      sleep 1
+    done
+    wait "$pid" || true
+    for t in "${list[@]}"; do
+      if [ "$(cat "$rdir/$(printf %s "$t" | tr / _).rc" 2>/dev/null || echo 1)" = 0 ]; then
         passed=$((passed + 1))
       else
         failed=$((failed + 1)); fail=1
+        out="$(cat "$rdir/$(printf %s "$t" | tr / _).out" 2>/dev/null || true)"
         echo "FAIL $t"; echo "$out" | tail -20 | sed 's/^/  /'
         echo "$out" | missing_dep_hint
       fi
     done
-    for t in scripts/tests/test_*.py; do
-      [ -e "$t" ] || continue
-      n_done=$((n_done + 1)); progress_step "tests $(basename "$t")" "$n_done" "$n_total"
-      if out="$(python3 "$t" 2>&1)"; then
-        passed=$((passed + 1))
-      else
-        failed=$((failed + 1)); fail=1
-        echo "FAIL $t"; echo "$out" | tail -20 | sed 's/^/  /'
-        echo "$out" | missing_dep_hint
-      fi
-    done
+    rm -rf "$rdir"
     echo "tests: $passed passed, $failed failed"
   fi
   exit "$fail"
