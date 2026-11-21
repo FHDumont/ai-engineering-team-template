@@ -193,4 +193,12 @@ templates="$(grep -F 'Templates em Markdown' "$REPO/docs/process-design.md" || t
 assert_contains "$templates" "não issue forms" "the design keeps the rule of Markdown templates"
 assert_contains "$templates" "modal pequeno, campo por campo" "the design says what the YAML form opens"
 assert_contains "$templates" "editor grande" "the design says what the Markdown template opens"
+
+# Texts never build PR, issue or review bodies at a fixed /tmp path (parallel sessions would overwrite it).
+for f in .claude/skills/*/SKILL.md .claude/agents/*.md; do
+  assert_not_contains "$(grep -E '/tmp/[A-Za-z0-9_.-]+' "$REPO/$f" || true)" "/tmp/" "$f has no fixed /tmp path"
+done
+for f in .claude/skills/execute/SKILL.md .claude/skills/close-phase/SKILL.md .claude/skills/ask-bot/SKILL.md .claude/agents/close-reviewer.md; do
+  assert_contains "$(cat "$REPO/$f")" "mktemp" "$f says to use mktemp for temporary texts"
+done
 finish

@@ -13,7 +13,7 @@ description: Sessão filha de uma fase já aberta por scripts/phase-start.sh —
 3a. A fase roda nesta sessão filha (regra única, §4.3 do `process-design`). Por etapa, compare o par dela na spec com o par desta sessão (o `check-env.sh` imprime os dois): par igual roda nesta sessão; par diferente vai a um subagente (ferramenta `Agent`) com o `model` e o `effort` da etapa, que faz o commit dela. Implemente, rode `scripts/validate.sh`, faça um commit Conventional Commits em inglês, adicionando arquivos pelo nome. Bug: primeiro o teste que falha no código antigo.
 4. Achados (§4.2): `scripts/open-issue.sh --type finding --size small|medium|large …`.
    - Leve e só em arquivos do PR: corrija num commit no próprio PR. Os outros entram numa única issue guarda-chuva por grupo, com checklist; nunca uma issue por ponto. Grande: avise a gerenciadora por mensagem; ela pergunta ao dono.
-5. Suposições vão para o PR. Nada de refatoração de carona.
+5. Texto de PR, issue ou parecer: monte em `mktemp` ou `.worktrees/issue-<n>/.process/`, nunca em caminho fixo em `/tmp` (outra filha o sobrescreve). Suposições vão para o PR. Nada de refatoração de carona.
 6. A tabela do PR "etapa | modelo/esforço pedido | modelo/esforço usado" é escrita pelo `close-phase.sh --prepare` (do trace, `scripts/trace-view.py --pairs <n>`); não a preencha à mão.
 7. Ao terminar as etapas, se a fase mudou o estado atual, atualize a sua parte do `docs/STATE.md` (só o estado atual, ≤500 palavras); se houve decisão, crie a ADR (`docs/adr/TEMPLATE.md`) e a linha no índice.
 8. Modo de fim:

@@ -10,4 +10,4 @@ description: Pergunta a um bot do time (caminho B) numa issue e espera a respost
 3. Saída 4: o webhook falhou três vezes; a issue ficou com `ask:<bot>`. Avise o dono do repo no bloco de status e siga com o que não depende da resposta.
 4. Saída 3: sem resposta no prazo; retome depois com `scripts/wait-reply.sh <issue> <id>`.
 5. Só vale resposta com a marca `<!-- bot:<slug> reply-to:<id> -->`, nunca por autor.
-6. Passou de ~10 comentários: escreva o resumo do que foi acordado e rode `scripts/summarize-thread.sh <issue> --summary-file <arquivo>`.
+6. Passou de ~10 comentários: escreva o resumo do que foi acordado e rode `scripts/summarize-thread.sh <issue> --summary-file <arquivo>` (arquivo de `mktemp` ou `.worktrees/issue-<n>/.process/`, nunca caminho fixo em `/tmp`).
