@@ -23,6 +23,6 @@ Repositório criado a partir do template do método (`docs/process-design.md`). 
 
 ## Pontos de atenção
 
-- Sem a proteção da `main` (`CI` + `review/independent`) não há merge: o `close-phase.sh --merge` recusa. Repo privado em plano sem proteção de branch: o `setup-repo.sh` sai 6.
+- Sem a proteção da `main` o merge só passa no modo sem proteção (`PROCESS_BRANCH_MODE`, repo privado em plano gratuito): `close-phase.sh --merge` lê `CI` e `review/independent` pela API (saída 11 se não verdes) e o hook `pre-push` recusa push na `main`; o servidor não impede merge à mão.
 - `close-phase.sh --abort` sai 10 com perda; `--discard` confirma.
 - `close-phase.sh --check`: conflito real no cherry-pick sai 4; `mergeable` UNKNOWN após 5 leituras sai 8; sem check no HEAD em ~180 s sai 7.
