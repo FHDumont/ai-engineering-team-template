@@ -6,6 +6,8 @@ source "$(dirname "$0")/lib.sh"
 
 repo="$(make_repo)"
 copy_scripts "$repo"
+# phase-start.sh checks the setup against the labels file of the repository.
+mkdir -p "$repo/.github" && cp "$REPO/.github/labels.tsv" "$repo/.github/labels.tsv"
 printf '.worktrees/\n.process/\n' >"$repo/.gitignore"
 mkdir -p "$repo/docs/specs"
 cat >"$repo/docs/specs/pair.md" <<'S'
@@ -17,7 +19,7 @@ cat >"$repo/docs/specs/pair.md" <<'S'
 2. Etapa. modelo: small · esforço: low · motivo: leve
 3. Etapa. modelo: big · esforço: high · motivo: forte
 S
-git -C "$repo" add scripts .gitignore docs
+git -C "$repo" add scripts .gitignore docs .github
 git -C "$repo" commit --quiet -m "chore: scripts and spec"
 export PROCESS_EVENTS_FILE="$repo/.process/events.jsonl"
 mkdir -p "$repo/.process"
@@ -25,6 +27,7 @@ git -C "$repo" worktree add --quiet -b feat/issue-7-x "$repo/.worktrees/issue-7"
 wt="$repo/.worktrees/issue-7"
 echo ': ' >"$TMP/handler.sh"
 use_fake_gh "$TMP/handler.sh"
+fake_setup ok
 
 # The harness keeps the transcript of a session at <config>/projects/<slug>/<session id>.jsonl.
 export CLAUDE_CONFIG_DIR="$TMP/claude"

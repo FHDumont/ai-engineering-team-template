@@ -11,6 +11,8 @@
 #: A missing required section is an error and nothing is created. Labels come
 #: from the template, the auto-label.py rules on the body and the options.
 #: --dry-run prints the body and labels without calling GitHub.
+#: When gh refuses the issue and the labels of the method are missing, the error
+#: is the one of setup-repo.sh --check (exit 7, "configurar o repo").
 #: Prints the URL of the new issue after reading the issue and its labels back.
 #: With a board configured, the item goes to Todo; a board write that fails
 #: exits != 0 with the cause and the fix (lib/project.sh).
@@ -88,7 +90,11 @@ for l in $labels; do
 done
 args=(issue create --repo "$repo" --title "$title" --body-file "$tmp/body.md")
 for l in $labels; do args+=(--label "$l"); done
-url="$(gh "${args[@]}")" || die "issue not created: gh issue create failed"
+if ! url="$(gh "${args[@]}")"; then
+  # Labels of the method missing: the repository was never set up; same message as phase-start.sh.
+  "$HERE/setup-repo.sh" --check --only labels >/dev/null
+  die "issue not created: gh issue create failed"
+fi
 # Exit 0 does not prove the issue exists: the URL must be one, and the issue is read back.
 num="$(printf '%s\n' "$url" | sed -n -E 's#^https://.*/issues/([0-9]+)$#\1#p' | tail -1)"
 [ -n "$num" ] || die "issue not created: gh issue create returned no issue URL (got '${url:-nothing}')"

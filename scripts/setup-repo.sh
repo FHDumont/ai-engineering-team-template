@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 #: setup-repo.sh: apply the method's standard to the GitHub repository (idempotent).
 #:
-#: Usage: setup-repo.sh [--dry-run] [--only labels|settings|protection]
+#: Usage: setup-repo.sh [--dry-run | --check] [--only labels|settings|protection]
 #:
 #: 1. Labels: syncs with .github/labels.tsv (creates, updates color and
 #:    description, renames from old names with `gh label edit --name`) and
@@ -27,6 +27,12 @@
 #:               PROCESS_OFFER_PROJECT / PROCESS_OFFER_RUNNER / PROCESS_OFFER_RUNNER_TRIGGER.
 #:    A runner declined at setup only returns through the triage trigger
 #:    (triage.sh --runner-offer).
+#: --check is the single conference of the mandatory setup (phase-start.sh,
+#: open-issue.sh and the session hook call it): it only reads, each thing once
+#: (labels, repository, protection, variables), and exits 0 when all three match and no offer
+#: is unanswered. Otherwise it prints one `missing:` line per part and the
+#: sentence to say ("configurar o repo") on stderr and exits 7; the plan without
+#: branch protection keeps its own message and exit 6. With --only it checks that part alone.
 #: --dry-run only shows the difference (with --project too: it only reads and says
 #: what it would create). A second run with no difference changes nothing. Pre-approved: the agent runs it; the owner never does.
 set -euo pipefail
@@ -41,6 +47,7 @@ while [ $# -gt 0 ]; do
   case "$1" in
     -h|--help) print_help "$0"; exit 0 ;;
     --dry-run) dry=1; shift ;;
+    --check) mode=check; dry=1; shift ;;
     --only) only="$2"; shift 2 ;;
     --offers) mode=offers; shift ;;
     --project) mode=project; shift ;;
@@ -54,20 +61,36 @@ branch="${SETUP_BRANCH:-main}"
 changes=0
 
 # One-time offers of the Project and of the runner. The "no" stays in the repository variable.
+# The variable names and the repository are read once per run, whatever asks for them.
+var_names="" var_names_read=0
 var_exists() { # var_exists <name>
-  gh variable list --repo "$repo" --json name --jq '.[].name' 2>/dev/null | grep -qxF "$1"
-}
-run_offers() {
-  local pending=0
-  if ! var_exists PROCESS_OFFER_PROJECT; then echo "offer:project"; pending=1; fi
-  if ! var_exists PROCESS_OFFER_RUNNER && ! var_exists CI_RUNS_ON &&
-     [ "$(gh api "repos/$repo" --jq .private 2>/dev/null)" = "true" ]; then
-    echo "offer:runner"; pending=1
+  if [ "$var_names_read" = 0 ]; then
+    var_names="$(gh variable list --repo "$repo" --json name --jq '.[].name' 2>/dev/null || true)"
+    var_names_read=1
   fi
-  [ "$pending" = 1 ] || echo "offers: none pending"
+  printf '%s\n' "$var_names" | grep -qxF "$1"
+}
+repo_info=""
+read_repo_info() {
+  [ -n "$repo_info" ] || repo_info="$(gh api "repos/$repo")"
+}
+offers_pending=""
+run_offers() {
+  offers_pending=""
+  var_exists PROCESS_OFFER_PROJECT || offers_pending="offer:project"
+  if ! var_exists PROCESS_OFFER_RUNNER && ! var_exists CI_RUNS_ON; then
+    read_repo_info 2>/dev/null || true
+    if [ "$(printf '%s' "$repo_info" | jq -r .private 2>/dev/null)" = "true" ]; then
+      offers_pending="${offers_pending:+$offers_pending }offer:runner"
+    fi
+  fi
 }
 case "$mode" in
-  offers) run_offers; exit 0 ;;
+  offers)
+    run_offers
+    # shellcheck disable=SC2086
+    if [ -n "$offers_pending" ]; then printf '%s\n' $offers_pending; else echo "offers: none pending"; fi
+    exit 0 ;;
   project)
     # shellcheck source=scripts/lib/project.sh
     source "$HERE/lib/project.sh"
@@ -196,7 +219,8 @@ sync_labels() {
 sync_settings() {
   local want have
   want='{"allow_auto_merge":true,"allow_merge_commit":false,"allow_squash_merge":false,"allow_rebase_merge":true,"delete_branch_on_merge":true}'
-  have="$(gh api "repos/$repo" --jq '{allow_auto_merge, allow_merge_commit, allow_squash_merge, allow_rebase_merge, delete_branch_on_merge}')"
+  read_repo_info
+  have="$(printf '%s' "$repo_info" | jq '{allow_auto_merge, allow_merge_commit, allow_squash_merge, allow_rebase_merge, delete_branch_on_merge}')"
   if [ "$(echo "$have" | jq -S -c .)" != "$(echo "$want" | jq -S -c .)" ]; then
     echo "settings: have $(echo "$have" | jq -S -c .)"
     apply "repo settings (rebase only, auto-merge, delete branch on merge)" \
@@ -262,6 +286,37 @@ sync_protection() {
 }
 
 case "$only" in
+  ""|labels|settings|protection) ;;
+  *) die "--only must be labels, settings or protection" 2 ;;
+esac
+
+# --check: the same reads as --dry-run and --offers, in one run; says only what is missing.
+if [ "$mode" = check ]; then
+  check_part() { # check_part <name> <function>
+    local before="$changes"
+    "$2" >/dev/null
+    [ "$changes" = "$before" ] || echo "missing: $1 ($((changes - before)) change(s) pending)" >&2
+  }
+  case "$only" in ""|labels) check_part "labels of the method" sync_labels ;; esac
+  case "$only" in ""|settings) check_part "repository settings" sync_settings ;; esac
+  case "$only" in ""|protection) check_part "protection of $branch" sync_protection ;; esac
+  if [ -z "$only" ]; then
+    run_offers
+    for o in $offers_pending; do
+      echo "missing: answer to $o (asked once, by the setup skill)" >&2
+      changes=$((changes + 1))
+    done
+  fi
+  if [ "$changes" = 0 ]; then
+    echo "ok: $repo is configured for the method"
+    exit 0
+  fi
+  echo "error: $repo is not configured for the method: no phase opens and no issue is created before the setup" >&2
+  echo "fix: say \"configurar o repo\" to the agent (setup skill, which runs the pre-approved scripts/setup-repo.sh)" >&2
+  exit 7
+fi
+
+case "$only" in
   ""|labels) sync_labels ;;
 esac
 case "$only" in
@@ -269,10 +324,6 @@ case "$only" in
 esac
 case "$only" in
   ""|protection) sync_protection ;;
-esac
-case "$only" in
-  ""|labels|settings|protection) ;;
-  *) die "--only must be labels, settings or protection" 2 ;;
 esac
 
 if [ "$changes" = 0 ]; then

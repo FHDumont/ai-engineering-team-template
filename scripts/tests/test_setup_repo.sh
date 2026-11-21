@@ -9,7 +9,7 @@ labels_json="$(bash -c 'source "$1/lib/common.sh"; label_rows "$2"' _ "$SCRIPTS"
 cat >"$TMP/conform.sh" <<H
 case "\$*" in
   "label list"*) echo '$labels_json' ;;
-  "api repos/owner/repo --jq"*) echo '{"allow_auto_merge":true,"allow_merge_commit":false,"allow_squash_merge":false,"allow_rebase_merge":true,"delete_branch_on_merge":true}' ;;
+  "api repos/owner/repo") echo '{"allow_auto_merge":true,"allow_merge_commit":false,"allow_squash_merge":false,"allow_rebase_merge":true,"delete_branch_on_merge":true}' ;;
   "api repos/owner/repo/branches/main/protection") cat <<'J'
 {"required_status_checks":{"strict":false,"checks":[{"context":"review/independent","app_id":null},{"context":"CI","app_id":15368}]},
  "enforce_admins":{"enabled":true},"required_pull_request_reviews":{"required_approving_review_count":0},
@@ -28,7 +28,7 @@ assert_not_contains "$(gh_calls)" "label create" "no label write when conforming
 cat >"$TMP/fresh.sh" <<'H'
 case "$*" in
   "label list"*) echo '[{"name":"bug","color":"d73a4a","description":"x"},{"name":"wontfix","color":"ffffff","description":"x"},{"name":"type:chore","color":"C5DEF5","description":"Manutenção, processo ou ferramenta"}]' ;;
-  "api repos/owner/repo --jq"*) echo '{"allow_auto_merge":false,"allow_merge_commit":true,"allow_squash_merge":true,"allow_rebase_merge":true,"delete_branch_on_merge":false}' ;;
+  "api repos/owner/repo") echo '{"allow_auto_merge":false,"allow_merge_commit":true,"allow_squash_merge":true,"allow_rebase_merge":true,"delete_branch_on_merge":false}' ;;
   "api repos/owner/repo/branches/main/protection")
     # FAKE_PLAN=free: the plan has no branch protection (private repo on a free account).
     if [ -n "${FAKE_PLAN:-}" ]; then
@@ -93,7 +93,7 @@ rm -f "$TMP/protected"
 cat >"$TMP/offers.sh" <<'H'
 case "$*" in
   "variable list"*) [ -n "${OFFER_VARS:-}" ] && printf '%s\n' $OFFER_VARS ;;
-  "api repos/owner/repo --jq .private") echo "${OFFER_PRIVATE:-true}" ;;
+  "api repos/owner/repo") echo "{\"private\": ${OFFER_PRIVATE:-true}}" ;;
 esac
 H
 use_fake_gh "$TMP/offers.sh"

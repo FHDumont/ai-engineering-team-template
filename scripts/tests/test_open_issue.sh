@@ -49,6 +49,7 @@ esac
 H
 export TMP
 use_fake_gh "$TMP/handler.sh"
+fake_setup ok
 out="$("$OPEN" --type feature --title "Filtro" --section Objetivo "Filtrar." --section "Pronto quando" "- [ ] ok" \
   --section "Arquivos ou áreas afetadas" "area:app" --section "Prioridade sugerida" "média" --group app --group novo)"
 assert_eq "https://github.com/owner/repo/issues/9" "$out" "prints the issue URL"

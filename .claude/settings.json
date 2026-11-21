@@ -141,6 +141,11 @@
           {
             "type": "command",
             "command": "\"${CLAUDE_PROJECT_DIR}\"/.claude/hooks/trace-event.sh"
+          },
+          {
+            "type": "command",
+            "command": "\"${CLAUDE_PROJECT_DIR}\"/.claude/hooks/session-setup-check.sh",
+            "timeout": 10
           }
         ]
       }
