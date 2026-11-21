@@ -125,7 +125,10 @@ Decisão do dono: teste só no fim. A abertura lê o check `CI` do commit base d
 
 Arquivos previstos: `scripts/phase-start.sh`, `scripts/new-phase.sh`, `scripts/open-parallel.sh`, `scripts/check-env.sh`, `scripts/tests/test_phase_start.sh`, `scripts/tests/test_phase_scripts.sh`, `docs/process-design.md` §4.3.
 
-Pronto quando: o da issue #17.
+Pronto quando: o das issues #17, #16 e #22. A #16 (modelo e esforço de cada filha no `status.sh` e nos passos da gerenciadora) saiu da #8 porque a filha headless não recebeu o brief; a #22 corrige isso (`start-headless.sh --brief`). O PR fecha #17, #16 e #22.
+
+Arquivos a mais: `scripts/status.sh`, `scripts/tests/test_status.sh`, `scripts/start-headless.sh` e o teste dele.
 
 1. CI do commit base e checagem de ambiente no lugar da suíte, na abertura e no `check-env.sh`, com testes. `modelo: sonnet · esforço: medium · motivo: peso medium de scripts/lib/weights.tsv`
 2. Desfazer o que a abertura criou quando ela falha, com testes. `modelo: sonnet · esforço: medium · motivo: peso medium de scripts/lib/weights.tsv`
+3. Par real de cada filha no `status.sh` e nos passos da gerenciadora (#16) e `--brief` no `start-headless.sh` (#22), com testes. `modelo: sonnet · esforço: medium · motivo: peso medium de scripts/lib/weights.tsv`
