@@ -180,7 +180,17 @@ A sessão que o dono abre é a de planejamento. Depois de abrir as fases ela vir
 2. A fase só abre por `scripts/phase-start.sh <n>`. Ele sai 1, sem criar nada, em três casos: issue fechada; nenhuma spec em `docs/specs` cita `#n`; a spec não tem a linha do par. Com spec, ele grava `phase_opened` no trace, cria branch e worktree (`.worktrees/issue-<n>`), commita a spec na branch e imprime os argumentos do `start_session`.
 3. Antes de qualquer `start_session`, a gerenciadora cria o **batimento**, uma tarefa recorrente do agente que a cada 4 minutos lê o estado das sessões ligadas e dos PRs das fases abertas e faz o próximo passo (cartão ainda não clicado: só repete o "Você precisa"), e o apaga no passo único de fim, porque ela só age quando algo a acorda e o aviso de fim da filha nem sempre chega (instrução impressa pelo `phase-start.sh`, sem trava que a confira). Vem antes das sessões porque a filha que vira cartão abre pelo clique do dono, fora de qualquer turno da gerenciadora.
 4. A gerenciadora abre todas as filhas do grupo no mesmo turno do "executar", um `start_session` por fase, com os campos: `initiation: "user_asked"`, `context: "fresh"`, `use_worktree: false`, `title`, `prompt`, `background`, `model` e `effort` da spec.
-5. O app recusou o `start_session` (turno sem mensagem do dono): a gerenciadora repete a chamada com `initiation: "own_initiative"`, que vira um cartão que o dono abre com um clique, e só então para em `esperando você`. Todo "Você precisa" que manda o dono agir em outra sessão (clicar num cartão, responder a um quadro) diz o título exato dela, lido de volta do app e nunca chutado (sem como ler, "a sessão que abriu a fase"), e onde ela fica: "na barra lateral, dentro do agrupamento da sessão principal; se não aparecer, abra o agrupamento". A fase nunca roda na gerenciadora nem num subagente dela.
+5. O app recusou o `start_session` (turno sem mensagem do dono): a gerenciadora roda `scripts/start-headless.sh <n>`, que abre a filha como `claude -p` em segundo plano no worktree, com o par da spec (`--model`, `--effort`), `--session-id` próprio, log em `.worktrees/issue-<n>/.process/headless.log` (fora do git) e o evento `phase_headless` (pid, `child_session`, log) no trace. A filha roda o `check-env.sh` e grava o `phase_session` como a do app; o portão do merge não muda. Ela não tem quadro: pergunta ao dono vai como comentário na issue, e a gerenciadora devolve a resposta por `claude -p --resume <child_session>` no worktree. Só com saída 3 (sem `claude`) ou 4 (a filha morreu logo) a gerenciadora repete o `start_session` com `initiation: "own_initiative"`, que vira um cartão que o dono abre com um clique, e então para em `esperando você`. Todo "Você precisa" que manda o dono agir em outra sessão (clicar num cartão, responder a um quadro) diz o título exato dela, lido de volta do app e nunca chutado (sem como ler, "a sessão que abriu a fase"), e onde ela fica: "na barra lateral, dentro do agrupamento da sessão principal; se não aparecer, abra o agrupamento". A fase nunca roda na gerenciadora nem num subagente dela.
+
+**O que o Remote Control recusa e aceita (medido em 2026-11-21).**
+
+| Fato | Estado | Como |
+|---|---|---|
+| `start_session` com `initiation: "user_asked"` num turno que não começou por mensagem do dono é recusado; `own_initiative` vira cartão | INFERRED | regra do prompt do app; não reproduzido aqui, a medição não pode abrir sessão do app |
+| `claude -p` roda no worktree com `--model`, `--effort`, `--permission-mode acceptEdits` e `--session-id <uuid>` próprio; o id sai no JSON | VERIFIED | execução real, `result` e `session_id` lidos de volta |
+| `claude -p --resume <id>` retoma o mesmo id e lembra o contexto | VERIFIED | segunda execução real respondeu o que a primeira pedira |
+| A filha headless não tem quadro (`AskUserQuestion`) nem aparece na barra lateral do app | INFERRED | `-p` não tem interface; o painel externo lê log e trace |
+| `claude -p` em segundo plano sobrevive ao fim do turno da gerenciadora (`nohup`) | INFERRED | `start-headless.sh` usa `nohup`; só o teste com `claude` falso confere o PID vivo |
 
 **O que cada sessão faz.**
 
@@ -242,6 +252,7 @@ Todo script tem `--help`, um teste em `scripts/tests/` e saída curta em inglês
 | `scripts/open-issue.sh` | Monta o corpo a partir do arquivo de template, exige as seções obrigatórias do tipo, aplica as labels | agentes, bots |
 | `scripts/weights.sh` | Lê `scripts/lib/weights.tsv`: lista os pesos, imprime o par de um peso, confere o arquivo (`--check`) | skills, `block-agent-pair.sh` |
 | `scripts/phase-start.sh` | Entrada única da fase (§4.3) | sessão principal |
+| `scripts/start-headless.sh` | Abre a filha como `claude -p` no worktree quando o app recusa o `start_session` (§4.3) | sessão principal |
 | `scripts/new-phase.sh` | Branch e worktree de uma fase solo; sai 1 sem spec | `phase-start.sh` |
 | `scripts/open-parallel.sh` | Worktrees do grupo paralelo e o registro `.worktrees/parallel-active.tsv`; sai 1 com sobra no registro | `phase-start.sh` |
 | `scripts/check-env.sh` | Confere o ambiente da fase: fora da `main`, spec da issue no git, par real da sessão (§3), git hooks instalados, testes rodando | sessão filha, antes da primeira etapa |
