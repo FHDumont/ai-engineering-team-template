@@ -209,4 +209,10 @@ for f in .claude/skills/*/SKILL.md; do
   case "$lab" in *"rode o scripts"*|*"rode o \`scripts"*) bad "$f lab-test text asks the owner to run a script" ;; *) ok ;; esac
 done
 
+# Reviewer reads the CI result (#43): the suite only runs when the Tests check of the SHA is missing or failed.
+reviewer="$(cat "$REPO/.claude/agents/close-reviewer.md")"
+assert_contains "$reviewer" "check-runs" "close-reviewer reads the Tests check of the SHA through the API"
+assert_contains "$reviewer" "só rode a suíte se o check \`Tests\` faltar ou falhar" "close-reviewer runs the suite only when the Tests check is missing or failed"
+assert_contains "$close" "revisor lê o check \`Tests\` do SHA" "close-phase says the reviewer reads the CI result"
+
 finish
