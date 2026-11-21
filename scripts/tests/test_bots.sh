@@ -193,6 +193,19 @@ assert_contains "$(last_output)" "nothing posted" "retry error is clear"
 assert_status 1 "retry stops without a secret provider" env FAKE_SECURITY_MISSING=1 "$SCRIPTS/ask-bot.sh" --retry 20260117100100-1 --issue 3 --timeout 0
 assert_not_contains "$(gh_calls)" "issue comment" "retry without a provider posts nothing"
 
+# wait-reply warns early (stderr) about a question without the authorship header.
+cat >"$TMP/loose.json" <<'J'
+[[{"created_at":"2026-01-17T10:01:00Z","html_url":"q","body":"Pergunta solta\n\n<!-- ask:bot-a:20260117100100-1 -->"}]]
+J
+err="$(FAKE_COMMENTS="$TMP/loose.json" "$SCRIPTS/wait-reply.sh" 3 20260117100100-1 --timeout 0 --interval 0 2>&1 >/dev/null || true)"
+assert_contains "$err" "has no authorship header" "wait-reply warns about a loose question"
+assert_contains "$err" "ask-bot.sh --retry 20260117100100-1 --issue 3" "the warning names the fix"
+cat >"$TMP/headed.json" <<'J'
+[[{"created_at":"2026-01-17T10:01:00Z","html_url":"q","body":"> **De:** a · **Para:** bot-a · **Pedido:** p · **Responde a:** —\n\nP\n\n<!-- ask:bot-a:20260117100100-1 -->"}]]
+J
+err="$(FAKE_COMMENTS="$TMP/headed.json" "$SCRIPTS/wait-reply.sh" 3 20260117100100-1 --timeout 0 --interval 0 2>&1 >/dev/null || true)"
+assert_not_contains "$err" "warning" "no warning for a question with the header"
+
 # Authorship header: the question and the follow-up start with De, Para, Pedido, Responde a.
 rm -f "$TMP/posted"
 AUTHOR_FROM="filha #34" "$SCRIPTS/ask-bot.sh" bot-a 3 "Opinião?" --timeout 0 >/dev/null 2>&1 || true
