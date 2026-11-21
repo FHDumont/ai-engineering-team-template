@@ -36,7 +36,18 @@ phase() { # phase <issue>: worktree and branch pushed
 phase 7; phase 8
 printf '7\tfeat/issue-7-x\t%s\n8\tfeat/issue-8-x\t%s\n9\tfeat/issue-9-x\t%s\n' \
   "$repo/.worktrees/issue-7" "$repo/.worktrees/issue-8" "$repo/.worktrees/issue-9" >"$REGISTRY"
+# A server left running in the worktree is stopped, and the end message says to archive.
+(cd "$repo/.worktrees/issue-7" && exec sleep 300) >/dev/null 2>&1 &
+leftover=$!
+sleep 1
 assert_status 0 "cleanup of a merged phase" sh -c "cd '$repo/.worktrees/issue-7' && scripts/close-phase.sh --cleanup"
+assert_contains "$(last_output)" "stopped process $leftover" "cleanup stops the process left in the worktree"
+assert_contains "$(last_output)" "Archive this session in the Claude app" "the end message says to archive"
+assert_contains "$(last_output)" "Do not delete it" "the end message says not to delete"
+sleep 1
+state="$(ps -o stat= -p "$leftover" 2>/dev/null || true)"
+case "$state" in ""|Z*) state=dead ;; *) state=alive ;; esac
+assert_eq dead "$state" "the leftover process is gone"
 assert_eq "8	feat/issue-8-x	$repo/.worktrees/issue-8" "$(cat "$REGISTRY")" "only the line of the phase still open stays in the registry"
 assert_eq "" "$(git -C "$repo" ls-remote --heads origin feat/issue-7-x)" "cleanup deletes the remote branch"
 assert_contains "$(last_output)" "deleted remote branch feat/issue-7-x" "says the remote branch was deleted"

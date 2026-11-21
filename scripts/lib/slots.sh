@@ -33,7 +33,7 @@ slots_load_limits() {
   : "${AI_METHOD_SLOTS_VALIDATE:=2}" "${AI_METHOD_SLOTS_FASE:=3}"
   : "${AI_METHOD_WAIT_TIMEOUT_SECONDS:=1200}" "${AI_METHOD_POLL_SECONDS:=2}"
   : "${AI_METHOD_WARN_LOAD1:=8}" "${AI_METHOD_WARN_FREE_MEM_MB:=1024}" "${AI_METHOD_WARN_SWAP_MB:=2048}"
-  : "${AI_METHOD_LINT_BASE:=main}"
+  : "${AI_METHOD_LINT_BASE:=main}" "${AI_METHOD_IDLE_HOURS:=4}"
 }
 
 # Number of slots of a class.
