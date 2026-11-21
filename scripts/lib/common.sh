@@ -124,6 +124,17 @@ spec_open_issues() { # spec_open_issues <spec file> <open issue numbers>
   return 0
 }
 
+# Open issues that have their own "## Fase #<n>" section in a spec (the phases the
+# spec still has to open), one per line. An issue cited only in the text (solved
+# inside another phase, or roadmap) is not a phase and does not count.
+spec_open_phases() { # spec_open_phases <spec file> <open issue numbers>
+  local n
+  for n in $2; do
+    grep -Eq "^## Fase #$n([^0-9]|\$)" "$1" && echo "$n"
+  done
+  return 0
+}
+
 # Pairs a spec asks for an issue, one "model effort" per line, without repeats:
 # every "modelo: X · esforço: Y" of the issue's sections ("## ... #<n> ..."); when
 # they have none, the first one of a spec that cites the issue. The first line is

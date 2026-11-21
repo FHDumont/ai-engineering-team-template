@@ -244,6 +244,17 @@ assert_eq "docs/specs/later.md" "$(git -C "$repo/.worktrees/issue-14" show --nam
 assert_eq "" "$(git -C "$repo" status --porcelain)" "the loose copy leaves with the last phase of the spec"
 unset FAKE_OPEN
 
+# #50: an open issue only cited in the text of the spec (solved inside the phase, or
+# roadmap) has no phase to open: it does not hold the loose copy.
+spec cited.md 17
+printf '# Spec (a #18 é roadmap)\n\n%s' "$(cat "$repo/docs/specs/cited.md")" >"$repo/docs/specs/cited.md.new" && mv "$repo/docs/specs/cited.md.new" "$repo/docs/specs/cited.md"
+printf '\n## Notas\n\nA #18 fica para depois.\n' >>"$repo/docs/specs/cited.md"
+export FAKE_OPEN="17 18"
+assert_status 0 "phase-start opens the phase whose spec cites another open issue in the text" sh -c "cd '$repo' && scripts/phase-start.sh 17 --no-check"
+assert_not_contains "$(last_output)" "kept the loose copy" "an issue cited only in the text does not keep the loose copy"
+assert_eq "" "$(git -C "$repo" status --porcelain)" "the loose copy is removed when no other phase section is open"
+unset FAKE_OPEN
+
 # A mention in passing is not a spec: an issue cited only inside the section of
 # another phase does not pass the guard and inherits no pair.
 spec passing.md 15
