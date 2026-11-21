@@ -78,6 +78,33 @@ lint_candidates() {
   git ls-files -co --exclude-standard
 }
 
+# Outside the CI, a missing module in the output of a failed test becomes one line:
+# folder, module and install command. Output on stdin; the CI prints nothing extra.
+missing_dep_hint() {
+  [ -z "${CI:-}" ] || return 0
+  local out mod base f dir
+  out="$(cat)"
+  printf '%s\n' "$out" | sed -nE "s/.*No module named '([^'.]+)[^']*'.*/\1/p" | sort -u | while read -r mod; do
+    f="$(git ls-files -co --exclude-standard 'requirements*.txt' '*/requirements*.txt' | while read -r r; do
+      grep -qiE "^${mod//_/[-_]}([^A-Za-z0-9_.-]|\$)" "$r" 2>/dev/null && echo "$r" && break
+    done | head -1)"
+    if [ -n "$f" ]; then
+      echo "missing dependency: module $mod (folder $(dirname "$f")): pip install -r $f"
+    else
+      echo "missing dependency: module $mod (no requirements*.txt lists it): pip install $mod"
+    fi
+  done
+  printf '%s\n' "$out" | sed -nE "s/.*Cannot find module '([^']+)'.*/\1/p" | sort -u | while read -r mod; do
+    f="$(git ls-files -co --exclude-standard package.json '*/package.json' | head -1)"
+    dir="$(dirname "${f:-package.json}")"
+    if [ "$dir" = . ]; then
+      echo "missing dependency: module $mod (folder .): npm install"
+    else
+      echo "missing dependency: module $mod (folder $dir): cd $dir && npm install"
+    fi
+  done
+}
+
 run_validate() {
   local fail=0 files pyfiles passed failed t out cands scope=""
   if [ "$lint" = 1 ]; then
@@ -115,6 +142,7 @@ for f in sys.argv[1:]:
       else
         failed=$((failed + 1)); fail=1
         echo "FAIL $t"; echo "$out" | tail -20 | sed 's/^/  /'
+        echo "$out" | missing_dep_hint
       fi
     done
     for t in scripts/tests/test_*.py; do
@@ -124,6 +152,7 @@ for f in sys.argv[1:]:
       else
         failed=$((failed + 1)); fail=1
         echo "FAIL $t"; echo "$out" | tail -20 | sed 's/^/  /'
+        echo "$out" | missing_dep_hint
       fi
     done
     echo "tests: $passed passed, $failed failed"
