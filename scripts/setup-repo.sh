@@ -12,7 +12,7 @@
 #:    0 approvals; linear history; enforced for admins; no force-push, no deletion.
 #:    It is read back after being applied. When the plan has no branch protection
 #:    (a private repository on a free account) it records the "unprotected" mode in
-#:    the repository variable PROCESS_BRANCH_MODE, warns and exits 0 (§10.3 of the
+#:    the repository variable PROCESS_BRANCH_MODE, warns and exits 0 (§10.5 of the
 #:    design); --check then accepts it and the gate is kept by scripts.
 #:
 #: Usage: setup-repo.sh --offers | [--dry-run] --project | --decline project|runner|runner-trigger
