@@ -17,8 +17,8 @@ description: Planejamento nível 2 — lê por inteiro só as issues escolhidas 
    - modo de fim, área sensível, solo ou paralela (`integration.md`).
 6. Ok da spec: quadro (ou label `approved`). Aplique `end:*` e `group:*`.
 7. **Antes de qualquer `start_session`:** linha com o par atual e o da spec; nunca execute aqui. Fecho liberado: passo 6. Abertura: só `scripts/phase-start.sh <n> [<n>…]`.
-   - **Batimento, antes de qualquer `start_session`:** tarefa recorrente do `phase-start.sh` (4 minutos): lê sessões ligadas e PRs e faz o próximo passo; cartão ainda não clicado: só repete o "Você precisa". A `integrate` apaga.
    - **Filhas:** no mesmo turno do "executar", um `start_session` por fase, com: `initiation: "user_asked"`, `context: "fresh"`, `use_worktree: false`, `title`, `prompt`, `background`, `model`/`effort` da spec; o fecho vai no brief. O `check-env.sh` da filha confere o par (§3); divergência: `set_session_model`/`set_session_effort`.
+   - **Batimento, depois das filhas:** só com `list_sessions` mostrando filha rodando. Tarefa do `phase-start.sh` (4 minutos): faz o próximo passo; só escreve, com o bloco, se o estado mudou. A `integrate` apaga.
    - **Recusado** (Remote Control): rode `scripts/start-headless.sh <n>` (filha `claude -p`; §4.3). Saída 3 ou 4: repita com `initiation: "own_initiative"` (cartão) e pare com o `--state esperando --need` do `phase-start.sh`: cartão, título exato (nunca chutado) e onde fica ("na barra lateral, dentro do agrupamento da sessão principal; se não aparecer, abra o agrupamento"). Nunca subagente.
 8. Vira a **gerenciadora**: não edita nem executa; só ela pergunta ao dono e repassa, inclusive "fechar fase". Atrasada: leia o estado. Após o último merge: skill `integrate`.
 9. Feito: só lido de volta.
