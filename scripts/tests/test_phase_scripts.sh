@@ -115,6 +115,32 @@ assert_status 75 "open-parallel.sh exits 75 without enough slots" env AI_METHOD_
 assert_eq "" "$(git -C "$repo" branch --list 'fix/issue-*')" "open-parallel.sh creates nothing without slots"
 assert_eq "no" "$([ -e "$repo/.worktrees/issue-8" ] && echo yes || echo no)" "no worktree without a slot"
 
+# A failure in the middle of the opening leaves nothing behind: here check-env.sh refuses
+# (the spec of #9 cites bots and there is no provider), after the branch and the worktree exist.
+printf '# Spec\n\nFase #9, pergunta ao bot com ask-bot.sh.\n' >"$repo/docs/specs/botnine.md"
+slots_before="$(ls "$AI_METHOD_CACHE/slots/fase" | wc -l | tr -d ' ')"
+assert_status 1 "new-phase fails when check-env refuses" sh -c "cd '$repo' && scripts/new-phase.sh 9"
+assert_contains "$(last_output)" "no bot secret provider" "says why the opening failed"
+assert_contains "$(last_output)" "undone: removed the worktree" "says what it undid"
+assert_eq "no" "$([ -e "$repo/.worktrees/issue-9" ] && echo yes || echo no)" "no worktree is left"
+assert_eq "" "$(git -C "$repo" branch --list 'fix/issue-9-*')" "no local branch is left"
+assert_eq "" "$(git -C "$repo" worktree list --porcelain | grep 'issue-9' || true)" "git keeps no worktree record"
+assert_eq "$slots_before" "$(ls "$AI_METHOD_CACHE/slots/fase" | wc -l | tr -d ' ')" "the slot went back"
+assert_status 0 "the same opening works again with no cleanup by hand" env BOT_WEBHOOK_BOT_B_URL=https://h.example sh -c "cd '$repo' && scripts/new-phase.sh 9"
+git -C "$repo" worktree remove --force "$repo/.worktrees/issue-9"; git -C "$repo" branch -D fix/issue-9-datas-no-fuso-errado >/dev/null
+# A group that fails in the middle: the phase already opened is undone too, and nothing is registered.
+assert_status 1 "open-parallel undoes the group when the second phase fails" sh -c "cd '$repo' && scripts/open-parallel.sh 8 9"
+assert_contains "$(last_output)" "the group was not opened" "says the group was not opened"
+assert_eq "" "$(git -C "$repo" branch --list 'fix/issue-8-*' 'fix/issue-9-*')" "no branch of the group is left"
+assert_eq "no" "$([ -e "$repo/.worktrees/issue-8" ] && echo yes || echo no)" "no worktree of the first phase is left"
+assert_eq "" "$(cat "$repo/.worktrees/parallel-active.tsv" 2>/dev/null || true)" "the registry has no line"
+assert_status 0 "the group opens after the cause is fixed" env BOT_WEBHOOK_BOT_B_URL=https://h.example sh -c "cd '$repo' && scripts/open-parallel.sh 8 9"
+for n in 8 9; do
+  git -C "$repo" worktree remove --force "$repo/.worktrees/issue-$n"
+done
+git -C "$repo" branch -D fix/issue-8-datas-no-fuso-errado fix/issue-9-datas-no-fuso-errado >/dev/null
+rm -f "$repo/.worktrees/parallel-active.tsv" "$repo/docs/specs/botnine.md"
+
 printf '7\tfeat/issue-7-listar-issues-por-area\t%s\n' "$path" >"$repo/.worktrees/parallel-active.tsv"
 assert_status 3 "integrate waits and times out while a phase is open" env FAKE_PR_STATE=OPEN sh -c "cd '$repo' && scripts/integrate-parallel.sh --timeout 0 --interval 0"
 assert_status 0 "integrate proceeds when all merged" sh -c "cd '$repo' && scripts/integrate-parallel.sh --dry-run --interval 0"
