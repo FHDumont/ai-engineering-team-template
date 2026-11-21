@@ -24,7 +24,8 @@
 #: say ("configurar o repo"), creating nothing. No option skips this, not even --no-check.
 #: It never runs the test suite: it reads from GitHub the check "CI" of the base commit
 #: (origin/main) before creating any branch or worktree, and refuses, creating
-#: nothing, when it is red, still running or absent, naming the run. Absent is accepted when
+#: nothing, when it is red, still running or absent, naming the run (a failure of the
+#: GitHub API reading the check is reported as such, with its error, not as absent). Absent is accepted when
 #: the merged PR that holds the commit (gh api commits/<sha>/pulls) had CI green on its head
 #: with the same tree (ci.yml runs only on pull_request; a rebase merge creates commits with no check). The merge gate
 #: already requires a green CI on main; the suite runs at the end (close-phase.sh
@@ -92,7 +93,10 @@ EOF2
 progress_step "reading the CI of the base commit"
 git fetch --quiet origin main || die "cannot fetch origin/main: nothing was created"
 base="$(git rev-parse origin/main)"
-ci="$(gh api "repos/$(repo_slug)/commits/$base/check-runs?per_page=100" 2>/dev/null |
+# A failure of the API (no network, GitHub down) is not an absent check: it says it did not read it.
+ci_json="$(gh api "repos/$(repo_slug)/commits/$base/check-runs?per_page=100" 2>&1)" ||
+  die "could not read the check 'CI' of the base commit ${base:0:9} (gh api failed: ${ci_json:-no output}): no phase opens; fix the access to GitHub and open again; nothing was created"
+ci="$(printf '%s' "$ci_json" |
   jq -r '[.check_runs[]? | select(.name == "CI")] | sort_by(.started_at // "") | last
     | if . == null then "absent" else "\(.status)/\(.conclusion // "none") \(.html_url // "")" end' 2>/dev/null || true)"
 case "$ci" in
