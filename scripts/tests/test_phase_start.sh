@@ -90,18 +90,18 @@ assert_contains "$out" "$wt" "the prompt names the worktree"
 # and its removal in the single end step.
 assert_eq 1 "$(grep -c "Open every session above in this same turn" <<<"$out")" "says once to open every session in this turn"
 assert_contains "$out" "create the manager heartbeat" "says to create the manager heartbeat"
-assert_contains "$out" "before any start_session" "says when to create the heartbeat"
-# Order: the heartbeat comes before the sessions and the stop comes last. A
-# session that becomes a card opens by the click of the owner, outside any turn of
-# the manager, so a heartbeat left for "after the first session opens" is never created.
+assert_contains "$out" "At least one child is running (app or headless): create the manager heartbeat" "creates the heartbeat only with a child running"
+assert_contains "$out" "create no heartbeat; the manager resumes when the owner writes here" "no heartbeat while every child is a card"
+# Order: the sessions open first, the heartbeat only after list_sessions shows a
+# child running, the stop (card) after it, the removal last.
 # A missing step counts as line 0, so the comparison fails instead of breaking.
 step_line() { local l; l="$(grep -n -F -- "$1" <<<"$out" | head -1 | cut -d: -f1)"; echo "${l:-0}"; }
 hb_line="$(step_line "create the manager heartbeat")"
 open_line="$(step_line "Open every session above in this same turn")"
 stop_line="$(step_line "scripts/status.sh --state esperando --need")"
-del_line="$(step_line "Delete the heartbeat in the single end step")"
-assert_eq 1 "$((hb_line < open_line))" "the heartbeat step comes before the sessions step"
-assert_eq 1 "$((open_line < stop_line))" "the stop comes after the sessions step"
+del_line="$(step_line "Delete the heartbeat, if it was created, in the single end step")"
+assert_eq 1 "$((open_line < hb_line))" "the heartbeat step comes after the sessions step"
+assert_eq 1 "$((hb_line < stop_line))" "the stop comes after the heartbeat step"
 assert_eq 1 "$((stop_line < del_line))" "the removal of the heartbeat comes last"
 assert_eq 1 "$(grep -c -F -- "--state esperando" <<<"$out")" "one stop command, after the sessions"
 # The stop sentence is ready for --need: which card, in which session, and where the
@@ -114,8 +114,9 @@ assert_contains "$need" "na barra lateral, dentro do agrupamento da sessão prin
 assert_contains "$out" "Replace TITULO with the title of this session read back from the app" "says to read the title of the session back"
 assert_contains "$out" "never a guessed one" "says the title is never guessed"
 assert_contains "$out" 'No way to read it: replace na sessão "TITULO" with na sessão que abriu a fase' "says what to write when the title cannot be read"
-assert_contains "$out" "A child session not started yet (its card was not clicked)" "the heartbeat covers the card not clicked yet"
-assert_contains "$out" 'only repeat the same "Você precisa"' "the heartbeat only repeats the need while the card waits"
+assert_contains "$out" "A child session not started yet (its card was not clicked): nothing to do for it" "the heartbeat covers the card not clicked yet"
+assert_contains "$out" "Write to the owner only when something changed since the last heartbeat" "the heartbeat writes only on change"
+assert_contains "$out" 'The same state as the last heartbeat (same phases, same states, same "Você precisa"): end the turn with no message to the owner and without the scripts/status.sh block' "the heartbeat is silent when the state is the same"
 assert_contains "$out" "every 4 minutes" "gives the interval of the heartbeat"
 assert_contains "$out" 'cron "*/4 * * * *"' "gives the cron of the heartbeat"
 # An end-step action denied by the app: the heartbeat text sends it to a choice
@@ -132,7 +133,7 @@ assert_contains "$out" "Manager heartbeat of phase #7:" "prints the heartbeat te
 assert_contains "$out" "linked sessions" "the heartbeat reads the linked sessions"
 assert_contains "$out" "pull request of each open phase" "the heartbeat reads the PRs of the open phases"
 assert_contains "$out" "do the next step" "the heartbeat does the next step"
-assert_contains "$out" "Delete the heartbeat in the single end step" "says to delete the heartbeat at the end"
+assert_contains "$out" "Delete the heartbeat, if it was created, in the single end step" "says to delete the heartbeat at the end"
 assert_status 0 "check-env accepts the phase branch with its spec" sh -c "cd '$wt' && scripts/check-env.sh --no-tests"
 # phase_session is the mark of the session that works on the phase, never of the one that opened it.
 assert_status 0 "check-env runs for the opening session" env CLAUDE_CODE_SESSION_ID=manager sh -c "cd '$wt' && scripts/check-env.sh --no-tests"
