@@ -21,7 +21,12 @@
 #:    cited issues are all closed. Any other path, a spec added or modified, or
 #:    a removed spec that cites an open issue: exits 1 with no status and no
 #:    merge. Accepted: publishes review/independent (the files are generated
-#:    and the removals follow one rule; no reviewer reads them) on the PR head.
+#:    and the removals follow one rule; no reviewer reads them) on the PR head
+#:    and reads it back: GitHub may take a few seconds to show a status just
+#:    published, so the read is tried up to GEN_DOCS_STATUS_TRIES times
+#:    (default 5), GEN_DOCS_STATUS_PAUSE seconds apart (default 3). Not read
+#:    back as success: exits 1 with no merge; the PR and the worktree stay and
+#:    the next run resumes them.
 #: 4. Requests the merge (gh pr merge --auto --rebase --delete-branch) and waits
 #:    for it (default 900 s, read every 15 s). Not merged in time: exit 3.
 #: 5. Merged, read back: removes the worktree and the local branch and
@@ -140,8 +145,17 @@ EOF
 fi
 gh api -X POST "repos/$repo/statuses/$sha" -f state=success -f context=review/independent \
   -f description="Só arquivos gerados e remoção de specs de issues fechadas" >/dev/null
-state="$(gh api "repos/$repo/commits/$sha/status" --jq '[.statuses[] | select(.context == "review/independent")][0].state // "missing"')"
-[ "$state" = success ] || die "review/independent not read back on ${sha:0:12} (it is $state)"
+# GitHub may not show yet the status it has just accepted: the read back is tried
+# again for a short time. Only a read that says success lets the merge go on.
+tries="${GEN_DOCS_STATUS_TRIES:-5}" pause="${GEN_DOCS_STATUS_PAUSE:-3}"
+case "$tries" in ''|*[!0-9]*|0) die "GEN_DOCS_STATUS_TRIES must be a positive integer (it is '$tries')" 2 ;; esac
+try=1
+while :; do
+  state="$(gh api "repos/$repo/commits/$sha/status" --jq '[.statuses[] | select(.context == "review/independent")][0].state // "missing"' 2>/dev/null)" || state=unread
+  [ "$state" != success ] && [ "$try" -lt "$tries" ] || break
+  sleep "$pause"; try=$((try + 1))
+done
+[ "$state" = success ] || die "review/independent not read back on ${sha:0:12} after $try reads (it is $state)"
 echo "published review/independent on ${sha:0:12}: PR #$n holds only generated files and removals of specs of closed issues"
 
 if ! gh pr merge "$n" --repo "$repo" --auto --rebase --delete-branch >/dev/null 2>&1; then

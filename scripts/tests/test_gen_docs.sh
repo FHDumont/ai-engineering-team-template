@@ -29,7 +29,9 @@ BRANCH="$(pr_branch)"
 # real ones of the pushed branch). FAKE_CHANGES: "status<TAB>path" lines of its
 # diff (default: the real ones). FAKE_MERGES=0: the merge never happens; otherwise
 # the merge moves main of the remote and deletes the branch, as GitHub does.
-# FAKE_STATUS: the review/independent state read back.
+# FAKE_STATUS: the review/independent state read back. FAKE_STATUS_LATE=<n>: the
+# first n reads of a run answer "missing" (GitHub not showing yet the status just
+# published) and the next ones answer FAKE_STATUS.
 cat >"$TMP/handler.sh" <<H
 branch="gen-docs/\$(git -C "$remote" rev-parse main | cut -c1-12)"
 case "\$*" in
@@ -44,7 +46,8 @@ case "\$*" in
   "pr create"*) touch "$TMP/created" ;;
   "pr view 30"*"--json files,headRefOid"*) printf '%s\n' \${FAKE_FILES:-\$(git -C "$remote" diff --name-only "main...\$branch")} | jq -Rcn --arg s "\$(git -C "$remote" rev-parse "\$branch")" '{files: [inputs | {path: .}], headRefOid: \$s}' ;;
   "api repos/owner/repo/compare/main..."*) if [ -n "\${FAKE_CHANGES:-}" ]; then printf '%b\n' "\$FAKE_CHANGES"; else git -C "$remote" diff --name-status "main...\$branch" | sed -e 's/^A/added/' -e 's/^M/modified/' -e 's/^D/removed/'; fi ;;
-  "api repos/owner/repo/commits/"*"/status"*) echo "\${FAKE_STATUS:-success}" ;;
+  "api repos/owner/repo/commits/"*"/status"*) reads="\$(( \$(cat "$TMP/status-reads" 2>/dev/null || echo 0) + 1 ))"; echo "\$reads" >"$TMP/status-reads"
+    if [ "\$reads" -le "\${FAKE_STATUS_LATE:-0}" ]; then echo missing; else echo "\${FAKE_STATUS:-success}"; fi ;;
   "pr merge 30"*) touch "$TMP/merge-asked"
     if [ "\${FAKE_MERGES:-1}" = 1 ]; then
       git -C "$remote" update-ref refs/heads/main "\$(git -C "$remote" rev-parse "\$branch")"
@@ -57,8 +60,8 @@ use_fake_gh "$TMP/handler.sh"
 run() { # run <exit code> <description> [VAR=value...]
   local want="$1" what="$2"
   shift 2
-  : >"$FAKE_GH_LOG"; rm -f "$TMP/merge-asked"
-  assert_status "$want" "$what" env ${1+"$@"} sh -c "cd '$repo' && '$GEN' --interval 0"
+  : >"$FAKE_GH_LOG"; rm -f "$TMP/merge-asked" "$TMP/status-reads"
+  assert_status "$want" "$what" env GEN_DOCS_STATUS_PAUSE=0 ${1+"$@"} sh -c "cd '$repo' && '$GEN' --interval 0"
 }
 
 # A PR with any other file: no review status, no merge.
@@ -94,11 +97,28 @@ refused "the removal of a spec that cites an open issue" "docs/specs/open.md sti
 refused "a file under docs/specs that is not a spec" "docs/specs/sub/x.md" FAKE_FILES="CHANGELOG.md docs/specs/sub/x.md"
 
 # Rerun on the open PR: status read back, merge by rebase, merge read back.
+status_reads() { gh_calls | grep -c "commits/$sha/status"; }
 run 1 "a review status that is not read back stops before the merge" FAKE_STATUS=missing
 assert_not_contains "$(gh_calls)" "pr merge" "no merge without the status read back"
+assert_eq 5 "$(status_reads)" "reads the status 5 times before giving up"
+assert_contains "$(last_output)" "not read back on ${sha:0:12} after 5 reads (it is missing)" "says how many reads found no status"
+run 1 "the number of reads is adjustable" FAKE_STATUS=missing GEN_DOCS_STATUS_TRIES=2
+assert_eq 2 "$(status_reads)" "reads the status as many times as asked"
+assert_not_contains "$(gh_calls)" "pr merge" "no merge after the adjusted reads"
+run 1 "a status published as failure never merges" FAKE_STATUS=failure
+assert_not_contains "$(gh_calls)" "pr merge" "no merge on a failure status"
+run 1 "a status read that fails every time stops before the merge" FAKE_GH_FAIL="commits/$sha/status"
+assert_eq 5 "$(status_reads)" "a failed read is tried again"
+assert_not_contains "$(gh_calls)" "pr merge" "no merge when the status cannot be read"
 run 3 "a PR that does not merge in time exits 3" FAKE_MERGES=0
-run 0 "merges the PR of generated files"
+# What the failed runs left: the PR open and the worktree in place. The next
+# run resumes both, with no removal by hand, and GitHub shows the status only on
+# the third read.
+[ -d "$repo/.worktrees/gen-docs" ] && ok || bad "the failed runs leave the worktree in place"
+run 0 "resumes the open PR and merges it when the status shows on the third read" FAKE_STATUS_LATE=2
 calls="$(gh_calls)"
+assert_eq 3 "$(status_reads)" "stops reading at the first success"
+assert_not_contains "$(last_output)" "already exists" "the leftover worktree asks for no removal by hand"
 assert_not_contains "$calls" "pr create" "the rerun opens no second PR"
 assert_contains "$calls" "api -X POST repos/owner/repo/statuses/$sha -f state=success -f context=review/independent" "publishes review/independent on the PR head"
 assert_contains "$calls" "pr merge 30 --repo owner/repo --auto --rebase --delete-branch" "merges by rebase"
@@ -142,6 +162,8 @@ git -C "$repo" add docs/specs/solo2.md
 git -C "$repo" commit --quiet -m "docs: spec"
 git -C "$repo" push --quiet origin main
 git -C "$repo" push --quiet origin main:refs/heads/gen-docs/0000000000aa
+# The earlier run also left its worktree: the new run removes it by itself.
+git -C "$repo" worktree add --quiet -b gen-docs/0000000000aa "$repo/.worktrees/gen-docs" origin/main
 run 1 "an earlier PR that does not close stops the run" FAKE_OLD_PR='29\tgen-docs/0000000000aa\n' FAKE_CLOSE_FAILS=1
 assert_contains "$(last_output)" "earlier PR #29 (gen-docs/0000000000aa) not read back as CLOSED" "says the earlier PR was not closed"
 assert_not_contains "$(gh_calls)" "pr create" "no new PR while the earlier one is open"
@@ -153,6 +175,8 @@ assert_eq 1 "$((  $(printf '%s\n' "$calls" | grep -n 'pr close 29' | head -1 | c
 assert_eq "" "$(git -C "$remote" branch --list 'gen-docs/0000000000aa')" "the branch of the earlier PR is deleted"
 assert_contains "$(last_output)" "closed PR #29 of an earlier run" "says the earlier PR was closed"
 assert_contains "$(last_output)" "PR #30 merged" "the new PR is merged"
+assert_eq "" "$(git -C "$repo" branch --list 'gen-docs/*')" "the local branch of the earlier run is removed"
+[ ! -e "$repo/.worktrees/gen-docs" ] && ok || bad "the worktree of the earlier run is removed"
 rm -f "$TMP/created" "$TMP/old-closed"
 
 # A phase never runs it: only the main checkout does.
