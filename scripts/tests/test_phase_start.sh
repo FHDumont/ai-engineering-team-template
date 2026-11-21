@@ -53,17 +53,17 @@ rm "$repo/docs/specs/eight.md" "$repo/docs/specs/other.md"
 # running or absent refuse, name the run, and leave no branch, worktree, registry or phase_opened.
 spec seven.md 7
 for ci in red running absent; do
-  assert_status 1 "phase-start refuses a base with CI $ci" env FAKE_CI=$ci sh -c "cd '$repo' && scripts/phase-start.sh 7 --no-check"
+  assert_status 1 "phase-start refuses a base with CI $ci" env FAKE_BASE_CI=$ci sh -c "cd '$repo' && scripts/phase-start.sh 7 --no-check"
   assert_contains "$(last_output)" "no phase opens" "says why ($ci)"
   assert_contains "$(last_output)" "nothing was created" "says nothing was created ($ci)"
   assert_eq "" "$(ls "$repo/.worktrees" 2>/dev/null || true)" "no worktree with CI $ci"
   assert_eq "" "$(git -C "$repo" branch --list '*issue-*')" "no branch with CI $ci"
   assert_not_contains "$(events)" "phase_opened" "no phase_opened with CI $ci"
 done
-assert_status 1 "a red base refuses the group too" env FAKE_CI=red sh -c "cd '$repo' && scripts/phase-start.sh 7 8 --no-check"
+assert_status 1 "a red base refuses the group too" env FAKE_BASE_CI=red sh -c "cd '$repo' && scripts/phase-start.sh 7 8 --no-check"
 assert_eq "" "$(ls "$repo/.worktrees" 2>/dev/null || true)" "the group creates nothing on a red base"
 assert_contains "$(last_output)" "actions/runs/3" "names the run of the red CI"
-assert_status 1 "a red base refuses --dry-run" env FAKE_CI=red sh -c "cd '$repo' && scripts/phase-start.sh 7 --dry-run"
+assert_status 1 "a red base refuses --dry-run" env FAKE_BASE_CI=red sh -c "cd '$repo' && scripts/phase-start.sh 7 --dry-run"
 rm "$repo/docs/specs/seven.md"
 
 # Opening never runs the suite: with check-env.sh active the output has the environment
