@@ -1,0 +1,73 @@
+#!/usr/bin/env bash
+# Tests of start-headless.sh with a fake "claude".
+# shellcheck source=scripts/tests/lib.sh
+source "$(dirname "$0")/lib.sh"
+
+repo="$(make_repo)"
+copy_scripts "$repo"
+printf '.worktrees/\n.process/\n' >"$repo/.gitignore"
+mkdir -p "$repo/docs/specs"
+printf '# Spec\n\n## Fase #7 — x\n\n1. Etapa. modelo: sonnet · esforço: medium · motivo: x\n' >"$repo/docs/specs/seven.md"
+git -C "$repo" add .gitignore scripts docs
+git -C "$repo" commit --quiet -m "chore: scripts and spec"
+export PROCESS_EVENTS_FILE="$repo/.process/events.jsonl"
+events() { cat "$PROCESS_EVENTS_FILE" 2>/dev/null || true; }
+
+# A fake claude that records its arguments and cwd, then stays alive a little.
+bin="$TMP/bin"; mkdir -p "$bin"
+cat >"$bin/claude" <<'F'
+#!/usr/bin/env bash
+printf '%s\n' "$PWD" "$@" >"$FAKE_CLAUDE_ARGS"
+echo "child running"
+sleep 5
+F
+chmod +x "$bin/claude"
+export FAKE_CLAUDE_ARGS="$TMP/claude.args"
+
+assert_status 0 "--help works" "$repo/scripts/start-headless.sh" --help
+assert_status 2 "needs an issue number" sh -c "cd '$repo' && scripts/start-headless.sh"
+assert_status 2 "refuses a phase without worktree" sh -c "cd '$repo' && PATH='$bin:$PATH' scripts/start-headless.sh 7"
+assert_contains "$(last_output)" "phase-start.sh" "says to open the phase first"
+
+git -C "$repo" worktree add --quiet -b feat/issue-7-x "$repo/.worktrees/issue-7"
+wt="$repo/.worktrees/issue-7"
+
+# claude missing: exit 3, nothing recorded (PATH without claude).
+nobin="$TMP/nobin"; mkdir -p "$nobin"
+for t in git jq python3 sed cat dirname; do ln -sf "$(command -v "$t")" "$nobin/$t"; done
+assert_status 3 "exit 3 without claude" sh -c "cd '$repo' && PATH='$nobin:/bin' scripts/start-headless.sh 7"
+assert_not_contains "$(events)" "phase_headless" "no event without claude"
+
+assert_status 0 "--dry-run starts nothing" sh -c "cd '$repo' && PATH='$bin:$PATH' scripts/start-headless.sh 7 --dry-run"
+assert_contains "$(last_output)" "--model sonnet" "dry-run shows the model of the spec"
+assert_not_contains "$(events)" "phase_headless" "dry-run records nothing"
+
+assert_status 0 "starts the headless child" sh -c "cd '$repo' && PATH='$bin:$PATH' scripts/start-headless.sh 7"
+args="$(cat "$FAKE_CLAUDE_ARGS")"
+assert_contains "$args" "$wt" "runs inside the worktree"
+assert_contains "$args" "-p" "runs headless"
+assert_contains "$args" "execute skill" "prompt names the execute skill"
+assert_contains "$args" "issue #7" "prompt names the issue"
+assert_contains "$(tr '\n' ' ' <"$FAKE_CLAUDE_ARGS")" "--model sonnet --effort medium" "passes the pair of the spec"
+assert_contains "$(tr '\n' ' ' <"$FAKE_CLAUDE_ARGS")" "--session-id" "passes the session id"
+assert_contains "$(cat "$wt/.process/headless.log")" "child running" "log is in the worktree"
+ev="$(events | jq -c 'select(.event == "phase_headless")')"
+pid="$(jq -r .pid <<<"$ev")"
+assert_eq "7" "$(jq -r .issue <<<"$ev")" "event carries the issue"
+assert_eq "sonnet" "$(jq -r .model <<<"$ev")" "event carries the model"
+assert_eq "medium" "$(jq -r .effort <<<"$ev")" "event carries the effort"
+assert_contains "$(jq -r .log <<<"$ev")" ".process/headless.log" "event carries the log path"
+assert_eq "$(jq -r .child_session <<<"$ev")" "$(tr '\n' ' ' <"$FAKE_CLAUDE_ARGS" | sed -n 's/.*--session-id \([^ ]*\).*/\1/p')" "event id is the one passed to claude"
+assert_eq 0 "$(kill -0 "$pid" 2>/dev/null && echo 0 || echo 1)" "the recorded pid is alive"
+kill "$pid" 2>/dev/null || true
+
+# A child that dies at once with an error: exit 4, no event.
+cat >"$bin/claude" <<'F'
+#!/usr/bin/env bash
+echo "Error: boom" >&2
+exit 1
+F
+before="$(events | wc -l)"
+assert_status 4 "exit 4 when the child dies at once" sh -c "cd '$repo' && PATH='$bin:$PATH' scripts/start-headless.sh 7"
+assert_eq "$before" "$(events | wc -l)" "no event for a child that died"
+finish
