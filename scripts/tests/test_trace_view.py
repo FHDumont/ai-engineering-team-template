@@ -90,6 +90,47 @@ class TraceViewTests(unittest.TestCase):
         self.assertTrue(plan["synthetic"])
         self.assertIn("(synthetic)", tv.render_text(self.tree()))
 
+    def test_timings_split_of_a_phase(self):
+        lines = [
+            phase("03:00:00", "phase_opened", sid=PLAN),
+            phase("03:10:00", "phase_session"),
+            phase("03:20:00", "phase_status", state="esperando você"),
+            phase("03:30:00", "phase_status", state="trabalhando"),
+            phase("03:50:00", "phase_validate", secs="120"),
+            phase("04:00:00", "phase_push", sha="a"),
+            phase("04:10:00", "review_round", verdict="failure"),
+            phase("04:20:00", "phase_push", sha="b"),
+            phase("04:25:00", "review_round", verdict="success"),
+            phase("04:26:00", "phase_closed"),
+            phase("04:27:00", "phase_status", state="pronto"),
+            phase("05:00:00", "phase_push", issue="99", sha="z"),
+        ]
+        events, _ = tv.load_events(lines)
+        out = tv.render_timings(events, "16")
+        self.assertIn("| abertura | 10m00s |", out)
+        # 50 min since the session, minus 10 min waiting and 2 min of validate.
+        self.assertIn("| trabalho (etapas, sem esperas) | 38m00s |", out)
+        self.assertIn("| espera pelo dono | 10m00s |", out)
+        self.assertIn("| validate.sh do --prepare | 2m00s |", out)
+        self.assertIn("rodada 1 (CI e revisor) | 10m00s |", out)
+        self.assertIn("rodada 2 (CI e revisor) | 5m00s |", out)
+        self.assertIn("| revisão até merge | 1m00s |", out)
+        self.assertIn("| limpeza (merge até o fim) | 1m00s |", out)
+        self.assertNotIn("#99", out)
+
+    def test_timings_cli_and_empty(self):
+        with tempfile.TemporaryDirectory() as d:
+            path = os.path.join(d, "events.jsonl")
+            with open(path, "w", encoding="utf-8") as f:
+                f.write(phase("03:00:00", "phase_opened") + "\n" + phase("03:05:00", "phase_session") + "\n")
+            out = io.StringIO()
+            with contextlib.redirect_stdout(out):
+                self.assertEqual(0, tv.main(["--events", path, "--timings", "--issue", "16"]))
+            self.assertIn("| abertura | 5m00s |", out.getvalue())
+            self.assertEqual(["events.jsonl"], os.listdir(d))
+        events, _ = tv.load_events([])
+        self.assertIn("Sem fase", tv.render_timings(events))
+
     def test_pairs_table_requested_and_used(self):
         lines = SAMPLE + [
             phase("03:00:30", "phase_session", model="claude-opus-9", effort="high",
