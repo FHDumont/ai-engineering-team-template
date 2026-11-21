@@ -15,7 +15,8 @@
 #: and quoted to the owner): create the manager heartbeat (a
 #: recurring agent task, every 4 minutes), open every session in this turn and
 #: delete the heartbeat in the single end step. The loose copy stays while the spec
-#: cites another open issue whose phase is not open yet. The --need sentence takes
+#: has a "## Fase #n" section of another open issue whose phase is not open yet (an issue only
+#: cited in the text does not hold it). The --need sentence takes
 #: the title of the session read back from the app, never a guessed one; with no
 #: way to read it, "a sessão que abriu a fase". --no-check skips check-env.sh;
 #: --dry-run only checks and lists.
@@ -144,7 +145,7 @@ for n in "${issues[@]}"; do
     status="$(git status --porcelain -- "$rel")"
     [ -n "$status" ] || continue
     later=""
-    for o in $(spec_open_issues "$rel" "$open_issues"); do
+    for o in $(spec_open_phases "$rel" "$open_issues"); do
       [ -d "$main_root/.worktrees/issue-$o" ] || later="$later #$o"
     done
     if [ -n "$later" ]; then
