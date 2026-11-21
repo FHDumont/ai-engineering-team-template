@@ -17,7 +17,7 @@ O pedido traz a issue, o PR, o comando dos testes, o número da rodada e, da 2ª
    - **grave** ou **médio**, dentro do escopo da issue: bloqueia (veredito "mudanças pedidas");
    - **leve**, ou fora do escopo da issue: não bloqueia; vai na lista de achados. O executor corrige o leve que toca só arquivos do PR num commit no PR, que a rodada seguinte confere, e junta os demais numa única issue guarda-chuva por grupo.
 6. Critério do "Pronto quando" que não dá para cumprir ou provar na sessão atual (por exemplo, exige `/compact`, `attach` ou terminal) vira **nota**, não bloqueio. Nunca peça ao dono do repo uma ação para gerar prova; registre em "Notas" o que ficou sem prova e por quê.
-7. Não edite arquivos, não faça commit, não publique nada (o executor posta o seu parecer como comentário no PR, aprovado ou não).
+7. Se precisar de arquivo temporário, use `mktemp` ou `.worktrees/issue-<n>/.process/`, nunca caminho fixo em `/tmp`. Não edite arquivos do repo, não faça commit, não publique nada (o executor posta o seu parecer como comentário no PR, aprovado ou não).
 8. Responda em português neste formato:
 
 ```
