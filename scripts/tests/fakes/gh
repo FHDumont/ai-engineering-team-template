@@ -35,10 +35,17 @@ case "$*" in
     exit 0 ;;
 esac
 # The check "CI" of the base commit (phase-start.sh): FAKE_BASE_CI is green (default), red,
-# running or absent.
+# running, absent or wait (running on the first FAKE_BASE_CI_RUNNING reads, then green: the
+# run of main that finishes while phase-start.sh waits for it).
 case "$*" in
   "api repos/$GH_REPO/commits/"*"/check-runs?per_page=100")
-    case "${FAKE_BASE_CI:-green}" in
+    ci_mode="${FAKE_BASE_CI:-green}"
+    if [ "$ci_mode" = wait ]; then
+      reads="$(cat "$FAKE_BASE_CI_COUNT" 2>/dev/null || echo 0)"
+      echo "$((reads + 1))" >"$FAKE_BASE_CI_COUNT"
+      if [ "$reads" -lt "${FAKE_BASE_CI_RUNNING:-2}" ]; then ci_mode=running; else ci_mode=green; fi
+    fi
+    case "$ci_mode" in
       green) echo '{"check_runs":[{"name":"lint","status":"completed","conclusion":"failure"},{"name":"CI","status":"completed","conclusion":"success","started_at":"2026-01-02T00:00:00Z","html_url":"https://github.com/owner/repo/actions/runs/2"}]}' ;;
       red) echo '{"check_runs":[{"name":"CI","status":"completed","conclusion":"failure","started_at":"2026-01-02T00:00:00Z","html_url":"https://github.com/owner/repo/actions/runs/3"}]}' ;;
       running) echo '{"check_runs":[{"name":"CI","status":"in_progress","conclusion":null,"started_at":"2026-01-02T00:00:00Z","html_url":"https://github.com/owner/repo/actions/runs/4"}]}' ;;
