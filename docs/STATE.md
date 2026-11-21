@@ -14,7 +14,7 @@ Repositório criado a partir do template do método (`docs/process-design.md`). 
 - **Runner:** hospedado pelo GitHub (`ubuntu-latest`); a variável `CI_RUNS_ON` não está definida.
 - **Bots (caminho B):** nenhum webhook configurado; `docs/BOTS.md` e `.github/bots.tsv` trazem só exemplos.
 - **Projects:** sem quadro.
-- **Progresso:** `validate.sh`, `phase-start.sh` e `new-phase.sh` gravam o andamento em `~/.cache/ai-method/progress/` (formato na `process-design` §6.4); `scripts/progress.sh` mostra ao dono, `status.sh` cita o passo. O `close-phase.sh` ainda não grava (#39).
+- **Progresso:** `validate.sh`, `phase-start.sh`, `new-phase.sh` e `close-phase.sh` gravam o andamento em `~/.cache/ai-method/progress/` (formato na `process-design` §6.4); `scripts/progress.sh` mostra ao dono, `status.sh` cita o passo.
 
 ## Pendente
 
@@ -27,3 +27,4 @@ Repositório criado a partir do template do método (`docs/process-design.md`). 
 - Sem a proteção da `main` o merge só passa no modo sem proteção (`PROCESS_BRANCH_MODE`, repo privado em plano gratuito): `close-phase.sh --merge` lê `CI` e `review/independent` pela API (saída 11 se não verdes) e o hook `pre-push` recusa push na `main`; o servidor não impede merge à mão.
 - `close-phase.sh --abort` sai 10 com perda; `--discard` confirma.
 - `close-phase.sh --check`: conflito real no cherry-pick sai 4; `mergeable` UNKNOWN após 5 leituras sai 8; sem check no HEAD em ~180 s sai 7.
+- **Meta de tempo:** padrão do método (fase 45 min, `validate.sh` 240 s); o projeto sobrepõe em `.github/time-targets.tsv` (a atualização do template não sobrescreve). `machine-slots.sh --report` imprime `over-target:`; a skill `integrate` abre quadro ao dono no fim do grupo.
