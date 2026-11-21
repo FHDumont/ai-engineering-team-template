@@ -62,6 +62,13 @@ assert_contains "$(last_output)" "no secret provider configured" "explains the m
 assert_eq "" "$(cat "$FAKE_OP_LOG" 2>/dev/null || true)" "check-env never calls op"
 printf '# Spec\n\nFase da issue #8, `bot-b`.\n' >"$path/docs/specs/a.md"
 assert_status 0 "check-env ignores specs of other issues" sh -c "cd '$path' && scripts/check-env.sh --no-tests"
+# Only the header and the phase's own section count; a skill path is not a bot call.
+printf '# Spec\n\n## Fase #7\n\nSem bots.\n\n## Fase #8\n\nPergunta ao bot `bot-b`.\n\n## Fase #9\n\nVer .claude/skills/ask-bot/SKILL.md\n' >"$path/docs/specs/a.md"
+assert_status 0 "check-env ignores bots cited in another phase's section" sh -c "cd '$path' && scripts/check-env.sh --no-tests"
+printf '# Spec\n\nFase #7: ver .claude/skills/ask-bot/SKILL.md\n' >"$path/docs/specs/a.md"
+assert_status 0 "check-env ignores an ask-bot/ file path" sh -c "cd '$path' && scripts/check-env.sh --no-tests"
+printf '# Spec\n\n## Fase #7\n\nPergunta ao bot `bot-b`.\n' >"$path/docs/specs/a.md"
+assert_status 1 "check-env still fails when the phase's own section cites a bot" sh -c "cd '$path' && scripts/check-env.sh --no-tests"
 rm -f "$path/docs/specs/a.md"
 
 out="$(cd "$repo" && scripts/open-parallel.sh 8 9 --dry-run 2>&1 || true)"
