@@ -234,6 +234,10 @@ Opcional. Os bots atuam nas pontas: abrem issues, respondem quando perguntados e
   ```
 - Depois de ~10 comentários, o `scripts/summarize-thread.sh` mantém um comentário fixo (`<!-- agreed-summary -->`) editado no lugar.
 
+### 5.3 Autoria visível
+
+Dono, gerenciadora, filhas e bots comentam como a mesma conta do GitHub. Todo comentário de agente ou bot abre com uma linha: `> **De:** <quem> · **Para:** <quem> · **Pedido:** <o quê> · **Responde a:** <link ou —>`. Comentário sem o cabeçalho é do dono. O `scripts/lib/author.sh` gera a linha (`author_header`; `AUTHOR_FROM` troca o "De", padrão `filha #<n>` ou `gerenciadora`) e o `block-bot-comment.sh` cobra. O `ask-bot.sh` já posta com ele; `ask-bot.sh --append <id> "texto"` acrescenta à pergunta aberta (marca `<!-- ask-append:<bot>:<id> -->`) e avisa o bot de novo. O `wait-reply.sh` avisa logo, no stderr, quando a pergunta não tem o cabeçalho (não foi postada pelo `ask-bot.sh`, o bot pode nunca ter sido avisado). Uma conta por papel (GitHub Apps) fica no roadmap (#35).
+
 ### 5.2 `docs/BOTS.md`
 
 No máximo 450 palavras (conferido pelo `check-docs.sh`). Uma linha por bot: slug, papel, o que responde, o que nunca faz. Traz também como guardar os segredos dos webhooks. A skill `ask-bot` aponta para ele; `.github/bots.tsv` é a configuração dos bots do repositório (slug, nome e referência de cada webhook); os scripts não citam nenhum bot, e as labels `ask:<slug>` saem da linha-modelo do `.github/labels.tsv`, uma por bot.
@@ -330,6 +334,7 @@ Os hooks do agente saem 2 quando barram; os do git saem 1. Todo hook tem teste. 
 |---|---|---|
 | `.claude/hooks/block-dangerous-git.sh` | PreToolUse, Bash | A lista fechada abaixo |
 | `.claude/hooks/block-attribution.sh` | PreToolUse, Bash | `git commit`, `gh pr create\|edit\|comment\|review\|close` e `gh issue create\|comment\|edit\|close` cujo texto tem assinatura de IA abrindo uma linha |
+| `.claude/hooks/block-bot-comment.sh` | PreToolUse, Bash | `gh issue\|pr comment` e `gh issue\|pr close --comment` sem o cabeçalho de autoria (§5.3), e o que pede algo a um bot fora do `ask-bot.sh` (marca `<!-- ask:` ou bot em `Para`) |
 | `.claude/hooks/block-phase-commit.sh` | PreToolUse, Bash | Todo comando git fora da lista de leitura (`status`, `log`, `diff`, `show`, `fetch`…) que rodaria em `.worktrees/issue-<n>`, quando a sessão é a que gravou o `phase_opened` da issue; e, para essa mesma sessão, `git push` da branch da fase a partir de qualquer diretório, o checkout principal incluído (destino da refspec, branch atual quando não há refspec, `--all`, `--mirror`, `--branches` ou padrão). Para qualquer sessão: comando que define ou apaga `CLAUDE_CODE_SESSION_ID` ou `PROCESS_EVENTS_FILE`, e escrita à mão em `.process/events.jsonl`. Falha fechado: sem `session_id`, sem trace ou com linha do trace que não é JSON, a escrita no worktree e o push da branch de fase são barrados |
 | `.claude/hooks/block-phase-edit.sh` | PreToolUse, Edit, Write, NotebookEdit | A edição de arquivo em `.worktrees/issue-<n>` pela sessão que gravou o `phase_opened` da issue; falha fechado igual. Para qualquer sessão: `.process/events.jsonl` |
 | `.claude/hooks/block-agent-pair.sh` | PreToolUse, Agent | A chamada de `Agent` sem `model` ou sem `effort`; a do `close-reviewer` e a do `triage` com par diferente do peso em `scripts/lib/weights.tsv` |
