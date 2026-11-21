@@ -56,4 +56,24 @@ assert_contains "$(last_output)" "not ok: the opening session cannot run --prepa
 [ "$took" -lt 120 ] && ok || bad "test_close_phase.sh with the lock off took ${took}s"
 assert_eq "" "$(pgrep -f "$broken/scripts" || true)" "no process of the broken copy is left alive"
 
+# Missing product dependency: outside the CI the failure names the folder, the module
+# and the install command; in the CI nothing changes.
+dep="$(make_repo)"
+mkdir -p "$dep/scripts/lib" "$dep/scripts/tests" "$dep/dashboard" "$dep/web"
+cp "$SCRIPTS/validate.sh" "$dep/scripts/validate.sh"
+cp "$SCRIPTS/lib/common.sh" "$SCRIPTS/lib/slots.sh" "$SCRIPTS/lib/machine-limits.env.example" "$dep/scripts/lib/"
+printf 'fastapi==0.110\nuvicorn\n' >"$dep/dashboard/requirements.txt"
+printf '{}\n' >"$dep/web/package.json"
+cat >"$dep/scripts/tests/test_dep.sh" <<'P'
+#!/usr/bin/env bash
+echo "ModuleNotFoundError: No module named 'fastapi.routing'"
+echo "Error: Cannot find module 'left-pad'"
+exit 1
+P
+assert_status 1 "a missing module fails the suite" env -u CI -u PROCESS_VALIDATE_RUNNING "$dep/scripts/validate.sh" --tests
+assert_contains "$(last_output)" "missing dependency: module fastapi (folder dashboard): pip install -r dashboard/requirements.txt" "the Python module line has folder, module and command"
+assert_contains "$(last_output)" "missing dependency: module left-pad (folder web): cd web && npm install" "the Node module line has folder, module and command"
+assert_status 1 "the CI run still fails" env -u PROCESS_VALIDATE_RUNNING CI=true "$dep/scripts/validate.sh" --tests
+case "$(last_output)" in *"missing dependency"*) bad "the CI output has no dependency line" ;; *) ok ;; esac
+
 finish
