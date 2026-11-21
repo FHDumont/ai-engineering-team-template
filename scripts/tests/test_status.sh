@@ -92,6 +92,15 @@ assert_eq "Fases abertas:
 **Você precisa:** nada
 
 **Próximo passo:** esperar as fases" "$out" "the main session lists each open phase with its last state"
+# The real pair of the child (phase_session of check-env.sh) is on the line of each phase;
+# without it, the pair the spec asks, marked "pedido".
+mkdir -p "$repo/.worktrees/issue-5/docs/specs"
+printf '# Spec\n\n## Fase #5 — a\n\n1. Etapa. modelo: fable · esforço: high · motivo: x\n' >"$repo/.worktrees/issue-5/docs/specs/five.md"
+printf '{"event":"phase_session","issue":"6","model":"sonnet","effort":"medium"}\n' >>"$PROCESS_EVENTS_FILE"
+out="$(cd "$repo" && "$SCRIPTS/status.sh" --state trabalhando --next "esperar as fases")"
+assert_contains "$out" "- #5 — Fim coerente — trabalhando — modelo/esforço: fable/high (pedido)" "no phase_session yet: the pair of the spec, marked pedido"
+assert_contains "$out" "- #6 — Modelo e esforço — trabalhando — modelo/esforço: sonnet/medium" "the real pair of the session"
+assert_not_contains "$out" "sonnet/medium (pedido)" "the real pair is not marked pedido"
 (cd "$repo/.worktrees/issue-5" && "$SCRIPTS/status.sh" --state esperando --need "responder ao cartão do merge" >/dev/null)
 out="$(cd "$repo" && "$SCRIPTS/status.sh" --state trabalhando --next "esperar as fases")"
 assert_contains "$out" "- #5 — Fim coerente — esperando você" "the phase that waits for the owner shows its state"

@@ -60,6 +60,25 @@ assert_contains "$(jq -r .log <<<"$ev")" ".process/headless.log" "event carries 
 assert_eq "$(jq -r .child_session <<<"$ev")" "$(tr '\n' ' ' <"$FAKE_CLAUDE_ARGS" | sed -n 's/.*--session-id \([^ ]*\).*/\1/p')" "event id is the one passed to claude"
 assert_eq 0 "$(kill -0 "$pid" 2>/dev/null && echo 0 || echo 1)" "the recorded pid is alive"
 kill "$pid" 2>/dev/null || true
+assert_eq "no" "$(jq -r .brief <<<"$ev")" "event says there was no brief"
+assert_not_contains "$args" "Brief of the manager" "no brief section without a brief"
+
+# The brief of the manager reaches the prompt, by text or by file, and the trace says so.
+assert_status 0 "starts with --brief" sh -c "cd '$repo' && PATH='$bin:$PATH' scripts/start-headless.sh 7 --brief 'also solve #16; only touch scripts/status.sh'"
+args="$(cat "$FAKE_CLAUDE_ARGS")"
+assert_contains "$args" "Brief of the manager:" "the prompt has the brief section"
+assert_contains "$args" "also solve #16; only touch scripts/status.sh" "the brief text is in the prompt"
+assert_contains "$args" "execute skill" "the execute prompt is still there"
+ev="$(events | jq -c 'select(.event == "phase_headless")' | tail -1)"
+assert_eq "yes" "$(jq -r .brief <<<"$ev")" "the trace records the brief"
+kill "$(jq -r .pid <<<"$ev")" 2>/dev/null || true
+printf 'line one\nline two\n' >"$TMP/brief.txt"
+assert_status 0 "starts with --brief-file" sh -c "cd '$repo' && PATH='$bin:$PATH' scripts/start-headless.sh 7 --brief-file '$TMP/brief.txt'"
+assert_contains "$(cat "$FAKE_CLAUDE_ARGS")" "line two" "the file brief is in the prompt"
+kill "$(events | jq -r 'select(.event == "phase_headless") | .pid' | tail -1)" 2>/dev/null || true
+assert_status 2 "a missing brief file is refused" sh -c "cd '$repo' && PATH='$bin:$PATH' scripts/start-headless.sh 7 --brief-file '$TMP/none.txt'"
+assert_status 0 "--dry-run shows the brief" sh -c "cd '$repo' && PATH='$bin:$PATH' scripts/start-headless.sh 7 --dry-run --brief 'dry brief'"
+assert_contains "$(last_output)" "dry brief" "dry-run prints the prompt with the brief"
 
 # A child that dies at once with an error: exit 4, no event.
 cat >"$bin/claude" <<'F'
