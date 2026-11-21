@@ -20,6 +20,9 @@
 #: With --issue N (the end of one phase, by its session), fails with a worktree,
 #: a local branch, a registry line, a remote branch or an open PR of phase N.
 #:
+#: In the unprotected mode (repository variable PROCESS_BRANCH_MODE, a plan with no
+#: branch protection) nothing here changes; the ok line names the mode.
+#:
 #: --offline runs only the checks that do not call GitHub.
 #: Exit: 0 clean; 1 at least one "fail:" line.
 set -euo pipefail
@@ -120,4 +123,9 @@ if [ "$fails" -gt 0 ]; then
 fi
 note=""
 [ "$offline" = 0 ] || note=" (offline: GitHub not read)"
+# The unprotected mode (no branch protection on the plan) is not an error: the gate is
+# kept by scripts, so it is only named here.
+if [ "$offline" = 0 ] && gh variable list --repo "$repo" --json name --jq '.[].name' 2>/dev/null | grep -qxF PROCESS_BRANCH_MODE; then
+  note="$note (mode: unprotected, the gate is kept by scripts)"
+fi
 echo "ok: end-check${issue:+ of phase #$issue}: nothing left$note"

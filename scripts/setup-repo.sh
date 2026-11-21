@@ -11,7 +11,9 @@
 #:    and the `review/independent` status, no "up to date" requirement;
 #:    0 approvals; linear history; enforced for admins; no force-push, no deletion.
 #:    It is read back after being applied. When the plan has no branch protection
-#:    (a private repository on a free account) it says so and exits 6.
+#:    (a private repository on a free account) it records the "unprotected" mode in
+#:    the repository variable PROCESS_BRANCH_MODE, warns and exits 0 (§10.3 of the
+#:    design); --check then accepts it and the gate is kept by scripts.
 #:
 #: Usage: setup-repo.sh --offers | [--dry-run] --project | --decline project|runner|runner-trigger
 #: Offers (asked once; the agent shows one choice board per offer):
@@ -31,8 +33,8 @@
 #: open-issue.sh and the session hook call it): it only reads, each thing once
 #: (labels, repository, protection, variables), and exits 0 when all three match and no offer
 #: is unanswered. Otherwise it prints one `missing:` line per part and the
-#: sentence to say ("configurar o repo") on stderr and exits 7; the plan without
-#: branch protection keeps its own message and exit 6. With --only it checks that part alone.
+#: sentence to say ("configurar o repo") on stderr and exits 7 (a plan without branch
+#: protection and no recorded mode is one of them). With --only it checks that part alone.
 #: --dry-run only shows the difference (with --project too: it only reads and says
 #: what it would create). A second run with no difference changes nothing. Pre-approved: the agent runs it; the owner never does.
 set -euo pipefail
@@ -240,12 +242,27 @@ NORMALIZE='{
 }'
 
 # The plan of the account has no branch protection for this repository (a private
-# repository on a free plan): GitHub answers 403 with an upgrade message.
-protection_unavailable() { # protection_unavailable <gh output>
+# repository on a free plan): GitHub answers 403 with an upgrade message. The method
+# then runs in the "unprotected" mode: the gate is kept by scripts (close-phase.sh
+# --merge reads CI and review/independent through the API; the reference-transaction
+# hook refuses a push to main), and the mode is recorded in the repository variable
+# PROCESS_BRANCH_MODE. Returns 0 when it handled the case (the caller leaves the
+# protection alone), 1 when the output is not that answer.
+unprotected_mode() { # unprotected_mode <gh output>
   printf '%s' "$1" | grep -qiE 'Upgrade to GitHub|make this repository public' || return 1
-  echo "error: branch protection is not available for $repo on the current GitHub plan (a private repository on a free plan): CI and review/independent cannot be required on $branch, so the gate is not enforced and close-phase.sh --merge refuses every merge" >&2
-  echo "fix: make the repository public or upgrade the plan, then run scripts/setup-repo.sh --only protection" >&2
-  exit 6
+  if var_exists PROCESS_BRANCH_MODE; then
+    echo "mode: unprotected ($repo has no branch protection on this plan; the gate is kept by scripts)" >&2
+    return 0
+  fi
+  changes=$((changes + 1))
+  local what="record the unprotected branch mode (PROCESS_BRANCH_MODE=unprotected)"
+  if [ "$dry" = 1 ]; then echo "would: $what"; return 0; fi
+  gh variable set PROCESS_BRANCH_MODE --repo "$repo" --body unprotected >/dev/null
+  var_names_read=0
+  var_exists PROCESS_BRANCH_MODE || die "PROCESS_BRANCH_MODE not confirmed on read back"
+  echo "done: $what (read back)"
+  echo "warning: $repo has no branch protection on this plan (a private repository on a free plan): the server does not enforce CI and review/independent, so close-phase.sh --merge checks them through the API and the git hook refuses a push to $branch; a merge done by hand on GitHub is not blocked" >&2
+  return 0
 }
 
 sync_protection() {
@@ -264,7 +281,8 @@ sync_protection() {
   if raw="$(gh api "repos/$repo/branches/$branch/protection" 2>&1)"; then
     have="$(echo "$raw" | jq -S -c "$NORMALIZE")"
   else
-    protection_unavailable "$raw" || have=none
+    unprotected_mode "$raw" && return 0
+    have=none
   fi
   want="$(echo "$want" | jq -S -c .)"
   [ "$have" != "$want" ] || return 0
@@ -273,13 +291,15 @@ sync_protection() {
   changes=$((changes + 1))
   if [ "$dry" = 1 ]; then echo "would: $what"; return 0; fi
   if ! raw="$(gh api -X PUT "repos/$repo/branches/$branch/protection" --input - <<<"$body" 2>&1)"; then
-    protection_unavailable "$raw" || die "could not $what: $(printf '%s' "$raw" | tail -1)"
+    unprotected_mode "$raw" && return 0
+    die "could not $what: $(printf '%s' "$raw" | tail -1)"
   fi
   # Exit 0 of the PUT is not the proof: the protection is read back and compared.
   if raw="$(gh api "repos/$repo/branches/$branch/protection" 2>&1)"; then
     have="$(echo "$raw" | jq -S -c "$NORMALIZE")"
   else
-    protection_unavailable "$raw" || have=none
+    unprotected_mode "$raw" && return 0
+    have=none
   fi
   [ "$have" = "$want" ] || die "protection of $branch not confirmed on read back (have $have)"
   echo "done: $what (read back)"

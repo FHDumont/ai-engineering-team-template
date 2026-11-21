@@ -33,11 +33,16 @@ assert_contains "$(cat "$TMP/o")" "missing: protection of main" "check names the
 fake_setup offer;        "$SETUP" --check >"$TMP/o" 2>&1 || true
 assert_contains "$(cat "$TMP/o")" "missing: answer to offer:project" "check names the unanswered offer"
 
-# A plan without branch protection keeps its own message and exit code.
+# A plan without branch protection: pending until the mode is recorded, then configured.
 fake_setup freeplan
-assert_status 6 "check exits 6 on a plan without branch protection" "$SETUP" --check
-assert_contains "$(last_output)" "branch protection is not available" "plan: own message"
-assert_not_contains "$(last_output)" "configurar o repo" "plan: does not tell to run the setup"
+assert_status 7 "check exits 7 on a plan without branch protection and no recorded mode" "$SETUP" --check
+assert_contains "$(last_output)" "missing: protection of main" "plan: names the missing mode"
+assert_contains "$(last_output)" 'say "configurar o repo"' "plan: tells to run the setup"
+assert_eq "" "$(gh_calls | grep -E '\-X (PUT|PATCH)|variable set' || true)" "plan: check writes nothing"
+fake_setup unprotected
+assert_status 0 "check passes in the unprotected mode" "$SETUP" --check
+assert_contains "$(last_output)" "is configured for the method" "unprotected: configured"
+assert_contains "$(last_output)" "mode: unprotected" "unprotected: says the mode"
 
 # phase-start.sh refuses before anything else, and --no-check does not skip it.
 repo="$(make_repo)"
@@ -67,8 +72,8 @@ for state in nolabels noprotection offer; do
   done
 done
 fake_setup freeplan
-assert_status 6 "phase-start refuses on a plan without branch protection" sh -c "cd '$repo' && scripts/phase-start.sh 7 --no-check"
-assert_contains "$(last_output)" "branch protection is not available" "phase-start: plan message"
+assert_status 7 "phase-start refuses on a plan without branch protection and no recorded mode" sh -c "cd '$repo' && scripts/phase-start.sh 7 --no-check"
+assert_contains "$(last_output)" "missing: protection of main" "phase-start: plan message"
 assert_eq "" "$(ls "$repo/.worktrees" 2>/dev/null || true)" "no worktree is created before the setup"
 assert_eq "" "$(git -C "$repo" branch --list '*issue-*')" "no branch is created before the setup"
 assert_eq "" "$(cat "$PROCESS_EVENTS_FILE" 2>/dev/null || true)" "no event is recorded before the setup"
