@@ -25,10 +25,12 @@
 #: say ("configurar o repo"), creating nothing. No option skips this, not even --no-check.
 #: It never runs the test suite: it reads from GitHub the check "CI" of the base commit
 #: (origin/main) before creating any branch or worktree, and refuses, creating
-#: nothing, when it is red, still running or absent, naming the run (a failure of the
+#: nothing, when it is red, absent or still running past the deadline, naming the run (a failure of the
 #: GitHub API reading the check is reported as such, with its error, not as absent). Absent is accepted when
 #: the merged PR that holds the commit (gh api commits/<sha>/pulls) had CI green on its head
-#: with the same tree (ci.yml runs only on pull_request; a rebase merge creates commits with no check). The merge gate
+#: with the same tree. ci.yml also runs on push to main, so a run of main that is still going is waited
+#: for (PHASE_START_CI_WAIT seconds, default 900; progress step "waiting for the CI of main"); with no run there is
+#: nothing to wait for. The merge gate
 #: already requires a green CI on main; the suite runs at the end (close-phase.sh
 #: --prepare) and in CI. The environment is checked by check-env.sh (tools and
 #: declared dependencies, no tests). A failure in the middle of the opening undoes
@@ -95,15 +97,34 @@ progress_step "reading the CI of the base commit"
 git fetch --quiet origin main || die "cannot fetch origin/main: nothing was created"
 base="$(git rev-parse origin/main)"
 # A failure of the API (no network, GitHub down) is not an absent check: it says it did not read it.
-ci_json="$(gh api "repos/$(repo_slug)/commits/$base/check-runs?per_page=100" 2>&1)" ||
-  die "could not read the check 'CI' of the base commit ${base:0:9} (gh api failed: ${ci_json:-no output}): no phase opens; fix the access to GitHub and open again; nothing was created"
-ci="$(printf '%s' "$ci_json" |
-  jq -r '[.check_runs[]? | select(.name == "CI")] | sort_by(.started_at // "") | last
-    | if . == null then "absent" else "\(.status)/\(.conclusion // "none") \(.html_url // "")" end' 2>/dev/null || true)"
+read_base_ci() { # sets ci_json and ci from the check "CI" of the base commit
+  ci_json="$(gh api "repos/$(repo_slug)/commits/$base/check-runs?per_page=100" 2>&1)" ||
+    die "could not read the check 'CI' of the base commit ${base:0:9} (gh api failed: ${ci_json:-no output}): no phase opens; fix the access to GitHub and open again; nothing was created"
+  ci="$(printf '%s' "$ci_json" |
+    jq -r '[.check_runs[]? | select(.name == "CI")] | sort_by(.started_at // "") | last
+      | if . == null then "absent" else "\(.status)/\(.conclusion // "none") \(.html_url // "")" end' 2>/dev/null || true)"
+}
+read_base_ci
+# ci.yml also runs on push to main: a run that is still going is the only thing worth waiting for
+# (the sum of PRs merged in a row has no other proof). No run, nothing to wait for. Deadline and
+# poll in seconds, PHASE_START_CI_WAIT (default 900) and PHASE_START_CI_POLL (default 15).
+case "$ci" in
+  queued/*|in_progress/*|waiting/*|pending/*|requested/*)
+    wait_max="${PHASE_START_CI_WAIT:-900}" poll="${PHASE_START_CI_POLL:-15}" waited=0
+    run_url="${ci#* }"
+    while :; do
+      case "$ci" in queued/*|in_progress/*|waiting/*|pending/*|requested/*) ;; *) break ;; esac
+      [ "$waited" -lt "$wait_max" ] ||
+        die "the run of 'CI' on the base commit ${base:0:9} of main did not finish in ${wait_max}s (${run_url}): no phase opens; wait for it and open again; nothing was created"
+      progress_step "waiting for the CI of main" "$waited" "$wait_max"
+      sleep "$poll"; waited=$((waited + poll))
+      read_base_ci
+    done ;;
+esac
 case "$ci" in
   completed/success*) echo "ok: CI of the base commit ${base:0:9} is green" ;;
   ""|absent)
-    # ci.yml runs only on pull_request and a rebase merge creates commits with no check:
+    # A rebase merge made before ci.yml ran on main leaves a commit with no check:
     # the base is accepted when the merged PR that holds it had CI green on its head, same tree.
     if pr="$(base_pr_vouches "$base")"; then
       echo "ok: no check 'CI' on the base commit ${base:0:9}, but its merged PR #$pr had CI green on the same tree"
