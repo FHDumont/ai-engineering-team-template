@@ -8,11 +8,16 @@
 #: share one account, so the author means nothing. Default wait: 15 minutes.
 #: Prints the reply bodies and exits 0; exits 3 on timeout; exits 1 when the
 #: comments cannot be read or the question is not on the issue. When the reply is
-#: found it records a bot_reply event (bot, ask_id) in the trace.
+#: Early warning (stderr, once, before the first wait): a question comment without the
+#: authorship header (scripts/lib/author.sh) was not posted by ask-bot.sh, so the bot
+#: may never have been notified; run ask-bot.sh --retry <id> instead of waiting in vain.
+#: When the reply is found it records a bot_reply event (bot, ask_id) in the trace.
 set -euo pipefail
 HERE="$(cd "$(dirname "$0")" && pwd)"
 # shellcheck source=scripts/lib/common.sh
 source "$HERE/lib/common.sh"
+# shellcheck source=scripts/lib/author.sh
+source "$HERE/lib/author.sh"
 
 [ $# -gt 0 ] || { print_help "$0"; exit 2; }
 case "$1" in -h|--help) print_help "$0"; exit 0 ;; esac
@@ -30,12 +35,19 @@ done
 repo="$(repo_slug)"
 
 start="$(date +%s)"
+warned=""
 while :; do
   comments="$(gh api "repos/$repo/issues/$issue/comments" --paginate --slurp)" ||
     die "could not read the comments of #$issue (gh api failed): no reply can be seen"
   # No question with this id: there is nothing to wait for, and a timeout would lie.
   printf '%s' "$comments" | jq -e --arg id "$id" 'add // [] | any(.[]; .body | test("<!-- ask:[a-z0-9-]+:" + $id + " -->"))' >/dev/null ||
     die "no question comment with <!-- ask:<bot>:$id --> on #$issue: nothing to wait for"
+  if [ -z "$warned" ]; then
+    warned=1
+    qbody="$(printf '%s' "$comments" | jq -r --arg id "$id" 'add // [] | map(select(.body | test("<!-- ask:[a-z0-9-]+:" + $id + " -->"))) | first | .body')"
+    printf '%s' "$qbody" | has_author_header ||
+      echo "warning: the question $id on #$issue has no authorship header, so ask-bot.sh did not post it and the bot may never have been notified; run: ask-bot.sh --retry $id --issue $issue" >&2
+  fi
   replies="$(printf '%s' "$comments" | jq -r --arg id "$id" '
     add // [] |
     (map(select(.body | test("<!-- ask:[a-z0-9-]+:" + $id + " -->"))) | first | .created_at) as $asked |
