@@ -25,4 +25,4 @@ O `scripts/lib/secret.sh` procura a URL e o segredo de cada bot nesta ordem (sem
 
 ## Identidade
 
-Todo comentário de agente ou bot abre com o cabeçalho de autoria (`De`, `Para`, `Pedido`, `Responde a`); sem ele, é do dono. Pedido a bot só pelo `ask-bot.sh`. Toda resposta de bot começa com `**<Nome> (bot do time)**`, sem emoji nem assinatura de IA. Uma GitHub App por bot (`<slug>[bot]`, só `issues: write` e `pull requests: read`) é opcional e não vem criada.
+Todo comentário de agente ou bot abre com `**De:** bot <nome> · **Para:** <papel> · **Pedido:** <ask_id> · **Responde a:** <link>` (a resposta do bot também; o papel é identificação, não assinatura de IA); sem o cabeçalho, é do dono. Pedido a bot só pelo `ask-bot.sh`. Toda resposta de bot começa com `**<Nome> (bot do time)**`, sem emoji nem assinatura de IA. Uma GitHub App por bot (`<slug>[bot]`, só `issues: write` e `pull requests: read`) é opcional e não vem criada.
