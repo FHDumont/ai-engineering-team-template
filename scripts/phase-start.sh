@@ -31,10 +31,14 @@
 #: --prepare) and in CI. The environment is checked by check-env.sh (tools and
 #: declared dependencies, no tests). A failure in the middle of the opening undoes
 #: what the scripts created (new-phase.sh, open-parallel.sh).
+#: Each step goes to ~/.cache/ai-method/progress/ (scripts/progress.sh), never to the
+#: output; --dry-run records nothing.
 set -euo pipefail
 HERE="$(cd "$(dirname "$0")" && pwd)"
 # shellcheck source=scripts/lib/common.sh
 source "$HERE/lib/common.sh"
+# shellcheck source=scripts/lib/progress.sh
+source "$HERE/lib/progress.sh"
 
 issues=() pass=() dry=0
 while [ $# -gt 0 ]; do
@@ -48,6 +52,11 @@ while [ $# -gt 0 ]; do
 done
 [ ${#issues[@]} -ge 1 ] || { print_help "$0"; exit 2; }
 require_cmd git gh jq python3
+if [ "$dry" = 0 ]; then
+  progress_start phase-start.sh "$([ ${#issues[@]} -ne 1 ] || echo "${issues[0]}")"
+  trap 'progress_end $?' EXIT
+fi
+progress_step "checking the setup of the repo"
 
 # Mandatory setup: nothing of the method opens on a repository that is not configured.
 "$HERE/setup-repo.sh" --check >/dev/null
@@ -80,6 +89,7 @@ EOF2
 }
 
 # The base of every branch is origin/main: its CI check must be green before anything is created.
+progress_step "reading the CI of the base commit"
 git fetch --quiet origin main || die "cannot fetch origin/main: nothing was created"
 base="$(git rev-parse origin/main)"
 ci="$(gh api "repos/$(repo_slug)/commits/$base/check-runs?per_page=100" 2>/dev/null |
@@ -99,6 +109,7 @@ case "$ci" in
 esac
 
 # Everything is checked before anything opens: issue open and spec (new-phase.sh --dry-run), then the pair.
+progress_step "checking the issues and the specs" 0 "${#issues[@]}"
 pairs=()
 for n in "${issues[@]}"; do
   "$HERE/new-phase.sh" "$n" --dry-run >/dev/null
@@ -109,6 +120,7 @@ for n in "${issues[@]}"; do
   pairs+=("$pair")
 done
 
+progress_step "opening the phase(s)" 0 "${#issues[@]}"
 if [ ${#issues[@]} -eq 1 ]; then
   "$HERE/new-phase.sh" "${issues[0]}" ${pass[@]+"${pass[@]}"}
 else
@@ -120,6 +132,7 @@ fi
 # block the update of main after the merge. It only goes away when a branch holds it.
 # A group spec whose other phases open later stays: the loose copy is the only spec
 # the main checkout has for them until the first phase of the group is merged.
+progress_step "cleaning the loose copies of the spec"
 open_issues="$(gh issue list --state open --limit 1000 --json number --jq '.[].number' 2>/dev/null || true)"
 for n in "${issues[@]}"; do
   while IFS= read -r rel; do

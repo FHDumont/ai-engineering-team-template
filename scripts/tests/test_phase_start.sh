@@ -108,6 +108,11 @@ assert_status 0 "phase-start opens a phase that has a spec" env CLAUDE_CODE_SESS
 out="$(last_output)"
 wt="$repo/.worktrees/issue-7"
 assert_eq "feat/issue-7-listar-issues" "$(git -C "$wt" branch --show-current)" "worktree is on the phase branch"
+# Progress of the opening: recorded for the owner, never printed.
+pf="$AI_METHOD_CACHE/progress/$(basename "$repo")-7.jsonl"
+assert_eq "phase-start.sh new-phase.sh" "$(jq -r 'select(.state == "end") | .script' "$pf" 2>/dev/null | sort -r | paste -sd' ' -)" "phase-start.sh and new-phase.sh record their end"
+assert_contains "$(jq -r 'select(.script == "new-phase.sh") | .step' "$pf")" "creating the branch and the worktree" "new-phase.sh records its steps"
+assert_not_contains "$out" "jsonl" "the opening prints no progress path"
 assert_eq "docs/specs/seven.md" "$(git -C "$wt" show --name-only --format= HEAD)" "the script commits the spec on the phase branch"
 assert_eq "" "$(git -C "$wt" status --porcelain)" "the worktree is clean after the spec commit"
 assert_eq "" "$(git -C "$repo" status --porcelain)" "the main checkout keeps no loose copy of the spec"

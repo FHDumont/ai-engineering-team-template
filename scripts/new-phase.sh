@@ -20,12 +20,16 @@
 #: A failure after the branch and the worktree exist (spec not committed, check-env.sh
 #: refusing) undoes them (worktree and local branch), says so
 #: and frees the slot: the same opening works again with no cleanup by hand.
+#: Each step goes to ~/.cache/ai-method/progress/ (scripts/progress.sh), never to the
+#: output; --dry-run records nothing.
 set -euo pipefail
 HERE="$(cd "$(dirname "$0")" && pwd)"
 # shellcheck source=scripts/lib/common.sh
 source "$HERE/lib/common.sh"
 # shellcheck source=scripts/lib/slots.sh
 source "$HERE/lib/slots.sh"
+# shellcheck source=scripts/lib/progress.sh
+source "$HERE/lib/progress.sh"
 
 [ $# -gt 0 ] || { print_help "$0"; exit 2; }
 case "$1" in -h|--help) print_help "$0"; exit 0 ;; esac
@@ -42,10 +46,15 @@ while [ $# -gt 0 ]; do
   esac
 done
 
+if [ "$dry" = 0 ]; then
+  progress_start new-phase.sh "$issue"
+  trap 'progress_end $?' EXIT
+fi
 # Always from the main checkout, not from inside another worktree.
 main_root="$(git worktree list --porcelain | sed -n '1s/^worktree //p')"
 cd "$main_root"
 
+progress_step "reading the issue and the spec"
 info_json="$(gh issue view "$issue" --json state,title,labels)" || die "cannot read issue #$issue"
 # No phase on a closed issue, and no phase without a spec in docs/specs citing #<n>.
 state="$(echo "$info_json" | jq -r '.state // empty')"
@@ -74,6 +83,7 @@ path="$main_root/.worktrees/issue-$issue"
 # A configured board must accept writes before anything opens (--dry-run included).
 # shellcheck source=scripts/lib/project.sh
 source "$HERE/lib/project.sh"
+progress_step "checking the board"
 project_preflight || die "phase #$issue not opened: the board cannot be written (cause and fix above)"
 if [ "$dry" = 1 ]; then
   echo "branch: $branch"
@@ -81,6 +91,7 @@ if [ "$dry" = 1 ]; then
   exit 0
 fi
 [ ! -e "$path" ] || die "worktree already exists: $path"
+progress_step "taking a phase slot"
 slots_load_limits
 if ! slots_try fase "$issue" "$path"; then
   echo "error: no free phase slot (limit $AI_METHOD_SLOTS_FASE); held by:" >&2
@@ -104,10 +115,12 @@ undo_open() {
   fi
   [ -z "$index" ] || rm -rf "$(dirname "$index")"
   [ -d "$path" ] || slots_release
+  progress_end "$rc"
   exit "$rc"
 }
 trap undo_open EXIT
 slots_load_report | grep '^warn:' || true
+progress_step "creating the branch and the worktree"
 git fetch --quiet origin main
 # Marks the session that opened the phase (planning): the close-phase.sh gate only
 # accepts as the child session a session different from this one.
@@ -146,12 +159,14 @@ if [ ${#added[@]} -gt 0 ]; then
   echo "spec committed on $branch: ${added[*]}"
 fi
 if [ "$check" = 1 ]; then
+  progress_step "checking the environment (check-env.sh)"
   (cd "$path" && "$path/scripts/check-env.sh")
 fi
 # The phase is open from here on: a board that refuses the write leaves it open (the
 # message says so), as the owner can fix the board and nothing of the phase is lost.
 made_wt=0
 board=0
+progress_step "updating the board"
 project_set_status "$issue" "In Progress" || board=1
 # Filter of the "Fase atual" view: the group of this phase plus the one of the parallel phases already active.
 project_refresh_phase_filter "$main_root" "$issue" "" || board=1
