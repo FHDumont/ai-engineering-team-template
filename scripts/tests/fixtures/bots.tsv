@@ -1,0 +1,3 @@
+# Bots of the tests (see .github/bots.tsv): slug, name, webhook reference.
+bot-a	Bot A	op://Your Vault/webhook-bot-a
+bot-b	Bot B	op://Your Vault/webhook-bot-b

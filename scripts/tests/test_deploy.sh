@@ -57,6 +57,24 @@ success_run() { # success_run <sha> [status] [conclusion]
 assert_status 0 "--help works" "$DEPLOY" --help
 assert_contains "$(last_output)" "Usage: deploy.sh" "--help shows the usage"
 
+# --timeout and --interval take a whole number of seconds: without a value, with
+# a value that is not a number or with a negative one, exit 2 with the usage,
+# before anything is dispatched or read from GitHub.
+usage_error() { # usage_error <description> <deploy.sh arguments...>
+  local what="$1"
+  shift
+  : >"$FAKE_GH_LOG"; rm -f "$TMP/dispatched" "$TMP/polls"
+  assert_status 2 "$what: exits 2" env CLAUDE_CODE_SESSION_ID=main sh -c 'cd "$1" && shift && "$@"' sh "$repo" "$DEPLOY" "$@"
+  assert_contains "$(last_output)" "Usage: deploy.sh [--timeout seconds] [--interval seconds]" "$what: shows the usage"
+  assert_eq "" "$(gh_calls)" "$what: dispatches nothing and reads nothing from GitHub"
+}
+usage_error "--timeout without a value" --interval 0 --timeout
+usage_error "--interval without a value" --timeout 10 --interval
+usage_error "--timeout with a value that is not a number" --interval 0 --timeout soon
+usage_error "--interval with a value that is not a number" --timeout 10 --interval fast
+usage_error "--timeout with a negative value" --interval 0 --timeout -5
+usage_error "--interval with a negative value" --timeout 10 --interval -1
+
 # Refusals: each one dispatches nothing.
 run 1 "refuses without a session id" CLAUDE_CODE_SESSION_ID=
 assert_contains "$(last_output)" "no session id" "says the session id is missing"

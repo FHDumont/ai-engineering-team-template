@@ -4,8 +4,8 @@
 source "$(dirname "$0")/lib.sh"
 SETUP="$SCRIPTS/setup-repo.sh"
 
-# "Already compliant" state: all the tsv labels, settings and protection correct.
-labels_json="$(grep -v '^#' "$REPO/.github/labels.tsv" | jq -R -s -c 'split("\n") | map(select(length > 0) | split("\t") | {name: .[0], color: .[1], description: .[2]})')"
+# "Already conforming" state: every label of the tsv, settings and protection right.
+labels_json="$(bash -c 'source "$1/lib/common.sh"; label_rows "$2"' _ "$SCRIPTS" "$REPO/.github/labels.tsv" | jq -R -s -c 'split("\n") | map(select(length > 0) | split("\t") | {name: .[0], color: .[1], description: .[2]})')"
 cat >"$TMP/conform.sh" <<H
 case "\$*" in
   "label list"*) echo '$labels_json' ;;
@@ -149,7 +149,7 @@ export TMP
 use_fake_gh "$TMP/project.sh"
 reset_board() { rm -f "$TMP/boardvar" "$TMP/linked" "$TMP/views.tsv" "$TMP/workflows.tsv" "$TMP/view-bodies.jsonl"; : >"$FAKE_GH_LOG"; }
 
-# Missing scope: shows the real step, creates and links nothing and does not declare success.
+# Missing scope: shows the real step, creates and links nothing and declares no success.
 reset_board
 rc=0; out="$(FAKE_SCOPES="'gist', 'repo'" "$SETUP" --project 2>&1)" || rc=$?
 assert_eq 1 "$rc" "missing scope exits 1"
@@ -165,7 +165,7 @@ reset_board
 out="$(FAKE_SCOPES="'project', 'repo'" "$SETUP" --project 2>&1)" || true
 assert_not_contains "$out" "needs-owner:" "project alone covers reading (gh does not list read:project with it)"
 
-# New board, link missing -> linked and checked, views created, workflows only read.
+# New board, missing link -> linked and checked, views created, workflows only read.
 reset_board
 out="$("$SETUP" --project 2>&1)"
 calls="$(gh_calls)"
@@ -208,14 +208,14 @@ out="$(FAKE_BOARD_VAR=7 "$SETUP" --project 2>&1)"
 assert_contains "$out" "pending: workflow 'Auto-add to project'" "missing auto-add is pending"
 assert_not_contains "$out" "done: project board" "no success claim without auto-add"
 
-# Partial view already existing: only adds what is missing.
+# Partial view already there: only adds what is missing.
 reset_board
 touch "$TMP/linked"
 printf 'Board por Status\tBOARD_LAYOUT\n' >"$TMP/views.tsv"
 out="$(FAKE_BOARD_VAR=7 "$SETUP" --project 2>&1)"
 assert_eq 6 "$(wc -l <"$TMP/view-bodies.jsonl" | tr -d ' ')" "only the 6 missing views are created"
 
-# View refused by the API: becomes a pending item for the browser, never "created".
+# View refused by the API: it becomes a pending step for the browser, never "created".
 reset_board
 touch "$TMP/linked"
 out="$(FAKE_BOARD_VAR=7 FAKE_REFUSE_VIEW="Roadmap por group" "$SETUP" --project 2>&1)"
@@ -223,7 +223,7 @@ assert_contains "$out" "pending: view 'Roadmap por group' refused by the API" "r
 assert_not_contains "$out" "view created: Roadmap por group" "refused view is not declared created"
 assert_contains "$out" "view created: Bugs abertos" "other views still get created"
 
-# Link not confirmed on read-back: error, without declaring success.
+# Link not confirmed on the read back: error, with no success declared.
 reset_board
 rc=0; out="$(FAKE_BOARD_VAR=7 FAKE_LINK_FAILS=1 "$SETUP" --project 2>&1)" || rc=$?
 assert_eq 1 "$rc" "unconfirmed link exits 1"

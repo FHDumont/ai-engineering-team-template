@@ -34,7 +34,7 @@ Cada regra tem uma trava que roda sozinha e sai com erro. A tabela é a do desen
 3. Abra a primeira issue por um [template](../../issues/new/choose).
 4. Diga "executar #n" (o número da issue). O agente planeja, pede o seu ok na spec, abre a fase numa sessão filha e fecha pelo portão.
 
-Antes da primeira fase, troque o que é exemplo: a pasta `app/`, o passo de deploy de `.github/workflows/deploy-example.yml`, os globs de `.github/sensitive-paths`, as labels `area:*` de `.github/labels.tsv` e os bots de `docs/BOTS.md`.
+Antes da primeira fase, troque o que é exemplo: a pasta `app/`, o passo de deploy de `.github/workflows/deploy-example.yml`, os globs de `.github/sensitive-paths`, as labels `area:*` de `.github/labels.tsv` e os bots de `.github/bots.tsv` e `docs/BOTS.md`.
 
 ## Requisitos
 

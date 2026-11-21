@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 #: init-env.sh: create the repo's .env (outside git) with empty keys.
 #:
-#: Usage: init-env.sh [<bot-slug>...]   (default: bot-a)
+#: Usage: init-env.sh [<bot-slug>...]   (default: every bot of .github/bots.tsv)
 #:
 #: Creates ~/.<repo-slug>/ with chmod 700 and the .env with chmod 600 (or the
 #: path in PROCESS_ENV_FILE), with empty BOT_WEBHOOK_<SLUG>_URL= and
@@ -17,8 +17,12 @@ source "$HERE/lib/secret.sh"
 case "${1:-}" in -h|--help) print_help "$0"; exit 0 ;; esac
 
 slugs=("$@")
-[ "${#slugs[@]}" -gt 0 ] || slugs=(bot-a)
+if [ "${#slugs[@]}" = 0 ]; then
+  while read -r s; do [ -z "$s" ] || slugs+=("$s"); done <<<"$(bot_slugs)"
+fi
+[ "${#slugs[@]}" -gt 0 ] || die "no bot given and none in .github/bots.tsv" 2
 
+# Always writes to the new path, never to the legacy one.
 file="${PROCESS_ENV_FILE:-$HOME/.$(secret_repo_slug)/.env}"
 dir="$(dirname "$file")"
 [ -d "$dir" ] || { mkdir -p "$dir"; chmod 700 "$dir"; }

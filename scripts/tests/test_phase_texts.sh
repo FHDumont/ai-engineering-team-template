@@ -99,6 +99,29 @@ for name in .claude/skills/close-phase/SKILL.md .claude/skills/integrate/SKILL.m
   assert_not_contains "$text" "chama o \`scripts/deploy.sh\`" "$name has no script that calls deploy.sh"
   assert_not_contains "$text" "sai do registro à mão" "$name edits no registry by hand"
 done
+# Archiving the child sessions: the child leaves no live work behind, and the manager
+# archives in one order: Remote Control off, read back, archive, repeat once with the field
+# the app returns, ask the child to stop its tasks, and only then a card to the owner.
+for name in execute close-phase; do
+  text="$(cat "$REPO/.claude/skills/$name/SKILL.md")"
+  assert_contains "$text" "Antes da parada final da fase" "$name has the step before the final stop"
+  assert_contains "$text" "liste as suas tarefas em segundo plano e pare cada uma" "$name stops its own background tasks"
+  assert_contains "$text" "liste as suas tarefas recorrentes e apague cada uma" "$name deletes its own recurring tasks"
+  assert_contains "$text" "leia de volta que as duas listas estão vazias" "$name reads back that no task is left"
+  assert_contains "$text" "\`Tarefas em segundo plano e recorrentes: nenhuma\`" "$name says in the final message that it left no task"
+done
+arch="$(printf '%s\n' "$integrate" | awk '/Arquive cada sessão filha/{p=1} /Apague o batimento/{p=0} p')"
+assert_eq "set_remote_control remoteControlState archive_session trabalho vivo quadro ao dono" \
+  "$(printf '%s\n' "$arch" | grep -oE 'set_remote_control|remoteControlState|archive_session|trabalho vivo|quadro ao dono' | awk '!seen[$0]++' | paste -sd' ' -)" \
+  "integrate archives in one order: Remote Control off, read back, archive, live work, card"
+assert_contains "$arch" "nesta ordem única" "integrate says the archiving has one order"
+assert_contains "$arch" "\`set_remote_control\` \`false\`. Sempre" "integrate always turns Remote Control off"
+assert_contains "$arch" "\`remoteControlState\` \`off\`" "integrate reads back that Remote Control is off"
+assert_contains "$arch" "Nunca arquive com ele ligado" "integrate never archives with Remote Control on"
+assert_contains "$arch" "repita uma vez, exatamente com esse campo" "integrate repeats the archiving once with the field the app returns"
+assert_contains "$arch" "mande mensagem à filha (\`send_message\`)" "integrate asks the child to stop its tasks on live work"
+assert_contains "$arch" "Só depois disso" "integrate opens the card only after the other tries"
+assert_contains "$arch" "quadro ao dono (\`AskUserQuestion\`) que começa por \`Fase #n — título\`" "integrate says how the archiving card starts"
 # Manager heartbeat: plan creates it and says what it reads, integrate deletes
 # it in the end step, the design has the rule and the reason and names no app tool.
 assert_contains "$plan" "**Batimento, antes de qualquer \`start_session\`:**" "plan creates the heartbeat before the sessions"
@@ -163,27 +186,9 @@ assert_contains "$execute" "par da principal" "execute has the one path for a pa
 assert_contains "$execute" "close-phase.sh --prepare" "execute leaves the PR table to the script"
 assert_not_contains "$execute" "nunca da memória" "execute fills no PR table by hand"
 assert_contains "$close" "o \`--prepare\` escreve nela a tabela" "close-phase leaves the pair section to the script"
-# Archiving the child sessions: the child leaves no live work behind, and the manager
-# archives in one order: Remote Control off, read back, archive, repeat once with the field
-# the app returns, ask the child to stop its tasks, and only then a card to the owner.
-for name in execute close-phase; do
-  text="$(cat "$REPO/.claude/skills/$name/SKILL.md")"
-  assert_contains "$text" "Antes da parada final da fase" "$name has the step before the final stop"
-  assert_contains "$text" "liste as suas tarefas em segundo plano e pare cada uma" "$name stops its own background tasks"
-  assert_contains "$text" "liste as suas tarefas recorrentes e apague cada uma" "$name deletes its own recurring tasks"
-  assert_contains "$text" "leia de volta que as duas listas estão vazias" "$name reads back that no task is left"
-  assert_contains "$text" "\`Tarefas em segundo plano e recorrentes: nenhuma\`" "$name says in the final message that it left no task"
-done
-arch="$(printf '%s\n' "$integrate" | awk '/Arquive cada sessão filha/{p=1} /Apague o batimento/{p=0} p')"
-assert_eq "set_remote_control remoteControlState archive_session trabalho vivo quadro ao dono" \
-  "$(printf '%s\n' "$arch" | grep -oE 'set_remote_control|remoteControlState|archive_session|trabalho vivo|quadro ao dono' | awk '!seen[$0]++' | paste -sd' ' -)" \
-  "integrate archives in one order: Remote Control off, read back, archive, live work, card"
-assert_contains "$arch" "nesta ordem única" "integrate says the archiving has one order"
-assert_contains "$arch" "\`set_remote_control\` \`false\`. Sempre" "integrate always turns Remote Control off"
-assert_contains "$arch" "\`remoteControlState\` \`off\`" "integrate reads back that Remote Control is off"
-assert_contains "$arch" "Nunca arquive com ele ligado" "integrate never archives with Remote Control on"
-assert_contains "$arch" "repita uma vez, exatamente com esse campo" "integrate repeats the archiving once with the field the app returns"
-assert_contains "$arch" "mande mensagem à filha (\`send_message\`)" "integrate asks the child to stop its tasks on live work"
-assert_contains "$arch" "Só depois disso" "integrate opens the card only after the other tries"
-assert_contains "$arch" "quadro ao dono (\`AskUserQuestion\`) que começa por \`Fase #n — título\`" "integrate says how the archiving card starts"
+# The design says why the issue templates are Markdown and not issue forms.
+templates="$(grep -F 'Templates em Markdown' "$REPO/docs/process-design.md" || true)"
+assert_contains "$templates" "não issue forms" "the design keeps the rule of Markdown templates"
+assert_contains "$templates" "modal pequeno, campo por campo" "the design says what the YAML form opens"
+assert_contains "$templates" "editor grande" "the design says what the Markdown template opens"
 finish

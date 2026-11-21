@@ -22,6 +22,10 @@ assert_contains "$out" '"n":2' "--include-test keeps test issues"
 assert_status 0 "--issue is accepted" "$SCRIPTS/triage.sh" --issue 2
 assert_eq '[{"n":2,"t":"Teste","l":["test"],"unlabeled":false,"needs":["type","priority","area"]}]' "$("$SCRIPTS/triage.sh" --issue 2 2>/dev/null || true)" "--issue lists the test issue asked for"
 assert_eq '[2,3]' "$("$SCRIPTS/triage.sh" --issue 3 --issue 2 2>/dev/null | jq -c 'map(.n)' || true)" "--issue repeats and lists only what was asked"
+# A closed issue asked for by number is said, not silently dropped.
+assert_eq '[]' "$("$SCRIPTS/triage.sh" --issue 9 2>/dev/null)" "--issue of a closed issue lists nothing"
+assert_contains "$("$SCRIPTS/triage.sh" --issue 9 2>&1 >/dev/null)" "warn: issue #9 is not open" "--issue of a closed issue warns on stderr"
+assert_eq "" "$("$SCRIPTS/triage.sh" --issue 3 2>&1 >/dev/null)" "--issue of an open issue warns nothing"
 # Runner re-offer trigger (pure logic).
 # shellcheck source=scripts/lib/runner_offer.sh
 source "$SCRIPTS/lib/runner_offer.sh"

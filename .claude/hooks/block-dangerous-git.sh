@@ -121,8 +121,8 @@ def expand(word, variables):
 HEREDOC_RE = re.compile(r"<<(-?)[ \t]*([^\s;&|()<>]+)")
 # Line that hands the heredoc to a shell (bash <<, cat <<X | sh, source, eval, .).
 SHELLISH_RE = re.compile(r"(^|[\s|;&(])((\S*/)?(ba|z|da|k)?sh|source|eval|\.)(\s|$)")
-MAX_CHECKED = 262144  # above this it cannot be checked quickly: fail closed
-MAX_SEGMENTS = 400    # same for commands with many parts
+MAX_CHECKED = 262144  # above this there is no fast check: fail closed
+MAX_SEGMENTS = 400    # the same for commands with many parts
 
 
 def heredoc_delim(word):
@@ -288,7 +288,7 @@ def take_herestring(argv):
     return out, here
 
 
-# ---------- rules ----------
+# ---------- regras ----------
 
 def abbrev(arg, full, minlen):
     """True if arg is full or an abbreviation accepted by git (--forc)."""

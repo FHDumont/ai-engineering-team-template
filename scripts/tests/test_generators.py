@@ -1,7 +1,9 @@
-"""Tests of gen-changelog.py and gen-roadmap.py."""
+"""Testes do gen-changelog.py e do gen-roadmap.py."""
 
 import importlib.util
 import os
+import subprocess
+import sys
 import time
 import unittest
 
@@ -45,9 +47,9 @@ class ChangelogTests(unittest.TestCase):
         self.assertIn("feat: x", text)
         self.assertNotIn("regenerate", text)
 
-    def test_included_pr_counts_as_merged_and_comes_first(self):
-        current = pr(9, "chore: fase 0", ["type:chore"], merged=None)
-        text = changelog.render([pr(1, "chore: old", ["type:chore"]), current])
+    def test_newest_merge_comes_first(self):
+        text = changelog.render([pr(1, "chore: old", ["type:chore"]),
+                                 pr(9, "chore: new", ["type:chore"], merged="2026-01-11T10:00:00Z")])
         self.assertLess(text.index("#9"), text.index("#1"))
 
     def test_pr_with_two_types_appears_once_in_the_first_group(self):
@@ -73,14 +75,12 @@ class ChangelogTests(unittest.TestCase):
 
 
 class RoadmapTests(unittest.TestCase):
-    def test_by_area_and_priority_without_closing_and_test(self):
-        issues = [issue(1, "fase 0", ["type:chore", "area:process"]),
-                  issue(2, "baixa", ["type:feature", "area:app", "priority:low"]),
+    def test_by_area_and_priority_without_test(self):
+        issues = [issue(2, "baixa", ["type:feature", "area:app", "priority:low"]),
                   issue(3, "alta", ["type:feature", "area:app", "priority:high", "group:app"]),
                   issue(4, "débito", ["debt", "priority:low"]),
                   issue(5, "teste", ["test"])]
-        text = roadmap.render(issues, {1})
-        self.assertNotIn("#1]", text)
+        text = roadmap.render(issues)
         self.assertNotIn("#5]", text)
         self.assertIn("## app", text)
         self.assertLess(text.index("#3]"), text.index("#2]"))
@@ -88,7 +88,24 @@ class RoadmapTests(unittest.TestCase):
         self.assertIn("## Débito técnico\n\n- [#4]", text)
 
     def test_empty(self):
-        self.assertIn("Nenhuma issue aberta.", roadmap.render([], set()))
+        self.assertIn("Nenhuma issue aberta.", roadmap.render([]))
+
+
+class OptionTests(unittest.TestCase):
+    # Options nobody calls are gone: the files are generated once, by
+    # gen-docs.sh, after the merges, so no PR or issue is counted ahead of time.
+    def refused(self, script, *args):
+        run = subprocess.run([sys.executable, os.path.join(ROOT, "scripts", script), "--output", "-"] + list(args),
+                             text=True, capture_output=True)
+        self.assertEqual(2, run.returncode, run.stderr)
+        self.assertIn("unrecognized arguments", run.stderr)
+
+    def test_changelog_has_no_include_pr(self):
+        self.refused("gen-changelog.py", "--input", os.devnull, "--include-pr", "9")
+        self.refused("gen-changelog.py", "--input", os.devnull, "--include-pr-json", os.devnull)
+
+    def test_roadmap_has_no_closing(self):
+        self.refused("gen-roadmap.py", "--input", os.devnull, "--closing", "1")
 
 
 if __name__ == "__main__":

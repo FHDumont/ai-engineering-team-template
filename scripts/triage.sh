@@ -8,11 +8,7 @@
 #: "needs": [...]}; "needs" lists what is still unclassified (type, priority,
 #: area). Issues labeled `test` are left out unless --include-test.
 #: --issue N (repeatable): only the issues asked for by number, `test` ones included.
-#: --runner-offer: prints `offer <reason>` or `skip <reason>`: re-offers the self-hosted
-#: runner only if the average CI run passes 5 min or the monthly minutes quota passes
-#: 50%; never on a public repo nor with CI_RUNS_ON set. An API failure on a criterion
-#: ignores it. The "no" at setup does not block; the one at the trigger
-#: (PROCESS_OFFER_RUNNER_TRIGGER) does.
+#: An issue asked for that is not open is left out, with a warning on stderr.
 set -euo pipefail
 HERE="$(cd "$(dirname "$0")" && pwd)"
 # shellcheck source=scripts/lib/common.sh
@@ -54,7 +50,13 @@ if [ "$runner_offer" = 1 ]; then
   runner_offer_decision "$private" "$has_runs_on" "$avg" "$quota"
   exit 0
 fi
-gh issue list --repo "$(repo_slug)" --state open --limit "$limit" --json number,title,labels |
+list="$(gh issue list --repo "$(repo_slug)" --state open --limit "$limit" --json number,title,labels)"
+# An issue asked for by number that is not in the open list (closed, or no such
+# issue) is said on stderr: the JSON on stdout stays the list of the open ones.
+for n in $(jq -r --argjson l "$list" '. - [$l[].number] | .[]' <<<"$only"); do
+  echo "warn: issue #$n is not open (closed or not found): left out" >&2
+done
+printf '%s\n' "$list" |
   jq -c --argjson it "$include_test" --argjson only "$only" '
     [ .[]
       | {n: .number, t: .title, l: [.labels[].name]}

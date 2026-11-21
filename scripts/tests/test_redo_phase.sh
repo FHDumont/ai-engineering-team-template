@@ -153,6 +153,26 @@ git -C "$repo" switch --quiet feat/issue-19-s
 git -C "$repo" branch -D feat/issue-19-s-r2 >/dev/null
 rm -f "$repo/.git/redo-phase" "$repo/.git/redo-phase.todo" "$repo/.git/redo-phase.kept"
 
+# 3c. A real conflict whose honest resolution is what main already has: the
+# session resolves, adds the file and runs the script again with the cherry-pick still
+# stopped; the script checks that nothing is left, drops the commit and finishes.
+git -C "$repo" switch --quiet -c feat/issue-21-r2d2-support origin/main
+commit "$repo" ahead2.txt mine "feat: phase 21, already on main"
+commit "$repo" phase21.txt phase "feat: phase 21"
+git -C "$repo" push --quiet origin feat/issue-21-r2d2-support
+main_moves ahead2.txt theirs2 "feat: phase 22"
+handler 99 100 21
+assert_status 4 "a real conflict stops (phase 21)" sh -c "cd '$repo' && '$REDO'"
+assert_contains "$(last_output)" "nothing left to commit after the resolution" "says how to go on when the resolution is empty"
+# The branch name has -r2 in the middle: only a whole -r<k> suffix is a redo mark.
+assert_eq "feat/issue-21-r2d2-support-r2" "$(git -C "$repo" branch --show-current)" "a -r<digit> inside the branch name is not cut"
+printf 'theirs2\n' >"$repo/ahead2.txt"
+git -C "$repo" add ahead2.txt
+assert_status 0 "the rerun drops the commit whose resolution is empty and finishes" sh -c "cd '$repo' && '$REDO'"
+assert_contains "$(last_output)" "the resolution left nothing to apply on main" "says the commit was dropped"
+assert_eq "feat: phase 21" "$(git -C "$repo" log --format=%s origin/main..feat/issue-21-r2d2-support-r2)" "only the commit that still applies is left"
+assert_contains "$(gh_calls)" "pr create --repo owner/repo --base main --head feat/issue-21-r2d2-support-r2" "opens the new PR after the empty resolution"
+
 # 3a. End to end: close-phase.sh --check on the conflicting PR redoes it and exits 0.
 git -C "$repo" switch --quiet -c feat/issue-18-e origin/main
 commit "$repo" phase18.txt phase "feat: phase 18"

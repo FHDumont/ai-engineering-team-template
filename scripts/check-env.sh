@@ -19,7 +19,7 @@
 #: requested_model and requested_effort. It then prints, per step pair of the
 #: spec, whether the step runs in this session (same pair) or in a subagent.
 #: "Spec cites bots": some docs/specs/*.md mentions the branch's issue (#N) and
-#: has "ask-bot", a "Bots" section/line, or a bot slug from scripts/lib/bots.tsv
+#: has "ask-bot", a "Bots" section/line, or a bot slug from .github/bots.tsv
 #: in backticks.
 set -euo pipefail
 HERE="$(cd "$(dirname "$0")" && pwd)"
@@ -118,7 +118,7 @@ spec_cites_bots() {
   local issue spec slugs
   issue="$(issue_from_branch "$branch")"
   [ -n "$issue" ] || return 1
-  slugs="$(cut -f1 "$HERE/lib/bots.tsv" | grep -v '^#' | paste -sd'|' -)"
+  slugs="$(bot_slugs | paste -sd'|' -)"
   for spec in "$HERE"/../docs/specs/*.md; do
     [ -f "$spec" ] || continue
     grep -q -E "#$issue([^0-9]|$)" "$spec" || continue
@@ -128,7 +128,7 @@ spec_cites_bots() {
 }
 if spec_cites_bots; then
   # Any bot webhook variable counts as an environment provider.
-  env_names="$(cut -f1 "$HERE/lib/bots.tsv" | grep -v '^#' | while read -r slug; do
+  env_names="$(bot_slugs | while read -r slug; do
     bot_webhook_var "$slug" url; bot_webhook_var "$slug" secret
   done)"
   # shellcheck disable=SC2086

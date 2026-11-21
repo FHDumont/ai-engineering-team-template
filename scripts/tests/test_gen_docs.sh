@@ -37,6 +37,9 @@ case "\$*" in
   "run list"*) echo '[]' ;;
   "pr list --state merged"*) echo '[{"number":7,"title":"feat: seven","labels":[{"name":"type:feature"}],"mergedAt":"2026-01-10T10:00:00Z","url":"https://x/pull/7","headRefName":"feat/issue-7-x"}]' ;;
   "issue list"*) echo '[{"number":9,"title":"Nine","labels":[{"name":"area:scripts"}],"url":"https://x/issues/9"}]' ;;
+  "pr list"*"number,headRefName"*) [ -f "$TMP/old-closed" ] || printf '%b' "\${FAKE_OLD_PR:-}" ;;
+  "pr close 29"*) [ -n "\${FAKE_CLOSE_FAILS:-}" ] || touch "$TMP/old-closed" ;;
+  "pr view 29"*"--json state"*) if [ -f "$TMP/old-closed" ]; then echo CLOSED; else echo OPEN; fi ;;
   "pr list"*"--state open"*) [ -f "$TMP/created" ] && echo 30 ;;
   "pr create"*) touch "$TMP/created" ;;
   "pr view 30"*"--json files,headRefOid"*) printf '%s\n' \${FAKE_FILES:-\$(git -C "$remote" diff --name-only "main...\$branch")} | jq -Rcn --arg s "\$(git -C "$remote" rev-parse "\$branch")" '{files: [inputs | {path: .}], headRefOid: \$s}' ;;
@@ -131,6 +134,26 @@ run 0 "merges a PR that only removes a spec"
 assert_contains "$(gh_calls)" "pr create" "opens the PR of the removal"
 assert_eq "D	docs/specs/solo.md" "$(git -C "$repo" diff --name-status "$before" main)" "the PR holds only the removal"
 rm -f "$TMP/created"
+
+# main moved between two runs: the PR of the earlier run, on gen-docs/<old
+# SHA>, is closed (read back) and its branch deleted before the new PR opens.
+printf '# Spec\n\nFase #8.\n' >"$repo/docs/specs/solo2.md"
+git -C "$repo" add docs/specs/solo2.md
+git -C "$repo" commit --quiet -m "docs: spec"
+git -C "$repo" push --quiet origin main
+git -C "$repo" push --quiet origin main:refs/heads/gen-docs/0000000000aa
+run 1 "an earlier PR that does not close stops the run" FAKE_OLD_PR='29\tgen-docs/0000000000aa\n' FAKE_CLOSE_FAILS=1
+assert_contains "$(last_output)" "earlier PR #29 (gen-docs/0000000000aa) not read back as CLOSED" "says the earlier PR was not closed"
+assert_not_contains "$(gh_calls)" "pr create" "no new PR while the earlier one is open"
+run 0 "closes the PR of an earlier run and merges the new one" FAKE_OLD_PR='29\tgen-docs/0000000000aa\n'
+calls="$(gh_calls)"
+assert_contains "$calls" "pr close 29 --repo owner/repo" "closes the earlier PR"
+assert_contains "$calls" "pr view 29 --repo owner/repo --json state" "reads the earlier PR back"
+assert_eq 1 "$((  $(printf '%s\n' "$calls" | grep -n 'pr close 29' | head -1 | cut -d: -f1) < $(printf '%s\n' "$calls" | grep -n 'pr create' | head -1 | cut -d: -f1) ))" "the earlier PR closes before the new one opens"
+assert_eq "" "$(git -C "$remote" branch --list 'gen-docs/0000000000aa')" "the branch of the earlier PR is deleted"
+assert_contains "$(last_output)" "closed PR #29 of an earlier run" "says the earlier PR was closed"
+assert_contains "$(last_output)" "PR #30 merged" "the new PR is merged"
+rm -f "$TMP/created" "$TMP/old-closed"
 
 # A phase never runs it: only the main checkout does.
 git -C "$repo" worktree add --quiet -b feat/issue-5-x "$repo/.worktrees/issue-5" origin/main

@@ -37,7 +37,7 @@ while [ $# -gt 0 ]; do
   esac
 done
 
-known="$(grep -v '^#' "$ROOT/.github/labels.tsv" | cut -f1)"
+known="$(label_rows "$ROOT/.github/labels.tsv" | cut -f1)"
 if [ ${#add[@]} -gt 0 ]; then
   for l in "${add[@]}"; do
     case "$l" in group:*) continue ;; esac

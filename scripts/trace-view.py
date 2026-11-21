@@ -34,7 +34,7 @@ SUB_LABELS = {"triage": "triage", "close-reviewer": "reviewer"}
 
 
 def parse_ts(value):
-    """Converts the ISO UTC ts to a datetime; None if invalid."""
+    """Converts the ISO UTC ts into a datetime; None when invalid."""
     try:
         text = str(value)
         if text.endswith("Z"):
@@ -190,7 +190,7 @@ def fmt_duration(start, end):
 
 
 def build_tree(events):
-    """Tree: root -> planning -> phases/subagents -> bots. Returns the root node."""
+    """Tree: root -> plannings -> phases/subagents -> bots. Returns the root node."""
     root = node("root", "trace", "")
     sessions, order = build_sessions(events)
     plannings = [sessions[i] for i in order if not sessions[i]["issue"]]
@@ -205,7 +205,7 @@ def build_tree(events):
         parent["children"].append(s["node"])
 
     def phase_for(ev):
-        """Phase of a script event: by the session; otherwise the last one of the same issue that started before."""
+        """Phase of the script event: by the session; otherwise the last one of the same issue that started before."""
         s = sessions.get(ev.get("session_id") or "")
         if s is not None and s["issue"]:
             return s
@@ -332,7 +332,7 @@ def render_html(tree):
 
 
 def family(model):
-    """Model family: "claude-sonnet-5-5" and "sonnet" are both "sonnet"."""
+    """Model family: "claude-sonnet-5-5" and "sonnet" are "sonnet"."""
     words = [w for w in str(model).lower().split("[")[0].split("-") if w.isalpha() and w != "claude"]
     return words[0] if words else str(model)
 
@@ -342,7 +342,7 @@ def pair_cell(model, effort):
 
 
 def render_pairs(events, issue):
-    """Markdown table requested x used for the issue phase (phase sessions and their subagents)."""
+    """Markdown table requested x used of the phase of the issue (the phase sessions and their subagents)."""
     last = {}
     for ev in events:
         if ev["event"] == "phase_session" and str(ev.get("issue") or "") == str(issue) and ev.get("session_id"):
@@ -373,7 +373,7 @@ def render_pairs(events, issue):
 
 
 def default_dir():
-    """Root of the main checkout (dirname of git-common-dir), where .process/ lives."""
+    """Root of the main checkout (dirname of the git-common-dir), where .process/ lives."""
     common = subprocess.run(["git", "rev-parse", "--path-format=absolute", "--git-common-dir"],
                             text=True, capture_output=True)
     if common.returncode != 0 or not common.stdout.strip():

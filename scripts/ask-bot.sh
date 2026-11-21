@@ -69,7 +69,7 @@ else
       *) die "unknown option: $1 (see --help)" 2 ;;
     esac
   done
-  grep -q "^$bot	" "$HERE/lib/bots.tsv" || die "unknown bot: $bot (see scripts/lib/bots.tsv)"
+  bot_slugs | grep -qxF -- "$bot" || die "unknown bot: $bot (see .github/bots.tsv)"
   require_secret "$bot"
 
   id="$(date +%Y%m%d%H%M%S)-$$"

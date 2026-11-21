@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
-"""measure-session.py: pilot measurements from a Claude Code JSONL transcript.
+"""measure-session.py: session measurements from a Claude Code JSONL transcript.
 
 Usage: measure-session.py <transcript.jsonl> [...] [--json]
 
 Counts, per file: owner messages (touches), tool calls, words read in tool
 results (an approximation of what the AI read), input/output tokens when the
 transcript has `usage`, and choice questions (AskUserQuestion). Triage
-accuracy and time to merge come from GitHub and belong to the pilot report.
+accuracy and time to merge come from GitHub and are not measured here.
 """
 
 import json

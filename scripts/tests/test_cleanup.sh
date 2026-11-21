@@ -45,6 +45,32 @@ assert_eq 1 "$(git -C "$repo" ls-remote --heads origin feat/issue-8-x | wc -l | 
 assert_status 0 "cleanup of the last phase" sh -c "cd '$repo/.worktrees/issue-8' && scripts/close-phase.sh --cleanup"
 assert_eq "" "$(cat "$REGISTRY")" "the registry is empty after the last cleanup"
 
+# An untracked file of the main checkout identical to the one the merge brings (the
+# spec written by the planning on main and committed on the phase branch) does not
+# abort the update of main; a different one is never removed.
+phase 9
+printf '# Spec\n\nFase #9.\n' >"$repo/docs/specs/nine.md"
+mkdir -p "$repo/.worktrees/issue-9/docs/specs"
+cp "$repo/docs/specs/nine.md" "$repo/.worktrees/issue-9/docs/specs/nine.md"
+git -C "$repo/.worktrees/issue-9" add docs/specs/nine.md
+git -C "$repo/.worktrees/issue-9" commit --quiet -m "docs(specs): add the spec of issue #9"
+git -C "$repo/.worktrees/issue-9" push --quiet origin feat/issue-9-x:main
+: >"$REGISTRY"
+assert_status 0 "cleanup with an identical untracked spec in the main checkout" sh -c "cd '$repo/.worktrees/issue-9' && scripts/close-phase.sh --cleanup"
+assert_contains "$(last_output)" "removed the untracked copy of docs/specs/nine.md" "says the loose copy left"
+assert_eq "$(git -C "$repo" rev-parse origin/main)" "$(git -C "$repo" rev-parse main)" "main is updated past the loose copy"
+assert_eq "" "$(git -C "$repo" status --porcelain)" "the spec is tracked and clean after the update"
+phase 10
+echo other >"$repo/loose.txt"
+echo mine >"$repo/.worktrees/issue-10/loose.txt"
+git -C "$repo/.worktrees/issue-10" add loose.txt
+git -C "$repo/.worktrees/issue-10" commit --quiet -m "feat: loose"
+git -C "$repo/.worktrees/issue-10" push --quiet origin feat/issue-10-x:main
+assert_status 1 "cleanup keeps an untracked file that differs from main" sh -c "cd '$repo/.worktrees/issue-10' && scripts/close-phase.sh --cleanup"
+assert_eq "other" "$(cat "$repo/loose.txt")" "the different file is left as it was"
+rm "$repo/loose.txt"
+assert_status 0 "cleanup goes on once the file is out of the way" sh -c "cd '$repo/.worktrees/issue-10' && scripts/close-phase.sh --cleanup"
+
 # --cleanup on main: only prunes the lines whose worktree is gone.
 printf '9\tfeat/issue-9-x\t%s\n' "$repo/.worktrees/issue-9" >"$REGISTRY"
 assert_status 0 "cleanup on main" sh -c "cd '$repo' && scripts/close-phase.sh --cleanup"

@@ -165,7 +165,7 @@ blocked "$repo" "echo 'a cd ' && git commit --no-verify -m x && echo ' b'"
 blocked "$repo" "git commit -m 'msg -C ' && git push --force && echo ' end'"
 blocked "$repo" "git log --grep 'x -C ' ; git push -f ; echo ' y'"
 blocked "$main_repo" "echo 'a cd ' && git commit -m x && echo ' b'"
-# Alternative ways to call git/gh and to hide the command.
+# Alternative ways of calling git/gh and of hiding the command.
 blocked "$repo" 'env git push --force'
 blocked "$repo" 'command git reset --hard'
 blocked "$repo" '"git" push -f'
@@ -258,7 +258,7 @@ allowed "$repo" "cat > notes.md <<'EOF'
 Nunca rode git push --force nem git reset --hard; it's \" odd
 EOF"
 allowed "$repo" "python3 - <<'EOF'
-import subprocess  # git push --force aparece só como texto
+import subprocess  # git push --force shows up only as text
 EOF"
 # Line continuation and file checkout.
 blocked "$repo" "git \\

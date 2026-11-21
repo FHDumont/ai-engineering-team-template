@@ -23,6 +23,7 @@ case "$*" in
   "issue view 9 "*) echo '{"state":"CLOSED","title":"Fechada","labels":[{"name":"type:bug"}]}' ;;
   "issue view 10 "*) echo '{"state":"OPEN","title":"Teste de fluxo","labels":[{"name":"test"}]}' ;;
   "issue view "*"--json state,title,labels"*) echo '{"state":"OPEN","title":"Listar issues","labels":[{"name":"type:feature"}]}' ;;
+  "issue list"*"--state open"*) printf '%s\n' ${FAKE_OPEN:-} ;;
 esac
 H
 use_fake_gh "$TMP/handler.sh"
@@ -103,7 +104,11 @@ assert_eq 1 "$(grep -c -F -- "--state esperando" <<<"$out")" "one stop command, 
 need="$(grep -F -- "scripts/status.sh --state esperando --need" <<<"$out" || true)"
 assert_contains "$need" 'clique no cartão "Fase #7" na sessão "TITULO"' "the stop sentence names the card and the session"
 assert_contains "$need" "na barra lateral, dentro do agrupamento da sessão principal; se não aparecer, abra o agrupamento" "the stop sentence says where the session is"
-assert_contains "$out" "Replace TITULO with the exact title of this session" "says to put the exact title of the session"
+# The title is read back, never guessed: a session opened by another one does
+# not know its own title; without a way to read it, the sentence names no title.
+assert_contains "$out" "Replace TITULO with the title of this session read back from the app" "says to read the title of the session back"
+assert_contains "$out" "never a guessed one" "says the title is never guessed"
+assert_contains "$out" 'No way to read it: replace na sessão "TITULO" with na sessão que abriu a fase' "says what to write when the title cannot be read"
 assert_contains "$out" "A child session not started yet (its card was not clicked)" "the heartbeat covers the card not clicked yet"
 assert_contains "$out" 'only repeat the same "Você precisa"' "the heartbeat only repeats the need while the card waits"
 assert_contains "$out" "every 4 minutes" "gives the interval of the heartbeat"
@@ -162,5 +167,31 @@ for n in 10 12; do
   assert_eq "docs/specs/group.md" "$(git -C "$repo/.worktrees/issue-$n" show --name-only --format= HEAD)" "spec committed on the branch of #$n"
 done
 assert_eq "" "$(git -C "$repo" status --porcelain)" "main checkout clean after the group"
+
+# A group spec opened one phase at a time: the loose copy stays in the main
+# checkout while another open issue of the spec has no phase, so the second phase,
+# opened before the merge of the first, still finds its spec.
+spec later.md 13
+printf '\n## Fase #14 — y\n\n1. Etapa.\n' >>"$repo/docs/specs/later.md"
+export FAKE_OPEN="13 14"
+assert_status 0 "phase-start opens the first phase of a group spec alone" sh -c "cd '$repo' && scripts/phase-start.sh 13 --no-check"
+assert_contains "$(last_output)" "kept the loose copy of docs/specs/later.md" "says the loose copy stays for the phase not open yet"
+assert_status 0 "the second phase of the spec opens before the merge of the first" sh -c "cd '$repo' && scripts/phase-start.sh 14 --no-check"
+assert_eq "docs/specs/later.md" "$(git -C "$repo/.worktrees/issue-14" show --name-only --format= HEAD)" "the second phase gets the spec on its branch"
+assert_eq "" "$(git -C "$repo" status --porcelain)" "the loose copy leaves with the last phase of the spec"
+unset FAKE_OPEN
+
+# A mention in passing is not a spec: an issue cited only inside the section of
+# another phase does not pass the guard and inherits no pair.
+spec passing.md 15
+printf 'Depende da #16, que fica para depois.\n' >>"$repo/docs/specs/passing.md"
+assert_status 1 "phase-start refuses an issue cited only in the section of another phase" sh -c "cd '$repo' && scripts/phase-start.sh 16 --no-check"
+assert_contains "$(last_output)" "no spec" "a mention in passing is not a spec"
+assert_status 0 "the issue of the section still has its spec" sh -c "cd '$repo' && scripts/new-phase.sh 15 --dry-run"
+rm "$repo/docs/specs/passing.md"
+# shellcheck source=scripts/lib/common.sh
+source "$SCRIPTS/lib/common.sh"
+printf '# Spec (issues #1 e #2)\n\nIntro #9.\n\n## Fase #1 — a\n\nVer #3.\n\n## Notas\n\n#4\n' >"$TMP/cites.md"
+assert_eq "1 2 4 9" "$(spec_open_issues "$TMP/cites.md" "1 2 3 4 9 33" | paste -sd' ' -)" "title, intro, heading and a section without issue cite; the section of another phase does not"
 assert_status 2 "phase-start needs an issue number" sh -c "cd '$repo' && scripts/phase-start.sh"
 finish

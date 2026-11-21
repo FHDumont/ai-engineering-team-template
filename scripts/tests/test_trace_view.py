@@ -1,4 +1,4 @@
-"""Tests of trace-view.py."""
+"""Testes do trace-view.py."""
 
 import contextlib
 import importlib.util
@@ -56,8 +56,8 @@ SAMPLE = [
     phase("03:15:01", "SubagentStop", agent_id="a2", agent_type="general-purpose"),
     phase("03:20:00", "SubagentStart", agent_id="r1", agent_type="close-reviewer"),
     phase("03:22:00", "SubagentStop", agent_id="r1", agent_type="close-reviewer"),
-    phase("03:23:00", "bot_ask", bot="bot-a", ask_id="7"),
-    phase("03:24:00", "bot_reply", bot="bot-a", ask_id="7"),
+    phase("03:23:00", "bot_ask", bot="bot-b", ask_id="7"),
+    phase("03:24:00", "bot_reply", bot="bot-b", ask_id="7"),
     phase("03:25:00", "bot_ask", bot="outro", ask_id="8"),
     phase("03:26:00", "review_round", round="1", verdict="approved"),
     phase("03:27:00", "phase_closed"),
@@ -83,7 +83,7 @@ class TraceViewTests(unittest.TestCase):
         self.assertEqual({"triage", "phase #16"}, {c["label"] for c in plan["children"]})
         ph = find(plan, "phase #16")
         labels = [c["label"] for c in ph["children"]]
-        self.assertEqual(["general-purpose", "general-purpose", "reviewer", "bot bot-a", "bot outro"], labels)
+        self.assertEqual(["general-purpose", "general-purpose", "reviewer", "bot bot-b", "bot outro"], labels)
 
     def test_synthetic_planning_is_marked(self):
         plan = self.tree()["children"][0]
@@ -206,7 +206,7 @@ class TraceViewTests(unittest.TestCase):
 
     def test_bots_and_notes(self):
         ph = find(self.tree()["children"][0], "phase #16")
-        self.assertEqual("replied", find(ph, "bot bot-a")["status"])
+        self.assertEqual("replied", find(ph, "bot bot-b")["status"])
         self.assertEqual("waiting", find(ph, "bot outro")["status"])
         self.assertIn("review round 1: approved", ph["notes"])
 

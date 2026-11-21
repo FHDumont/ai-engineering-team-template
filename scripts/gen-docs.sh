@@ -1,5 +1,4 @@
 #!/usr/bin/env bash
-# gen-docs.sh: the single generation of CHANGELOG.md and ROADMAP.md, by the main session.
 #: gen-docs.sh: regenerate CHANGELOG.md and ROADMAP.md once, remove the specs of
 #: closed issues and merge both through one PR.
 #:
@@ -12,6 +11,9 @@
 #:    every docs/specs/*.md that cites no open issue (the spec a group left on
 #:    main: close-phase.sh removes it only when the closing phase can). Nothing
 #:    generated and no spec to remove: prints "up to date" and exits 0 with no PR.
+#:    Before that, an open PR of an earlier run (branch gen-docs/<another SHA>:
+#:    main moved since) is closed with a comment, read back, and its remote
+#:    branch and leftover worktree are removed: the new run replaces it.
 #: 2. Commits, pushes and opens a PR that holds only the two generated files
 #:    and those removals.
 #: 3. Reads the files of the PR back from GitHub. It accepts CHANGELOG.md,
@@ -61,6 +63,24 @@ drop_worktree() {
 open_issues() {
   gh issue list --repo "$repo" --state open --limit 1000 --json number --jq '.[].number'
 }
+
+# The PR of an earlier run, opened when main was at another SHA, never enters: this
+# run regenerates everything from the main of now. It is closed before the new one opens.
+gh pr list --repo "$repo" --state open --limit 1000 --json number,headRefName \
+  --jq '.[] | select(.headRefName | startswith("gen-docs/")) | "\(.number)\t\(.headRefName)"' |
+  while IFS="$(printf '\t')" read -r old_n old_branch; do
+    [ -n "$old_n" ] && [ "$old_branch" != "$branch" ] || continue
+    gh pr close "$old_n" --repo "$repo" --comment "Substituído por uma nova geração sobre a \`main\` atual (\`$branch\`)." >/dev/null
+    [ "$(gh pr view "$old_n" --repo "$repo" --json state --jq .state)" = CLOSED ] || die "earlier PR #$old_n ($old_branch) not read back as CLOSED"
+    if [ -n "$(git -C "$main_root" ls-remote --heads origin "$old_branch")" ]; then
+      git -C "$main_root" push --quiet origin --delete "$old_branch"
+    fi
+    if [ "$(current_branch "$wt")" = "$old_branch" ]; then
+      git -C "$main_root" worktree remove --force "$wt"
+    fi
+    git -C "$main_root" branch -D "$old_branch" >/dev/null 2>&1 || true
+    echo "closed PR #$old_n of an earlier run ($old_branch): main moved since"
+  done
 
 n="$(gh pr list --repo "$repo" --head "$branch" --state open --json number --jq '.[0].number // empty')"
 if [ -z "$n" ]; then

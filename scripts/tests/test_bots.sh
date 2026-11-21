@@ -32,7 +32,7 @@ cat >"$TMP/bin/security" <<'F'
 echo "sa-token-123"
 F
 export PROCESS_ENV_FILE="$TMP/none.env"
-unset BOT_WEBHOOK_BOT_B_URL BOT_WEBHOOK_BOT_B_SECRET BOT_WEBHOOK_BOT_A_URL BOT_WEBHOOK_BOT_A_SECRET
+unset BOT_WEBHOOK_BOT_A_URL BOT_WEBHOOK_BOT_A_SECRET BOT_WEBHOOK_BOT_B_URL BOT_WEBHOOK_BOT_B_SECRET
 cat >"$TMP/bin/op" <<'F'
 #!/usr/bin/env bash
 echo "$2" >>"$FAKE_OP_LOG"
@@ -48,7 +48,7 @@ F
 chmod +x "$TMP/bin/security" "$TMP/bin/op" "$TMP/bin/curl"
 export FAKE_CURL_LOG="$TMP/curl.log" FAKE_CURL_COUNT="$TMP/curl.count" FAKE_OP_LOG="$TMP/op.log" NOTIFY_RETRY_WAIT=0
 
-assert_status 0 "notifies the bot" "$SCRIPTS/notify-bot.sh" bot-b 3 "https://x/c/1" --ask-id 20260117100100-1
+assert_status 0 "notifies the bot" "$SCRIPTS/notify-bot.sh" bot-a 3 "https://x/c/1" --ask-id 20260117100100-1
 assert_eq "1" "$(cat "$FAKE_CURL_COUNT")" "one attempt on success"
 args="$(grep '^args:' "$FAKE_CURL_LOG")"
 config="$(grep -v '^args:' "$FAKE_CURL_LOG")"
@@ -63,38 +63,38 @@ assert_contains "$args" '"repo":"owner/repo"' "payload has repo as owner/name"
 assert_contains "$args" '"issue":3' "payload has the issue number"
 assert_contains "$args" '"comment_url":"https://x/c/1"' "payload has the comment link"
 assert_contains "$args" '"ask_id":"20260117100100-1"' "payload has the ask id"
-assert_contains "$args" '"reply_marker":"<!-- bot:bot-b reply-to:20260117100100-1 -->"' "payload has the reply marker"
-assert_eq "op://Your Vault/webhook-bot-b/url" "$(head -1 "$FAKE_OP_LOG")" "vault reference with spaces is one argument"
+assert_contains "$args" '"reply_marker":"<!-- bot:bot-a reply-to:20260117100100-1 -->"' "payload has the reply marker"
+assert_eq "op://Your Vault/webhook-bot-a/url" "$(head -1 "$FAKE_OP_LOG")" "vault reference with spaces is one argument"
 
-# A secret with quotes and a backslash does not break the curl configuration.
+# A secret with quotes and a backslash does not break curl's config.
 cat >"$TMP/bin/op" <<'F'
 #!/usr/bin/env bash
 case "$2" in */url) echo "https://hooks.example/bot" ;; */secret) printf '%s\n' 'a"b\c' ;; esac
 F
 : >"$FAKE_CURL_LOG"
-assert_status 0 "notifies with a quoted secret" "$SCRIPTS/notify-bot.sh" bot-b 3 "https://x/c/1" --ask-id 20260117100100-1
+assert_status 0 "notifies with a quoted secret" "$SCRIPTS/notify-bot.sh" bot-a 3 "https://x/c/1" --ask-id 20260117100100-1
 assert_contains "$(cat "$FAKE_CURL_LOG")" 'header = "X-Automation-Key: a\"b\\c"' "secret is escaped in the config"
 
 rm -f "$FAKE_CURL_COUNT"
-assert_status 4 "forced webhook failure exits 4" env FAKE_CURL_EXIT=22 "$SCRIPTS/notify-bot.sh" bot-b 3 "https://x/c/1"
+assert_status 4 "forced webhook failure exits 4" env FAKE_CURL_EXIT=22 "$SCRIPTS/notify-bot.sh" bot-a 3 "https://x/c/1"
 assert_eq "3" "$(cat "$FAKE_CURL_COUNT")" "1 attempt + 2 retries"
-assert_contains "$(gh_calls)" "issue edit 3 --repo owner/repo --add-label ask:bot-b" "labels ask:<bot> on failure"
-assert_contains "$(last_output)" "labeled ask:bot-b on #3 (read back)" "the label is read back"
+assert_contains "$(gh_calls)" "issue edit 3 --repo owner/repo --add-label ask:bot-a" "labels ask:<bot> on failure"
+assert_contains "$(last_output)" "labeled ask:bot-a on #3 (read back)" "the label is read back"
 # Failure: the notice failed and the label did not land either; it does not say it labeled.
 rm -f "$TMP/labels"
-assert_status 5 "webhook and label both failing exits 5" env FAKE_CURL_EXIT=22 FAKE_GH_FAIL='^issue edit' "$SCRIPTS/notify-bot.sh" bot-b 3 "https://x/c/1"
-assert_contains "$(last_output)" "the label ask:bot-b is not on #3" "says the label is missing"
-assert_not_contains "$(last_output)" "labeled ask:bot-b" "never claims the label"
+assert_status 5 "webhook and label both failing exits 5" env FAKE_CURL_EXIT=22 FAKE_GH_FAIL='^issue edit' "$SCRIPTS/notify-bot.sh" bot-a 3 "https://x/c/1"
+assert_contains "$(last_output)" "the label ask:bot-a is not on #3" "says the label is missing"
+assert_not_contains "$(last_output)" "labeled ask:bot-a" "never claims the label"
 assert_status 1 "unknown bot" "$SCRIPTS/notify-bot.sh" nobody 3 x
 
 # wait-reply: only the mark counts, posted after the question.
 cat >"$TMP/comments.json" <<'J'
-[[{"created_at":"2026-01-17T10:00:00Z","html_url":"u0","body":"<!-- bot:bot-b reply-to:20260117100100-1 --> antiga, antes da pergunta"},
-  {"created_at":"2026-01-17T10:01:00Z","html_url":"u1","body":"Pergunta\n\n<!-- ask:bot-b:20260117100100-1 -->"},
+[[{"created_at":"2026-01-17T10:00:00Z","html_url":"u0","body":"<!-- bot:bot-a reply-to:20260117100100-1 --> antiga, antes da pergunta"},
+  {"created_at":"2026-01-17T10:01:00Z","html_url":"u1","body":"Pergunta\n\n<!-- ask:bot-a:20260117100100-1 -->"},
   {"created_at":"2026-01-17T10:02:00Z","html_url":"u2","body":"resposta sem marca"},
-  {"created_at":"2026-01-17T10:03:00Z","html_url":"u3","body":"Texto ok <!-- bot:bot-b reply-to:20260117100100-1 -->"},
-  {"created_at":"2026-01-17T10:04:00Z","html_url":"u4","body":"<!-- bot:bot-b reply-to:zz --> outra pergunta"},
-  {"created_at":"2026-01-17T10:05:00Z","html_url":"u5","body":"Sem resposta\n\n<!-- ask:bot-b:20260117100199-9 -->"}]]
+  {"created_at":"2026-01-17T10:03:00Z","html_url":"u3","body":"Texto ok <!-- bot:bot-a reply-to:20260117100100-1 -->"},
+  {"created_at":"2026-01-17T10:04:00Z","html_url":"u4","body":"<!-- bot:bot-a reply-to:zz --> outra pergunta"},
+  {"created_at":"2026-01-17T10:05:00Z","html_url":"u5","body":"Sem resposta\n\n<!-- ask:bot-a:20260117100199-9 -->"}]]
 J
 export FAKE_COMMENTS="$TMP/comments.json"
 out="$("$SCRIPTS/wait-reply.sh" 3 20260117100100-1 --timeout 1 --interval 0)"
@@ -111,21 +111,21 @@ assert_contains "$(last_output)" "nothing to wait for" "says there is no questio
 
 # ask-bot: comments with the mark, notifies and waits.
 rm -f "$FAKE_CURL_COUNT"
-assert_status 4 "ask-bot stops when notify fails" env FAKE_CURL_EXIT=7 "$SCRIPTS/ask-bot.sh" bot-b 3 "Opinião sobre o texto?"
+assert_status 4 "ask-bot stops when notify fails" env FAKE_CURL_EXIT=7 "$SCRIPTS/ask-bot.sh" bot-a 3 "Opinião sobre o texto?"
 assert_contains "$(gh_calls)" "issue comment 3 --repo owner/repo --body-file -" "posts the question"
 # Failures: a question that was not posted does not notify the bot.
 for lost in FAKE_COMMENT_NO_URL FAKE_COMMENT_LOST; do
   rm -f "$FAKE_CURL_COUNT" "$TMP/posted"
-  assert_status 1 "ask-bot fails when the question is not posted ($lost)" env "$lost=1" "$SCRIPTS/ask-bot.sh" bot-b 3 "Opinião?" --timeout 0
+  assert_status 1 "ask-bot fails when the question is not posted ($lost)" env "$lost=1" "$SCRIPTS/ask-bot.sh" bot-a 3 "Opinião?" --timeout 0
   assert_contains "$(last_output)" "the bot was not notified" "says the bot was not notified ($lost)"
   assert_eq "" "$(cat "$FAKE_CURL_COUNT" 2>/dev/null || true)" "never notifies without the question ($lost)"
 done
 rm -f "$FAKE_CURL_COUNT" "$TMP/posted"
-assert_status 1 "ask-bot fails when gh issue comment fails" env FAKE_GH_FAIL='^issue comment' "$SCRIPTS/ask-bot.sh" bot-b 3 "Opinião?" --timeout 0
+assert_status 1 "ask-bot fails when gh issue comment fails" env FAKE_GH_FAIL='^issue comment' "$SCRIPTS/ask-bot.sh" bot-a 3 "Opinião?" --timeout 0
 assert_eq "" "$(cat "$FAKE_CURL_COUNT" 2>/dev/null || true)" "never notifies when the comment fails"
 
-# ask-bot: trace events, secret provider check and --retry.
-# Fake op that returns url and secret (the Service Account token comes from the fake security).
+# ask-bot: events in the trace, the secret provider check and --retry.
+# Fake op that returns url and secret (the service account token comes from the fake security).
 cat >"$TMP/bin/op" <<'F'
 #!/usr/bin/env bash
 case "$2" in */url) echo "https://hooks.example/bot" ;; */secret) echo "s3cr3t-value" ;; esac
@@ -134,27 +134,27 @@ export PROCESS_EVENTS_FILE="$TMP/events.jsonl"
 : >"$PROCESS_EVENTS_FILE"
 : >"$FAKE_GH_LOG"
 rm -f "$FAKE_CURL_COUNT"
-# The new id never has a reply in the sample JSON: the wait ends in a timeout (3).
-assert_status 3 "ask-bot posts, notifies and then waits" "$SCRIPTS/ask-bot.sh" bot-b 3 "Opinião?" --timeout 0
+# The new id never has a reply in the example JSON: the wait ends in a timeout (3).
+assert_status 3 "ask-bot posts, notifies and then waits" "$SCRIPTS/ask-bot.sh" bot-a 3 "Opinião?" --timeout 0
 assert_eq "1" "$(grep -c '^issue comment' "$FAKE_GH_LOG")" "ask-bot posts one question"
 assert_eq "1" "$(cat "$FAKE_CURL_COUNT")" "ask-bot notifies once"
 events="$(cat "$PROCESS_EVENTS_FILE")"
 assert_eq "1" "$(printf '%s\n' "$events" | jq -s '[.[] | select(.event == "bot_ask")] | length')" "records one bot_ask"
-assert_eq "bot-b" "$(printf '%s\n' "$events" | jq -rs '[.[] | select(.event == "bot_ask")][0].bot')" "bot_ask has the bot"
+assert_eq "bot-a" "$(printf '%s\n' "$events" | jq -rs '[.[] | select(.event == "bot_ask")][0].bot')" "bot_ask has the bot"
 assert_contains "$events" '"comment":"https://github.com/owner/repo/issues/3#issuecomment-1"' "bot_ask has the comment link"
 "$SCRIPTS/wait-reply.sh" 3 20260117100100-1 --timeout 1 --interval 0 >/dev/null
-assert_eq "1" "$(jq -s '[.[] | select(.event == "bot_reply" and .bot == "bot-b" and .ask_id == "20260117100100-1")] | length' "$PROCESS_EVENTS_FILE")" "wait-reply records bot_reply"
+assert_eq "1" "$(jq -s '[.[] | select(.event == "bot_reply" and .bot == "bot-a" and .ask_id == "20260117100100-1")] | length' "$PROCESS_EVENTS_FILE")" "wait-reply records bot_reply"
 
 # No secret provider: posts nothing and does not call curl.
 : >"$FAKE_GH_LOG"
 rm -f "$FAKE_CURL_COUNT"
-assert_status 1 "ask-bot stops without a secret provider" env FAKE_SECURITY_MISSING=1 "$SCRIPTS/ask-bot.sh" bot-b 3 "Opinião?"
+assert_status 1 "ask-bot stops without a secret provider" env FAKE_SECURITY_MISSING=1 "$SCRIPTS/ask-bot.sh" bot-a 3 "Opinião?"
 assert_contains "$(last_output)" "no secret provider configured" "explains the missing provider"
 assert_contains "$(last_output)" "nothing was posted" "says nothing was posted"
 assert_eq "" "$(gh_calls)" "nothing reaches GitHub without a provider"
 assert_eq "" "$(cat "$FAKE_CURL_COUNT" 2>/dev/null || true)" "curl is never called without a provider"
-# The same holds for notify-bot: it stops before curl, no label.
-assert_status 1 "notify-bot stops without a secret provider" env FAKE_SECURITY_MISSING=1 "$SCRIPTS/notify-bot.sh" bot-b 3 "https://x/c/1"
+# The same goes for notify-bot: it stops before curl, with no label.
+assert_status 1 "notify-bot stops without a secret provider" env FAKE_SECURITY_MISSING=1 "$SCRIPTS/notify-bot.sh" bot-a 3 "https://x/c/1"
 assert_eq "" "$(gh_calls)" "notify-bot labels nothing without a provider"
 assert_eq "" "$(cat "$FAKE_CURL_COUNT" 2>/dev/null || true)" "notify-bot never calls curl without a provider"
 # Locked credential store: message with the fix, nothing posted.
@@ -164,18 +164,18 @@ echo "security: User interaction is not allowed." >&2; exit 36
 F
 cp "$TMP/bin/security" "$TMP/bin/security.ok"
 cp "$TMP/bin/security.locked" "$TMP/bin/security"
-assert_status 1 "ask-bot stops with a locked credential store" "$SCRIPTS/ask-bot.sh" bot-b 3 "Opinião?"
+assert_status 1 "ask-bot stops with a locked credential store" "$SCRIPTS/ask-bot.sh" bot-a 3 "Opinião?"
 assert_contains "$(last_output)" "security unlock-keychain" "locked credential store shows the fix"
 assert_eq "" "$(gh_calls)" "nothing reaches GitHub with a locked credential store"
 cp "$TMP/bin/security.ok" "$TMP/bin/security"
-# An environment provider is enough, no credential store.
+# The environment provider is enough, with no credential store.
 : >"$FAKE_CURL_LOG"
-assert_status 0 "env provider notifies without credential store or op" env FAKE_SECURITY_MISSING=1 \
-  BOT_WEBHOOK_BOT_B_URL="https://env.example/h" BOT_WEBHOOK_BOT_B_SECRET="env-secret" \
-  "$SCRIPTS/notify-bot.sh" bot-b 3 "https://x/c/1" --ask-id 20260117100100-1
+assert_status 0 "env provider notifies without the credential store or op" env FAKE_SECURITY_MISSING=1 \
+  BOT_WEBHOOK_BOT_A_URL="https://env.example/h" BOT_WEBHOOK_BOT_A_SECRET="env-secret" \
+  "$SCRIPTS/notify-bot.sh" bot-a 3 "https://x/c/1" --ask-id 20260117100100-1
 assert_contains "$(cat "$FAKE_CURL_LOG")" 'url = "https://env.example/h"' "env webhook URL is used"
 
-# --retry: only notifies again, no new comment.
+# --retry: only notifies again, with no new comment.
 : >"$FAKE_GH_LOG"
 : >"$PROCESS_EVENTS_FILE"
 rm -f "$FAKE_CURL_COUNT"
@@ -183,7 +183,7 @@ assert_status 0 "retry notifies again" "$SCRIPTS/ask-bot.sh" --retry 20260117100
 assert_not_contains "$(gh_calls)" "issue comment" "retry posts no new comment"
 assert_eq "1" "$(cat "$FAKE_CURL_COUNT")" "retry calls the webhook"
 assert_contains "$(cat "$FAKE_CURL_LOG")" '"comment_url":"u1"' "retry notifies with the original comment link"
-assert_contains "$(cat "$FAKE_CURL_LOG")" '"reply_marker":"<!-- bot:bot-b reply-to:20260117100100-1 -->"' "retry keeps the ask id and bot"
+assert_contains "$(cat "$FAKE_CURL_LOG")" '"reply_marker":"<!-- bot:bot-a reply-to:20260117100100-1 -->"' "retry keeps the ask id and bot"
 retry_event="$(jq -c 'select(.event == "bot_ask")' "$PROCESS_EVENTS_FILE")"
 assert_contains "$retry_event" '"retry":"1"' "retry event has retry=1"
 assert_contains "$retry_event" '"ask_id":"20260117100100-1"' "retry event has the ask id"
@@ -199,7 +199,7 @@ assert_status 0 "needs summary after 10 comments" "$SCRIPTS/summarize-thread.sh"
 echo "Acordado: X" >"$TMP/summary.md"
 assert_status 0 "creates the summary" "$SCRIPTS/summarize-thread.sh" 3 --summary-file "$TMP/summary.md"
 assert_contains "$(last_output)" "created summary" "first time creates"
-rm -f "$TMP/posted"  # the handler adds the posted comment to the list
+rm -f "$TMP/posted"  # the handler appends the posted comment to the list
 echo '[[{"id":77,"body":"<!-- agreed-summary -->\nvelho"}]]' >"$TMP/comments.json"
 assert_status 0 "updates the summary" "$SCRIPTS/summarize-thread.sh" 3 --summary-file "$TMP/summary.md"
 assert_contains "$(gh_calls)" "api -X PATCH repos/owner/repo/issues/comments/77" "edits in place"
@@ -210,4 +210,29 @@ for bad in 'a.*' 'x" or true' '1)(2'; do
   assert_status 2 "wait-reply refuses ask id '$bad'" "$SCRIPTS/wait-reply.sh" 3 "$bad" --timeout 0 --interval 0
 done
 assert_contains "$(last_output)" "invalid ask id" "invalid ask id error is clear"
+# The bots are data of the repository (.github/bots.tsv, or BOTS_FILE): the code names none.
+printf '# slug\tname\treference\nsolo\tSolo Bot\t\n' >"$TMP/bots.tsv"
+assert_status 1 "a bot missing from the bots file is refused" env BOTS_FILE="$TMP/bots.tsv" "$SCRIPTS/ask-bot.sh" bot-a 3 "Opinião?"
+assert_contains "$(last_output)" "unknown bot: bot-a (see .github/bots.tsv)" "the error names the bots file"
+: >"$FAKE_CURL_LOG"; : >"$FAKE_OP_LOG"
+assert_status 0 "a bot with no reference is notified from the environment" env BOTS_FILE="$TMP/bots.tsv" FAKE_SECURITY_MISSING=1 \
+  BOT_WEBHOOK_SOLO_URL=https://env.example/hook BOT_WEBHOOK_SOLO_SECRET=env-secret "$SCRIPTS/notify-bot.sh" solo 3 "https://x/c/1"
+assert_eq "" "$(cat "$FAKE_OP_LOG")" "no reference, no op call"
+rows="$(BOTS_FILE="$TMP/bots.tsv" bash -c 'source "$1/lib/common.sh"; label_rows "$2"' _ "$SCRIPTS" "$REPO/.github/labels.tsv")"
+assert_contains "$rows" "ask:solo	ededed	O bot Solo Bot não foi avisado" "labels.tsv gets one ask:<slug> row per bot"
+assert_not_contains "$rows" "<slug>" "no placeholder row is left"
+assert_not_contains "$rows" "#" "comment lines are dropped"
+assert_eq "$(grep -vc -e '^#' -e '<slug>' "$REPO/.github/labels.tsv")" "$(BOTS_FILE="$TMP/missing.tsv" bash -c 'source "$1/lib/common.sh"; label_rows "$2"' _ "$SCRIPTS" "$REPO/.github/labels.tsv" | wc -l | tr -d ' ')" "with no bots file the fixed labels remain"
+assert_status 0 "label-issue accepts the ask label of a bot" env BOTS_FILE="$TMP/bots.tsv" "$SCRIPTS/label-issue.sh" 3 --add ask:solo --dry-run
+assert_status 1 "label-issue refuses the ask label of an unknown bot" env BOTS_FILE="$TMP/bots.tsv" "$SCRIPTS/label-issue.sh" 3 --add ask:bot-a --dry-run
+[ ! -e "$SCRIPTS/lib/bots.tsv" ] && ok || bad "scripts/lib/ holds no bot list"
+
+# Names of one repository (the list of docs/repo-notes.md, when the file exists) stay out of
+# the method's code; the bots file is the repository's own data.
+if [ -f "$REPO/docs/repo-notes.md" ]; then
+  names="$(awk '$0 == "## Nomes só deste repositório" { p = 1; next } p && /^## / { exit } p && /^- / { print }' "$REPO/docs/repo-notes.md" | grep -oE '`[^`]+`' | tr -d '`')"
+  hits="$(cd "$REPO" && git ls-files scripts .claude/hooks .githooks .github | grep -vxF .github/bots.tsv | tr '\n' '\0' | xargs -0 grep -nF -- "$names" 2>/dev/null | cut -c1-120 || true)"
+  assert_eq "" "$hits" "the method's code cites no repository-only name"
+fi
+
 finish

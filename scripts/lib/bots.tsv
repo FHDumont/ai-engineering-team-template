@@ -1,3 +1,0 @@
-# slug	webhook reference in the password manager (optional provider; a vault name with spaces is always quoted in op read; fields url and secret)
-bot-a	op://Your Vault/webhook-bot-a
-bot-b	op://Your Vault/webhook-bot-b

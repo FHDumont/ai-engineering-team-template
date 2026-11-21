@@ -1,4 +1,4 @@
-# name	color	description	old_names (comma separated; renamed when one exists)
+# name	color	description	old_names (comma-separated; renamed when one exists). A row with <slug> is repeated once per bot of .github/bots.tsv (<slug> and <name>).
 type:feature	1d76db	Funcionalidade nova	enhancement
 type:bug	d73a4a	Algo não funciona como deveria	bug
 type:docs	0075ca	Só documentação	documentation
@@ -27,7 +27,6 @@ needs-context	fbca04	Não deu para classificar ou falta seção obrigatória
 needs-owner-ok	e11d21	PR toca caminho ou área sensível: precisa do ok do dono do repo	
 finding	c5def5	Achado durante o trabalho	achado
 friction	f9d0c4	Atrito do método (na 2ª vez, propor um hook)	
-ask:bot-a	ededed	O Bot A não foi avisado	
-ask:bot-b	ededed	O Bot B não foi avisado	
+ask:<slug>	ededed	O bot <name> não foi avisado	
 approved	0e8a16	Ok do dono do repo na spec (só o dono do repo aplica)	
 test	ededed	Issue ou PR de teste: fora do roadmap e do changelog	

@@ -6,7 +6,7 @@
 #: The webhook URL and secret come from scripts/lib/secret.sh (variables
 #: BOT_WEBHOOK_<SLUG>_URL and _SECRET; the .env outside the repo; or, optionally,
 #: a password manager service account, fields `url` and `secret` of the item
-#: referenced in scripts/lib/bots.tsv) at call
+#: referenced in .github/bots.tsv) at call
 #: time and never go to a file, a process argument or a log: the URL and both
 #: headers (`Authorization: Bearer` and `X-Automation-Key`) go in curl's config
 #: on stdin. JSON body: source, bot, repo (owner/name), issue, comment_url,
@@ -14,7 +14,7 @@
 #: has 10 s. One attempt plus 2 retries; if all fail, labels the issue
 #: ask:<bot>, reads the label back and exits 4; when the label is not there
 #: either, it says so and exits 5. With no secret provider (or a locked credential store, or a
-#: too-open .env) it exits 1 before calling curl. Bots: scripts/lib/bots.tsv.
+#: too-open .env) it exits 1 before calling curl. Bots: .github/bots.tsv.
 set -euo pipefail
 HERE="$(cd "$(dirname "$0")" && pwd)"
 # shellcheck source=scripts/lib/common.sh
@@ -35,8 +35,8 @@ while [ $# -gt 0 ]; do
   esac
 done
 
-ref="$(awk -F'\t' -v b="$bot" '$1 == b {print $2}' "$HERE/lib/bots.tsv")"
-[ -n "$ref" ] || die "unknown bot: $bot (see scripts/lib/bots.tsv)"
+bot_slugs | grep -qxF -- "$bot" || die "unknown bot: $bot (see .github/bots.tsv)"
+ref="$(awk -F'\t' -v b="$bot" '$1 == b {print $3}' "$(bots_file)")"
 repo="$(repo_slug)"
 marker="<!-- bot:$bot reply-to:$ask_id -->"
 
@@ -50,10 +50,10 @@ attempt() {
   local hook secret payload rc=0
   # Secrets only in local variables; `op` and `curl` get nothing through a visible argument.
   # The reference may have spaces (vault name): always quoted.
-  hook="$(secret_get "$(bot_webhook_var "$bot" url)" "$ref/url")" || rc=$?
+  hook="$(secret_get "$(bot_webhook_var "$bot" url)" "${ref:+$ref/url}")" || rc=$?
   # Configuration problem (no provider, locked credential store, open .env): retrying does not help.
   case "$rc" in 10|11|13) exit 1 ;; 0) ;; *) return 1 ;; esac
-  secret="$(secret_get "$(bot_webhook_var "$bot" secret)" "$ref/secret")" || return 1
+  secret="$(secret_get "$(bot_webhook_var "$bot" secret)" "${ref:+$ref/secret}")" || return 1
   payload="$(jq -cn --arg bot "$bot" --arg repo "$repo" --arg issue "$issue" --arg url "$url" \
     --arg id "$ask_id" --arg marker "$marker" \
     '{source: "ask-bot", bot: $bot, repo: $repo, issue: ($issue | tonumber), comment_url: $url,

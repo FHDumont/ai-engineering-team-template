@@ -11,6 +11,8 @@ TMP="$(cd "$(mktemp -d)" && pwd -P)"
 trap 'rm -rf "$TMP"' EXIT
 # No test writes to the real trace (.process/events.jsonl of the main checkout).
 export PROCESS_EVENTS_FILE="$TMP/events.jsonl"
+# No test depends on the bots of this repository: every one reads the fixture.
+export BOTS_FILE="$TESTS_DIR/fixtures/bots.tsv"
 # No test inherits the session of whoever runs it: each one names its own.
 unset CLAUDE_CODE_SESSION_ID
 FAILS=0
@@ -19,10 +21,10 @@ COUNT=0
 ok() { COUNT=$((COUNT + 1)); }
 bad() { COUNT=$((COUNT + 1)); FAILS=$((FAILS + 1)); echo "not ok: $1"; }
 
-assert_eq() { # assert_eq <expected> <got> <description>
+assert_eq() { # assert_eq <expected> <actual> <description>
   if [ "$1" = "$2" ]; then ok; else bad "$3 (expected '$1', got '$2')"; fi
 }
-assert_contains() { # assert_contains <text> <snippet> <description>
+assert_contains() { # assert_contains <text> <excerpt> <description>
   case "$1" in *"$2"*) ok ;; *) bad "$3 (missing '$2' in: $(printf '%s' "$1" | head -c 400))" ;; esac
 }
 assert_not_contains() {

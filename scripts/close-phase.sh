@@ -15,8 +15,9 @@
 #:   main session generates them once at the end, with gen-docs.sh) and does not
 #:   require a change in docs/STATE.md. Deletes, in a phase commit, every spec
 #:   that cites the phase issue and cites no other open issue (issues the PR
-#:   closes do not count); the file name does not matter. The spec text goes at
-#:   the end of the PR body, in a <details>.
+#:   closes do not count); the file name does not matter. The text of every spec
+#:   that cites the phase issue, deleted or kept, goes at the end of the PR body,
+#:   in a <details>; a deleted spec that does not cite it stays out.
 #:   Writes the "## Modelo e esforço" section of the PR body from the trace
 #:   (requested x used table, scripts/trace-view.py --pairs): what the body file
 #:   has in that section is replaced.
@@ -66,7 +67,8 @@
 #:   another active phase), takes out of .worktrees/parallel-active.tsv the line
 #:   of the phase and every line whose worktree is gone, removes the local
 #:   worktree and branch and the remote branch (read back) and updates main. On
-#:   main it only cleans the registry and updates main.
+#:   main it only cleans the registry and updates main. An untracked file of the
+#:   main checkout identical to one main now adds is removed before the update.
 #: --abort: gives up the phase without a merge. Before touching anything, lists
 #:   what would be lost (uncommitted change, untracked file, commit not pushed,
 #:   pushed commit that no PR keeps) and exits 10. With nothing to lose, or with
@@ -235,22 +237,37 @@ body_with_pairs() { # body_with_pairs <body file>
   echo "$out"
 }
 
-# PR body + text of the specs deleted on this branch; prints the file to use.
+# PR body + the text of the specs of the phase, each in a <details>: the specs that
+# cite the phase issue, whether this branch deleted them or they stay for another
+# open issue. A spec the branch deleted that does not cite the issue is not the
+# phase's and stays out. Prints the file to use.
 body_with_spec() { # body_with_spec <body file>
-  local out c f
-  out="$(mktemp)"
+  local out c f text
+  out="$(mktemp)" text="$(mktemp)"
   cat "$1" >"$out"
   for c in $(git log --diff-filter=D --format=%H origin/main..HEAD -- 'docs/specs/*.md'); do
     for f in $(git show --diff-filter=D --name-only --format= "$c" -- 'docs/specs/*.md'); do
-      grep -qF "<summary>Spec ($f)</summary>" "$out" && continue
-      printf '\n<details>\n<summary>Spec (%s)</summary>\n\n%s\n\n</details>\n' "$f" "$(git show "$c^:$f")" >>"$out"
+      git show "$c^:$f" >"$text"
+      [ -z "$issue" ] || spec_cites "$text" "$issue" || continue
+      spec_details "$out" "$f" "$text"
     done
   done
-  # With no deleted spec, the original file is used.
+  if [ -n "$issue" ]; then
+    for f in $(specs_citing "$issue" "$ROOT"); do
+      [ -n "$(git ls-files -- "$f")" ] || continue
+      spec_details "$out" "$f" "$ROOT/$f"
+    done
+  fi
+  rm -f "$text"
+  # No spec of the phase: the original file goes on.
   if cmp -s "$1" "$out"; then rm -f "$out"; echo "$1"; else echo "$out"; fi
 }
+spec_details() { # spec_details <body file> <spec path> <file with the spec text>
+  grep -qF "<summary>Spec ($2)</summary>" "$1" && return 0
+  printf '\n<details>\n<summary>Spec (%s)</summary>\n\n%s\n\n</details>\n' "$2" "$(cat "$3")" >>"$1"
+}
 
-# Stuck PR: dirty (conflict) or CI missing on HEAD. Never forces a push.
+# Stuck PR: dirty (conflict) or CI missing on HEAD. Never force-pushes.
 # A conflicting PR is redone by redo-phase.sh, the one owner of that path.
 check_pr() { # check_pr [PR number]
   local n info m s sha reads=0 tries="${CLOSE_PHASE_MERGEABLE_TRIES:-5}"
@@ -459,13 +476,24 @@ cleanup() {
     source "$HERE/lib/project.sh"
     # A board write that fails does not stop the cleanup: it fails the script at the end.
     project_set_status "$(issue_from_branch "$branch")" "Done" || board=1
-    # Filter of the "Fase atual" view: clear it, or keep only the group of phases still active.
+    # Filter of the "Fase atual" view: cleared, or left with only the group of the phases still active.
     project_refresh_phase_filter "$main_root" "" "$(issue_from_branch "$branch")" || board=1
     registry_drop "$main_root" "$(issue_from_branch "$branch")"
   else
     registry_drop "$main_root"
   fi
   git -C "$main_root" switch --quiet main
+  # An untracked file of the main checkout equal to the one main now brings (the
+  # spec the planning wrote there and the phase committed) would abort the
+  # fast-forward: the copy leaves, the content comes back with the pull.
+  git -C "$main_root" fetch --quiet origin main
+  local f
+  git -C "$main_root" diff --name-only --diff-filter=A HEAD FETCH_HEAD | while IFS= read -r f; do
+    [ -f "$main_root/$f" ] && [ -z "$(git -C "$main_root" ls-files -- "$f")" ] || continue
+    [ "$(git -C "$main_root" hash-object "$main_root/$f")" = "$(git -C "$main_root" rev-parse "FETCH_HEAD:$f")" ] || continue
+    rm -f "$main_root/$f"
+    echo "removed the untracked copy of $f from the main checkout (main brings the same file)"
+  done
   git -C "$main_root" pull --quiet --ff-only origin main
   if [ "$here" != "$main_root" ]; then
     git -C "$main_root" worktree remove --force "$here"

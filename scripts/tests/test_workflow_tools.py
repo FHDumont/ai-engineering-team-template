@@ -1,4 +1,4 @@
-"""Tests of check-workflows.py, sensitive_paths.py and the steps of ci.yml."""
+"""Testes do check-workflows.py, do sensitive_paths.py e dos passos do ci.yml."""
 
 import importlib.util
 import json
@@ -50,7 +50,7 @@ class WorkflowTests(unittest.TestCase):
             self.assertEqual(cw.check(os.path.join(wf, name)), [], name)
 
     def test_deploy_not_run_twice_per_push(self):
-        # The deploy only runs by workflow_dispatch; the build on the PR belongs to ci.yml.
+        # The deploy only runs on workflow_dispatch; the build on the PR belongs to ci.yml.
         text = open(os.path.join(ROOT, ".github", "workflows", "deploy-example.yml")).read()
         on = text.split("\non:\n", 1)[1].split("\npermissions:", 1)[0]
         self.assertIn("workflow_dispatch", on)
@@ -159,10 +159,11 @@ class SensitivePathsTests(unittest.TestCase):
 
     def test_gate_verifiers_sensitive(self):
         # A PR that changes the CI workflow, a verifier of the gate or the list
-        # itself needs the owner's ok.
+        # itself needs the owner's ok (check-docs.sh, read from the base by the
+        # policy job, is one of them).
         globs = sp.load_globs(os.path.join(ROOT, ".github", "sensitive-paths"))
         paths = [".github/workflows/ci.yml", "scripts/ci-gate.sh", "scripts/check-attribution.sh",
-                 "scripts/lib/sensitive_paths.py", ".github/sensitive-paths"]
+                 "scripts/check-docs.sh", "scripts/lib/sensitive_paths.py", ".github/sensitive-paths"]
         self.assertEqual(sp.sensitive(paths, globs), paths)
         for rel in paths:
             self.assertTrue(os.path.isfile(os.path.join(ROOT, rel)), rel)
@@ -260,7 +261,7 @@ class CiStepsTests(unittest.TestCase):
         out = self.detect({".github/ISSUE_TEMPLATE/bug.md": "x\n"})
         self.assertEqual((out["code"], out["docs_only"]), ("true", "false"))
 
-    def test_filter_app(self):
+    def test_filter_page(self):
         self.assertEqual(self.detect({"app/README.md": "x\n"})["app"], "true")
 
     def base_checkout(self):

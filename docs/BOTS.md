@@ -2,7 +2,7 @@
 
 Opcional. O `scripts/ask-bot.sh` comenta a pergunta na issue e chama o webhook do bot. A resposta é reconhecida pela marca `<!-- bot:<slug> reply-to:<id> -->`, não pelo autor: funciona mesmo quando todos usam a mesma conta do GitHub.
 
-Os bots abaixo são exemplos. Troque as linhas pelos bots do seu time e mantenha os mesmos slugs em `scripts/lib/bots.tsv` e nas labels `ask:<slug>` de `.github/labels.tsv`.
+Os bots abaixo são exemplos. Troque as linhas pelos bots do seu time e mantenha os mesmos slugs em `.github/bots.tsv` (slug, nome e referência do webhook); as labels `ask:<slug>` saem da linha-modelo de `.github/labels.tsv`, uma por bot.
 
 | Slug | Nome | Papel | Quando perguntar | Nunca pode |
 |---|---|---|---|---|
@@ -21,7 +21,7 @@ O `scripts/lib/secret.sh` procura a URL e o segredo de cada bot nesta ordem (sem
 
 **`.env` (padrão):** fica em `~/.<nome-do-repo>/.env` (pasta 700, arquivo 600; `PROCESS_ENV_FILE` troca o caminho). O agente cria o arquivo só com as chaves vazias (`scripts/init-env.sh <slug>...`); o dono do repo o abre e cola os valores. O script recusa permissão aberta, e o arquivo fica fora do git.
 
-**Gerenciador de senhas (opcional):** o código aceita uma conta de serviço lida pelo CLI `op`. Crie uma conta de serviço só de leitura no cofre dos webhooks, com um item por bot (campos `url` e `secret`), e ponha a referência `op://<cofre>/<item>` de cada bot em `scripts/lib/bots.tsv`. O token da conta de serviço fica no cofre de credenciais do sistema operacional (no macOS, um item de senha genérica com serviço `op-service-account` e conta `$USER`), nunca em arquivo do repo. O agente só chama o `op` pelos scripts. Cofre do sistema trancado numa sessão remota: destranque-o e rode de novo.
+**Gerenciador de senhas (opcional):** o código aceita uma conta de serviço lida pelo CLI `op`. Crie uma conta de serviço só de leitura no cofre dos webhooks, com um item por bot (campos `url` e `secret`), e ponha a referência `op://<cofre>/<item>` de cada bot em `.github/bots.tsv`. O token da conta de serviço fica no cofre de credenciais do sistema operacional (no macOS, um item de senha genérica com serviço `op-service-account` e conta `$USER`), nunca em arquivo do repo. O agente só chama o `op` pelos scripts. Cofre do sistema trancado numa sessão remota: destranque-o e rode de novo.
 
 ## Identidade
 

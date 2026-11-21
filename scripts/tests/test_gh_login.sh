@@ -36,7 +36,7 @@ while IFS= read -r line; do
   [ -n "$line" ] || continue
   case "$line" in
     "$self":*|docs/specs/*|.github/workflows/ci.yml:*) continue ;;
-    AGENTS.md:*|docs/process-design.md:*|.claude/skills/setup/SKILL.md:*)
+    AGENTS.md:*|docs/repo-notes.md:*|docs/process-design.md:*|.claude/skills/setup/SKILL.md:*)
       if printf '%s' "$line" | grep -qiE 'nunca|never'; then continue; fi ;;
   esac
   offenders="$offenders$line"$'\n'
@@ -44,7 +44,7 @@ done <<<"$(git -C "$REPO" grep -nIE --untracked -e "$banned" -- . || true)"
 assert_eq "" "$offenders" "no gh auth refresh/logout/setup-git, --with-token or token variable outside the rule"
 
 # The same filter refuses a planted line (the check is not vacuous).
-planted="$(printf 'scripts/x.sh:1:gh auth refresh --scopes project\ndocs/x.md:9:rode gh auth logout\n' | grep -cE "$banned")"
+planted="$(printf 'scripts/x.sh:1:gh auth refresh --scopes project\ndocs/repo-notes.md:9:rode gh auth logout\n' | grep -cE "$banned")"
 assert_eq 2 "$planted" "the pattern catches a planted command"
 
 finish

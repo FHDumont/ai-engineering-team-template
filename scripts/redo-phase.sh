@@ -1,5 +1,4 @@
 #!/usr/bin/env bash
-# redo-phase.sh: the one owner of redoing a phase whose PR conflicts with main.
 #: redo-phase.sh: redo the phase of the current branch on top of the updated main.
 #:
 #: Usage: redo-phase.sh
@@ -11,7 +10,14 @@
 #:    conflict in a generated file (CHANGELOG.md, ROADMAP.md) keeps the file of
 #:    main. Any other conflict is real: exit 4 with the cherry-pick stopped and
 #:    the files listed; resolve them, git add them by name, run
-#:    git cherry-pick --continue and run redo-phase.sh again (it resumes).
+#:    git cherry-pick --continue and run redo-phase.sh again (it resumes). A
+#:    resolution that leaves nothing to commit (the change is already on main):
+#:    git add the files and run redo-phase.sh again, with the cherry-pick still
+#:    stopped; it checks that nothing is left and drops the commit itself. A
+#:    git cherry-pick --skip by hand is refused: the script cannot tell it from a
+#:    lost commit.
+#:    The new branch is <branch>-r<k>; only a whole -r<k> suffix of a branch
+#:    already redone is replaced.
 #: 2. Pushes the new branch (no force) and opens a new PR with the title, body and
 #:    labels of the old one, "Closes #n" included.
 #: 3. Closes the old PR with a comment and deletes the old remote branch.
@@ -56,8 +62,16 @@ is_generated() { case " $GENERATED " in *" $1 "*) return 0 ;; *) return 1 ;; esa
 if [ -f "$state" ]; then
   old="$(sed -n 1p "$state")"; old_pr="$(sed -n 2p "$state")"; new="$(sed -n 3p "$state")"
   [ "$branch" = "$new" ] || die "a redo of $old is stopped on branch $new: switch to it or delete $state"
-  if git rev-parse -q --verify CHERRY_PICK_HEAD >/dev/null || [ -n "$(unmerged)" ]; then
-    die "the cherry-pick is still stopped: resolve the files, git add them by name and run git cherry-pick --continue" 4
+  if stopped="$(git rev-parse -q --verify CHERRY_PICK_HEAD)" && [ -z "$(unmerged)" ] &&
+     git diff --quiet && git diff --cached --quiet; then
+    # Resolved to exactly what main has: nothing of the commit is left to apply. The
+    # script drops it here, checked, so the count of kept commits still holds.
+    git cherry-pick --skip >/dev/null 2>&1
+    grep -vxF "$stopped" "$state.kept" >"$state.kept.tmp" || true
+    mv "$state.kept.tmp" "$state.kept"
+    echo "dropped ${stopped:0:12}: the resolution left nothing to apply on main"
+  elif [ -n "$stopped" ] || [ -n "$(unmerged)" ]; then
+    die "the cherry-pick is still stopped: resolve the files, git add them by name and run git cherry-pick --continue (nothing left to commit: run scripts/redo-phase.sh again without it)" 4
   fi
   echo "resuming the redo of $old on $new"
 else
@@ -69,7 +83,8 @@ else
   git rev-list --reverse "origin/main..$old" >"$state.todo"
   : >"$state.kept"
   [ -s "$state.todo" ] || { rm -f "$state.todo" "$state.kept"; die "$old has no commit ahead of origin/main"; }
-  base="${old%-r[0-9]*}"
+  # Only a whole -r<k> suffix is a redo mark: feat/issue-5-r2d2-support keeps its name.
+  base="$(printf '%s\n' "$old" | sed -E 's/-r[0-9]+$//')"
   k=2; new="$base-r$k"
   while git show-ref --verify --quiet "refs/heads/$new" || [ -n "$(git ls-remote --heads origin "$new")" ]; do
     k=$((k + 1)); new="$base-r$k"
@@ -94,6 +109,7 @@ while [ -s "$state.todo" ]; do
     echo "real conflict: cherry-pick of ${c:0:12} ($(git log -1 --format=%s "$c")) stopped on branch $new" >&2
     unmerged | sed 's/^/  conflict: /' >&2
     echo "resolve these files, git add them by name, run git cherry-pick --continue, then run scripts/redo-phase.sh again" >&2
+    echo "nothing left to commit after the resolution (the change is already on main): git add the files and run scripts/redo-phase.sh again; it drops the commit. Never git cherry-pick --skip by hand" >&2
     exit 4
   fi
   git rev-parse -q --verify CHERRY_PICK_HEAD >/dev/null || die "cherry-pick of $c failed without a conflict: see git status"
@@ -109,7 +125,7 @@ done
 # No commit is lost in silence: a cherry-pick that was aborted or skipped by hand shows here.
 kept="$(wc -l <"$state.kept" | tr -d ' ')"
 have="$(git rev-list --count origin/main..HEAD)"
-[ "$have" = "$kept" ] || die "branch $new has $have commit(s) on top of origin/main, expected $kept: a cherry-pick was aborted or skipped; nothing was pushed. Switch back to $old, delete branch $new and $state*, and run redo-phase.sh again"
+[ "$have" = "$kept" ] || die "branch $new has $have commit(s) on top of origin/main, expected $kept: a cherry-pick was aborted or skipped by hand; nothing was pushed (a commit whose resolution is empty is dropped by redo-phase.sh itself, run with the cherry-pick still stopped). Switch back to $old, delete branch $new and $state*, and run redo-phase.sh again"
 [ "$(git rev-list --count origin/main..HEAD)" -gt 0 ] || die "nothing of $old is left on top of origin/main: branch $new is empty"
 
 git push --quiet -u origin "$new"

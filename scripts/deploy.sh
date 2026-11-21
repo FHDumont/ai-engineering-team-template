@@ -1,5 +1,4 @@
 #!/usr/bin/env bash
-# deploy.sh: the single deploy of a close, by the main session, with main tested and the run read back.
 #: deploy.sh: the one deploy of a close: dispatch each deploy-*.yml on main, wait for the run, read it back.
 #:
 #: Usage: deploy.sh [--timeout seconds] [--interval seconds]
@@ -39,12 +38,29 @@ HERE="$(cd "$(dirname "$0")" && pwd)"
 # shellcheck source=scripts/lib/common.sh
 source "$HERE/lib/common.sh"
 
+usage_error() { # usage_error <message>: the message and the usage, exit 2
+  {
+    echo "error: $1"
+    echo "Usage: deploy.sh [--timeout seconds] [--interval seconds]"
+    echo "       deploy.sh --check"
+  } >&2
+  exit 2
+}
+# Prints the value of option <name>: a whole number of seconds, zero or more.
+seconds_of() { # seconds_of <name> <number of arguments left> [value]
+  [ "$2" -ge 2 ] || usage_error "$1 needs a value: a whole number of seconds"
+  case "$3" in
+    ''|*[!0-9]*) usage_error "$1 needs a whole number of seconds, zero or more: got '$3'" ;;
+  esac
+  echo "$3"
+}
+
 timeout=1800 interval=15 check=0
 while [ $# -gt 0 ]; do
   case "$1" in
     -h|--help) print_help "$0"; exit 0 ;;
-    --timeout) timeout="$2"; shift 2 ;;
-    --interval) interval="$2"; shift 2 ;;
+    --timeout) timeout="$(seconds_of "$1" $# "${2-}")" || exit 2; shift 2 ;;
+    --interval) interval="$(seconds_of "$1" $# "${2-}")" || exit 2; shift 2 ;;
     --check) check=1; shift ;;
     *) die "unknown option: $1 (see --help)" 2 ;;
   esac
@@ -66,7 +82,7 @@ if [ "$check" = 0 ]; then
   trace="$(phase_trace_file "$main_root")" || die "deploy refused: cannot locate the trace"
   if [ -f "$trace" ]; then
     # A phase_session of an issue this same session opened (phase_opened) is not a
-    # phase session: the session that opens a phase also runs check-env.sh.
+    # phase session: the old new-phase.sh ran check-env.sh in the session that opened it.
     phases="$(jq -rs --arg s "$sid" '
       [.[] | select(type == "object" and .session_id == $s)] as $e
       | [$e[] | select(.event == "phase_opened") | (.issue | tostring)] as $opened

@@ -27,7 +27,7 @@ assert_eq feat/issue-42-x "$(field 1 branch)" "branch"
 assert_eq 42 "$(field 1 issue)" "issue from the branch"
 assert_contains "$(field 1 ts)" "T" "ISO timestamp"
 
-# PreToolUse of Agent: model and effort asked for in tool_input.
+# PreToolUse of Agent: model and effort requested in tool_input.
 jq -cn --arg d "$repo" '{hook_event_name: "PreToolUse", session_id: "s1", cwd: $d,
   tool_name: "Agent", tool_use_id: "toolu_1", effort: {level: "high"},
   tool_input: {description: "step 2", subagent_type: "general-purpose", model: "sonnet", effort: "medium"}}' | "$HOOK"
@@ -43,7 +43,7 @@ assert_eq a1b2c3 "$(sed -n 3p "$EV" | jq -r .subagent_id)" "subagent id from the
 assert_eq toolu_1 "$(sed -n 3p "$EV" | jq -r .tool_use_id)" "tool use id on PostToolUse"
 sed -i.bak 3d "$EV"
 
-# No effort in tool_input: the subagent default applies.
+# No effort in tool_input: the default of the subagents applies.
 jq -cn --arg d "$repo" '{hook_event_name: "PreToolUse", session_id: "s1", cwd: $d,
   tool_name: "Agent", tool_input: {description: "x"}}' | CLAUDE_CODE_SUBAGENT_EFFORT=low "$HOOK"
 assert_eq low "$(field 3 effort)" "subagent effort default from the env"
@@ -68,10 +68,10 @@ assert_eq 4 "$(wc -l <"$EV" | tr -d ' ')" "bad input writes nothing"
   cd "$repo/.worktrees/issue-7"
   # shellcheck source=scripts/lib/common.sh
   source "$REPO/scripts/lib/common.sh"
-  trace_event bot_ask bot=bot-a ask_id=abc note="a=b c"
+  trace_event bot_ask bot=bot-b ask_id=abc note="a=b c"
 )
 assert_eq bot_ask "$(field 5 event)" "script event name"
-assert_eq bot-a "$(field 5 bot)" "script event field"
+assert_eq bot-b "$(field 5 bot)" "script event field"
 assert_eq "a=b c" "$(field 5 note)" "value keeps '=' and spaces"
 assert_eq 7 "$(field 5 issue)" "script event issue"
 

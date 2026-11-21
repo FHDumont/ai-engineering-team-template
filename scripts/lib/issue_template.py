@@ -5,9 +5,6 @@ CLI (used by open-issue.sh):
   issue_template.py render <type> <json-file>  # body built from the template
 """
 
-# Single source of the section titles: the files in .github/ISSUE_TEMPLATE/. open-issue.sh and
-# auto-label.py use this module, so both always read the same titles.
-
 import json
 import os
 import re
@@ -78,12 +75,12 @@ def split_sections(body):
 
 
 def section_text(raw):
-    """Real text of the section, without guide comments and surrounding spaces."""
+    """Real text of the section, without guide comments and without spaces."""
     return COMMENT_RE.sub("", raw or "").strip()
 
 
 def load_template(kind, root=None):
-    """Template of a type -> dict with labels and sections (title, required, guide)."""
+    """Template of one type -> dict with labels and sections (title, required, guide)."""
     if kind not in TYPES:
         raise ValueError("unknown issue type: %s" % kind)
     path = os.path.join(template_dir(root), TYPES[kind])
@@ -104,7 +101,7 @@ def load_template(kind, root=None):
 
 
 def detect_type(labels, sections, root=None):
-    """Issue type: by the template labels, otherwise by the sections present."""
+    """Type of the issue: by the labels of the template, otherwise by the sections present."""
     labels = set(labels or [])
     for kind in ("finding", "debt", "bug", "feature"):
         if MARKER_LABELS[kind] in labels:
@@ -130,7 +127,7 @@ def missing_required(kind, body, root=None):
 
 def render(kind, values, root=None):
     """Builds the body from the template: keeps the order and the titles,
-    replaces the guide comment with the given text; an empty optional section is dropped."""
+    swaps the guide comment for the given text; an empty optional section is dropped."""
     tpl = load_template(kind, root)
     known = {s["title"] for s in tpl["sections"]}
     unknown = sorted(set(values) - known)

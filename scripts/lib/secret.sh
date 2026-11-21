@@ -42,11 +42,18 @@ secret_repo_slug() {
 }
 
 # Path of the .env (outside the repo): PROCESS_ENV_FILE or ~/.<repo-slug>/.env.
+# The legacy ~/.config/<repo-slug>/.env is used only while the new one is missing.
 secret_env_file() {
+  local slug
   if [ -n "${PROCESS_ENV_FILE:-}" ]; then
     printf '%s\n' "$PROCESS_ENV_FILE"
+    return
+  fi
+  slug="$(secret_repo_slug)"
+  if [ ! -e "$HOME/.$slug/.env" ] && [ -e "$HOME/.config/$slug/.env" ]; then
+    printf '%s/.config/%s/.env\n' "$HOME" "$slug"
   else
-    printf '%s/.%s/.env\n' "$HOME" "$(secret_repo_slug)"
+    printf '%s/.%s/.env\n' "$HOME" "$slug"
   fi
 }
 
@@ -109,6 +116,11 @@ _secret_env_file_check() {
   local f mode
   f="$(secret_env_file)"
   [ -f "$f" ] || return 1
+  if [ -z "${PROCESS_ENV_FILE:-}" ]; then
+    case "$f" in
+      "$HOME"/.config/*/.env) _secret_err "warning: using the legacy $f; move it to $HOME/.$(secret_repo_slug)/.env" ;;
+    esac
+  fi
   mode="$(_secret_mode "$f")" || mode=""
   case "$mode" in
     ''|*[!0-7]*) _secret_err "cannot read the permissions of $f"; return "$SECRET_BAD_PERMS" ;;

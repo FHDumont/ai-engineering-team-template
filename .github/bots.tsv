@@ -1,0 +1,5 @@
+# The bots of this repository (repo configuration, not method code). Tab-separated:
+# slug	name	webhook reference in the password manager (optional provider; a vault name with spaces is always quoted in op read; fields url and secret)
+# The two bots below are examples: replace them with the bots of your team.
+bot-a	Bot A	op://Your Vault/webhook-bot-a
+bot-b	Bot B	op://Your Vault/webhook-bot-b

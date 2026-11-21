@@ -511,6 +511,24 @@ spec_round '[{"number":1},{"number":2}]' 2026-01-18-g.md 'Fases #1 e #2.'
 assert_contains "$(last_output)" "kept docs/specs/2026-01-18-g.md: it still cites open issue(s) #2" "keeps the spec while another cited issue is open"
 [ -e "$repo/docs/specs/2026-01-18-g.md" ] && ok || bad "spec file stays"
 
+# The body carries the spec of the phase even when it stays: the kept spec is
+# attached, and a spec the branch deleted that does not cite the phase issue is not.
+body_arg="$(gh_calls | sed -n 's/.*pr edit 12 --repo owner\/repo --title chore: x --body-file \([^ ]*\).*/\1/p' | head -1)"
+assert_contains "$(cat "$body_arg")" "<summary>Spec (docs/specs/2026-01-18-g.md)</summary>" "PR body carries the spec that stays for another open issue"
+git -C "$repo" switch --quiet -c chore/old-specs origin/main
+mkdir -p "$repo/docs/specs"
+printf '# Spec\n\nFase #50, antiga.\n' >"$repo/docs/specs/2026-01-17-old.md"
+git -C "$repo" add docs/specs/2026-01-17-old.md
+git -C "$repo" commit --quiet -m "docs: old spec"
+git -C "$repo" push --quiet origin chore/old-specs:main
+git -C "$repo" fetch --quiet origin
+git -C "$repo" switch --quiet -c chore/issue-1-drops-old origin/main
+git -C "$repo" rm --quiet docs/specs/2026-01-17-old.md
+git -C "$repo" commit --quiet -m "docs: drop the old spec"
+assert_status 0 "prepare of a phase that deletes a spec of another issue" sh -c "cd '$repo' && scripts/close-phase.sh --prepare --title 'chore: x' --body-file '$TMP/body.md'"
+body_arg="$(gh_calls | sed -n 's/.*pr edit 12 --repo owner\/repo --title chore: x --body-file \([^ ]*\).*/\1/p' | tail -1)"
+assert_not_contains "$(cat "${body_arg:-$TMP/body.md}")" "2026-01-17-old.md" "PR body leaves out a deleted spec that does not cite the phase issue"
+
 # A spec named after the group that does not cite the phase issue is not the phase's to delete.
 spec_round '[{"number":1}]' 2026-01-18-g.md 'Fase #15 apenas.'
 [ -e "$repo/docs/specs/2026-01-18-g.md" ] && ok || bad "a spec that does not cite the issue stays"

@@ -111,8 +111,39 @@ assert_status 1 "fails a base rule whose lock does not exist" env REPO_ROOT="$d"
 assert_contains "$(last_output)" "base rule 2 names .claude/hooks/gone.sh, which does not exist" "names the missing lock"
 d="$(fixture)"; edit_design "$d" 's#| 1 | Termina sem deploy |#|  | Termina sem deploy |#'
 assert_status 1 "fails a base rule without an exit code" env REPO_ROOT="$d" "$CHECK"
+# Names of one repository stay out of the method: docs/repo-notes.md lists them.
+d="$(fixture)"; printf '# Notas do repositório\n\n## Nomes só deste repositório\n\n- `AcmeBot`\n\n## Outra\n\n- `scripts/gate.sh`\n' >"$d/docs/repo-notes.md"
+assert_status 0 "passes a design that cites no repository-only name" env REPO_ROOT="$d" "$CHECK"
+echo "Pergunte ao AcmeBot." >>"$d/docs/process-design.md"
+assert_status 1 "fails a design that cites a repository-only name" env REPO_ROOT="$d" "$CHECK"
+assert_contains "$(last_output)" "cites the repository-only name AcmeBot" "names the repository-only name"
+# The same list covers AGENTS.md and the skills; the path docs/repo-notes.md itself is allowed.
+d="$(fixture)"; printf '# Notas do repositório\n\n## Nomes só deste repositório\n\n- `AcmeBot`\n- `repo-notes`\n' >"$d/docs/repo-notes.md"
+echo "Notas: docs/repo-notes.md." >>"$d/AGENTS.md"; echo "Veja docs/repo-notes.md." >>"$d/.claude/skills/plan/SKILL.md"
+assert_status 0 "passes method files that only cite the path docs/repo-notes.md" env REPO_ROOT="$d" "$CHECK"
+echo "Pergunte ao AcmeBot." >>"$d/AGENTS.md"
+assert_status 1 "fails an AGENTS.md that cites a repository-only name" env REPO_ROOT="$d" "$CHECK"
+assert_contains "$(last_output)" "AGENTS.md cites the repository-only name AcmeBot" "names the file and the repository-only name"
+d="$(fixture)"; printf '# Notas do repositório\n\n## Nomes só deste repositório\n\n- `AcmeBot`\n' >"$d/docs/repo-notes.md"
+mkdir -p "$d/.claude/skills/ask-bot"; echo "Pergunte ao AcmeBot." >"$d/.claude/skills/ask-bot/notes.md"
+assert_status 1 "fails a skill that cites a repository-only name" env REPO_ROOT="$d" "$CHECK"
+assert_contains "$(last_output)" ".claude/skills/ask-bot/notes.md cites the repository-only name AcmeBot" "names the skill file"
+d="$(fixture)"; mkdir -p "$d/.claude/skills/ask-bot"; echo "Pergunte ao AcmeBot." >"$d/.claude/skills/ask-bot/SKILL.md"
+assert_status 0 "with no docs/repo-notes.md there is no list to check" env REPO_ROOT="$d" "$CHECK"
 
-# archive-adr: moves, swaps the link and marks it superseded; check-docs stays green.
+# Issue templates are Markdown: a YAML issue form is refused; only config.yml may be YAML.
+d="$(fixture)"; mkdir -p "$d/.github/ISSUE_TEMPLATE"
+printf 'blank_issues_enabled: false\n' >"$d/.github/ISSUE_TEMPLATE/config.yml"; : >"$d/.github/ISSUE_TEMPLATE/bug.md"
+assert_status 0 "passes Markdown templates and config.yml" env REPO_ROOT="$d" "$CHECK"
+for form in bug.yml feature.yaml; do
+  d="$(fixture)"; mkdir -p "$d/.github/ISSUE_TEMPLATE"; printf 'name: x\nbody: []\n' >"$d/.github/ISSUE_TEMPLATE/$form"
+  assert_status 1 "fails the issue form $form" env REPO_ROOT="$d" "$CHECK"
+  assert_contains "$(last_output)" ".github/ISSUE_TEMPLATE/$form is an issue form" "names the issue form $form"
+done
+forms="$(cd "$REPO" && git ls-files .github/ISSUE_TEMPLATE | grep -E '\.ya?ml$' | grep -vxF .github/ISSUE_TEMPLATE/config.yml || true)"
+assert_eq "" "$forms" "this repository has no issue form"
+
+# archive-adr: moves, swaps the link and marks it "substituída"; check-docs stays green.
 d="$(fixture)"
 git -C "$d" add docs >/dev/null 2>&1; git -C "$d" commit --quiet -m "docs: adrs"
 assert_status 0 "archives ADR-001" env REPO_ROOT="$d" "$SCRIPTS/archive-adr.sh" 001 --by 002
@@ -122,7 +153,7 @@ assert_contains "$line" "(archive/ADR-001-core.md)" "index link points to archiv
 assert_contains "$line" "substituída por ADR-002" "index marks replaced"
 assert_status 0 "check-docs passes after archiving" env REPO_ROOT="$d" "$CHECK"
 assert_status 1 "refuses unknown replacement" env REPO_ROOT="$d" "$SCRIPTS/archive-adr.sh" 002 --by 009
-# Failure: an ADR without an index row is not declared archived, and nothing moves.
+# Failure: an ADR with no line in the index is not declared archived, and nothing moves.
 d="$(fixture)"
 grep -v 'ADR-001' "$d/docs/adr/INDEX.md" >"$d/index.new"; mv "$d/index.new" "$d/docs/adr/INDEX.md"
 assert_status 1 "fails when the index has no line for the ADR" env REPO_ROOT="$d" "$SCRIPTS/archive-adr.sh" 001 --by 002

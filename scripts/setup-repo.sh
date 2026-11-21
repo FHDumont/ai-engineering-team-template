@@ -53,7 +53,7 @@ repo="$(repo_slug)"
 branch="${SETUP_BRANCH:-main}"
 changes=0
 
-# One-time offers of Project and runner. The "no" is kept in the repository variable.
+# One-time offers of the Project and of the runner. The "no" stays in the repository variable.
 var_exists() { # var_exists <name>
   gh variable list --repo "$repo" --json name --jq '.[].name' 2>/dev/null | grep -qxF "$1"
 }
@@ -130,7 +130,7 @@ case "$mode" in
     echo "done: $name=declined"; exit 0 ;;
 esac
 
-# Runs (or only shows, with --dry-run) a change.
+# Runs (or only shows, with --dry-run) one change.
 apply() { # apply <description> <command...>
   local what="$1"; shift
   changes=$((changes + 1))
@@ -180,10 +180,10 @@ sync_labels() {
     else
       apply "create label $name" gh label create "$name" --repo "$repo" --color "$color" --description "$desc"
     fi
-  done <"$ROOT/.github/labels.tsv"
+  done <<<"$(label_rows "$ROOT/.github/labels.tsv")"
 
   local wanted
-  wanted="$(grep -v '^#' "$ROOT/.github/labels.tsv" | cut -f1)"
+  wanted="$(label_rows "$ROOT/.github/labels.tsv" | cut -f1)"
   while IFS= read -r name; do
     [ -n "$name" ] || continue
     echo "$wanted" | grep -qxF "$name" && continue
@@ -236,7 +236,7 @@ sync_protection() {
     "allow_deletions": false
   }'
   want='{"strict":false,"checks":["CI@15368","review/independent@any"],"enforce_admins":true,"reviews":0,"linear":true,"force_pushes":false,"deletions":false}'
-  # Without protection, the API answers 404: compare with "none".
+  # With no protection the API answers 404: compares with "none".
   if raw="$(gh api "repos/$repo/branches/$branch/protection" 2>&1)"; then
     have="$(echo "$raw" | jq -S -c "$NORMALIZE")"
   else

@@ -40,7 +40,7 @@ current_branch() {
   git -C "${1:-.}" branch --show-current 2>/dev/null
 }
 
-# True if the branch is the main one.
+# True when the branch is the main one.
 is_main_branch() {
   case "$1" in
     main|master) return 0 ;;
@@ -61,23 +61,65 @@ issue_from_branch() {
   echo "$1" | sed -n -E 's/.*issue-([0-9]+).*/\1/p'
 }
 
-# Specs that cite an issue: paths (relative to the checkout root) of the
-# docs/specs/*.md files that mention #<n>, one per line. Empty when none does.
+# The bots of this repository are data, not code: .github/bots.tsv of the checkout
+# these scripts run from (BOTS_FILE overrides the path), one bot per line:
+# slug, name, webhook reference (tab-separated; "#" starts a comment line).
+bots_file() {
+  printf '%s\n' "${BOTS_FILE:-$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)/.github/bots.tsv}"
+}
+
+# Slugs of the bots, one per line. Empty when the repository has no bots file.
+bot_slugs() {
+  local f
+  f="$(bots_file)"
+  [ -f "$f" ] || return 0
+  awk -F '\t' '!/^#/ && $1 != "" { print $1 }' "$f"
+}
+
+# Rows of a labels file, without the comment lines. A row with <slug> is repeated
+# once per bot, with <slug> and <name> replaced by the columns of the bots file.
+label_rows() { # label_rows <labels.tsv>
+  local f
+  f="$(bots_file)"
+  [ -f "$f" ] || f=/dev/null
+  awk -F '\t' '
+    FILENAME == ARGV[1] && ARGV[1] != ARGV[2] { if ($0 !~ /^#/ && $1 != "") { n++; slug[n] = $1; name[n] = $2 } next }
+    /^#/ || $0 == "" { next }
+    /<slug>/ {
+      for (i = 1; i <= n; i++) { row = $0; gsub(/<slug>/, slug[i], row); gsub(/<name>/, name[i], row); print row }
+      next
+    }
+    { print }' "$f" "$1"
+}
+
+# True when a spec cites an issue. A mention in passing does not count: #<n> only
+# inside the section ("## ...") of another phase, one whose heading names other
+# issues and not this one. The title, the text before the first section, a section
+# heading and a section whose heading names no issue all count.
+spec_cites() { # spec_cites <spec file> <issue>
+  awk -v re="#$2([^0-9]|\$)" '
+    /^## / { other = ($0 !~ re && $0 ~ /#[0-9]/) }
+    !other && $0 ~ re { found = 1; exit }
+    END { exit !found }' "$1"
+}
+
+# Specs that cite an issue (spec_cites): paths (relative to the checkout root) of
+# the docs/specs/*.md files, one per line. Empty when none does.
 specs_citing() { # specs_citing <issue> [checkout root]
   local root="${2:-.}" f
   for f in "$root"/docs/specs/*.md; do
     [ -f "$f" ] || continue
-    grep -q -E "#$1([^0-9]|\$)" "$f" && echo "docs/specs/$(basename "$f")"
+    spec_cites "$f" "$1" && echo "docs/specs/$(basename "$f")"
   done
   return 0
 }
 
-# Open issues a spec still cites: the numbers of <open issues> (one per line)
-# that <spec file> mentions as #<n>, one per line. Empty: the spec has no open issue.
+# Open issues a spec still cites (spec_cites): the numbers of <open issues> (one
+# per line), one per line. Empty: the spec has no open issue.
 spec_open_issues() { # spec_open_issues <spec file> <open issue numbers>
   local n
   for n in $2; do
-    grep -q -E "#$n([^0-9]|\$)" "$1" && echo "$n"
+    spec_cites "$1" "$n" && echo "$n"
   done
   return 0
 }
@@ -186,7 +228,7 @@ events_file() {
   echo "$(dirname "$common")/.process/events.jsonl"
 }
 
-# Appends a JSON line to the trace. Never fails: the trace must not stop the flow.
+# Appends one JSON line to the trace. Never fails: the trace must not stop the flow.
 append_event() { # append_event <json-line> [directory]
   local f
   f="$(events_file "${2:-.}")" || return 0

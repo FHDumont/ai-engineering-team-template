@@ -180,7 +180,7 @@ A sessão que o dono abre é a de planejamento. Depois de abrir as fases ela vir
 2. A fase só abre por `scripts/phase-start.sh <n>`. Ele sai 1, sem criar nada, em três casos: issue fechada; nenhuma spec em `docs/specs` cita `#n`; a spec não tem a linha do par. Com spec, ele grava `phase_opened` no trace, cria branch e worktree (`.worktrees/issue-<n>`), commita a spec na branch e imprime os argumentos do `start_session`.
 3. Antes de qualquer `start_session`, a gerenciadora cria o **batimento**, uma tarefa recorrente do agente que a cada 4 minutos lê o estado das sessões ligadas e dos PRs das fases abertas e faz o próximo passo (cartão ainda não clicado: só repete o "Você precisa"), e o apaga no passo único de fim, porque ela só age quando algo a acorda e o aviso de fim da filha nem sempre chega (instrução impressa pelo `phase-start.sh`, sem trava que a confira). Vem antes das sessões porque a filha que vira cartão abre pelo clique do dono, fora de qualquer turno da gerenciadora.
 4. A gerenciadora abre todas as filhas do grupo no mesmo turno do "executar", um `start_session` por fase, com os campos: `initiation: "user_asked"`, `context: "fresh"`, `use_worktree: false`, `title`, `prompt`, `background`, `model` e `effort` da spec.
-5. O app recusou o `start_session` (turno sem mensagem do dono): a gerenciadora repete a chamada com `initiation: "own_initiative"`, que vira um cartão que o dono abre com um clique, e só então para em `esperando você`. Todo "Você precisa" que manda o dono agir em outra sessão (clicar num cartão, responder a um quadro) diz o título exato dela e onde ela fica: "na barra lateral, dentro do agrupamento da sessão principal; se não aparecer, abra o agrupamento". A fase nunca roda na gerenciadora nem num subagente dela.
+5. O app recusou o `start_session` (turno sem mensagem do dono): a gerenciadora repete a chamada com `initiation: "own_initiative"`, que vira um cartão que o dono abre com um clique, e só então para em `esperando você`. Todo "Você precisa" que manda o dono agir em outra sessão (clicar num cartão, responder a um quadro) diz o título exato dela, lido de volta do app e nunca chutado (sem como ler, "a sessão que abriu a fase"), e onde ela fica: "na barra lateral, dentro do agrupamento da sessão principal; se não aparecer, abra o agrupamento". A fase nunca roda na gerenciadora nem num subagente dela.
 
 **O que cada sessão faz.**
 
@@ -223,7 +223,7 @@ Opcional. Os bots atuam nas pontas: abrem issues, respondem quando perguntados e
 
 ### 5.2 `docs/BOTS.md`
 
-No máximo 450 palavras (conferido pelo `check-docs.sh`). Uma linha por bot: slug, papel, o que responde, o que nunca faz. Traz também como guardar os segredos dos webhooks. A skill `ask-bot` aponta para ele; `scripts/lib/bots.tsv` lista os slugs e a referência de cada webhook.
+No máximo 450 palavras (conferido pelo `check-docs.sh`). Uma linha por bot: slug, papel, o que responde, o que nunca faz. Traz também como guardar os segredos dos webhooks. A skill `ask-bot` aponta para ele; `.github/bots.tsv` é a configuração dos bots do repositório (slug, nome e referência de cada webhook); os scripts não citam nenhum bot, e as labels `ask:<slug>` saem da linha-modelo do `.github/labels.tsv`, uma por bot.
 
 ---
 
@@ -255,7 +255,7 @@ Todo script tem `--help`, um teste em `scripts/tests/` e saída curta em inglês
 | `scripts/gen-roadmap.py` | `ROADMAP.md` das issues abertas por área e prioridade | `gen-docs.sh`, `end-check.sh` |
 | `scripts/deploy.sh` | O único deploy (§9.4) | sessão principal, no passo único de fim |
 | `scripts/validate.sh` | Lint e todos os testes; único lugar onde roda o shellcheck | agentes, CI |
-| `scripts/check-docs.sh` | Limites de palavras (`AGENTS.md` 300–500, `docs/STATE.md` ≤500, `docs/BOTS.md` ≤450, skill `plan` ≤400); `CLAUDE.md` só com `@AGENTS.md`; uma linha por ADR no índice; nenhuma seção de histórico; este desenho contra o repositório: tabela das regras-base, tabela de scripts, tabela de hooks e tabela de arquivos | CI, `close-phase.sh` |
+| `scripts/check-docs.sh` | Limites de palavras (`AGENTS.md` 300–500, `docs/STATE.md` ≤500, `docs/BOTS.md` ≤450, skill `plan` ≤400); `CLAUDE.md` só com `@AGENTS.md`; uma linha por ADR no índice; nenhuma seção de histórico; este desenho contra o repositório: tabela das regras-base, tabela de scripts, tabela de hooks e tabela de arquivos; nenhum nome só de um repositório (lista das notas dele, quando existem) neste desenho, no `AGENTS.md` nem nas skills; nenhum formulário de issue em YAML (§8.2) | CI, `close-phase.sh` |
 | `scripts/check-workflows.py` | Padrão dos workflows (§9) além do `actionlint` | CI |
 | `scripts/check-attribution.sh` | Reprova assinatura de IA abrindo uma linha nos commits e no corpo do PR | CI `policy`, `close-phase.sh --merge`, `.githooks/commit-msg` |
 | `scripts/ci-gate.sh` | Decide o resultado do job `CI` a partir dos outros jobs (§9.2) | `ci.yml` |
@@ -411,7 +411,8 @@ A tabela é a árvore de arquivos do método. Caminho sem `<…>` precisa existi
 | `.github/workflows/issues-label.yml` | labels automáticas das issues |
 | `.github/workflows/deploy-<alvo>.yml` | deploy, só quando há app (§9.4) |
 | `scripts/` | scripts do método (§6) |
-| `scripts/lib/` | código comum, `weights.tsv` e `bots.tsv` |
+| `scripts/lib/` | código comum e `weights.tsv` |
+| `.github/bots.tsv` | bots do repositório: slug, nome e referência do webhook (§5.2) |
 | `scripts/tests/` | testes dos scripts |
 | `<checkout principal>/.worktrees/issue-<n>` | worktree da fase, fora do git |
 | `<checkout principal>/.process/events.jsonl` | trace, fora do git (§6.3) |
@@ -447,7 +448,7 @@ Fonte: `.github/labels.tsv` (nomes em inglês, descrições em português). O `s
 
 ### 8.2 Templates de issue
 
-Templates em Markdown, não issue forms. Cada template tem front matter (`name`, `about`, `title`, `labels`) e o texto-guia em comentários `<!-- -->`. O `config.yml` mantém `blank_issues_enabled: false`.
+Templates em Markdown, não issue forms: o formulário em YAML abre um modal pequeno, campo por campo, e o template em Markdown abre o editor grande; o `check-docs.sh` reprova formulário em `.github/ISSUE_TEMPLATE/` (só o `config.yml` é YAML). Cada template tem front matter (`name`, `about`, `title`, `labels`) e o texto-guia em comentários `<!-- -->`. O `config.yml` mantém `blank_issues_enabled: false`.
 
 | Seção (`##`) | feature | bug | debt | finding |
 |---|---|---|---|---|

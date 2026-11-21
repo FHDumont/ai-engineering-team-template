@@ -16,6 +16,13 @@
 #: - "### 6.2 Hooks": lists exactly the files of .claude/hooks/ and .githooks/;
 #: - "## 7. Arquivos": every path without a placeholder (<...> or *) exists.
 #:
+#: Repository-only names: the design, AGENTS.md and the skills (.claude/skills/*/*.md) cite
+#: no name listed under "## Nomes só deste repositório" of docs/repo-notes.md, when that file
+#: exists; the path docs/repo-notes.md itself is allowed.
+#:
+#: Issue templates: .github/ISSUE_TEMPLATE/ has no YAML issue form; only
+#: config.yml is YAML.
+#:
 #: Lists every problem and exits 1.
 set -euo pipefail
 HERE="$(cd "$(dirname "$0")" && pwd)"
@@ -132,6 +139,31 @@ if [ -f "$design" ]; then
 else
   problem "$design missing"
 fi
+
+# Names of one repository stay out of the method: the design, AGENTS.md and the
+# skills cite none of the names docs/repo-notes.md lists. The one exception is defined
+# here: the path of that file itself, which the method may cite.
+repo_notes=docs/repo-notes.md
+if [ -f "$repo_notes" ]; then
+  names="$(awk '$0 == "## Nomes só deste repositório" { p = 1; next } p && /^## / { exit } p && /^- / { print }' "$repo_notes" | grep -oE '`[^`]+`' | tr -d '`' || true)"
+  for f in "$design" AGENTS.md .claude/skills/*/*.md; do
+    [ -f "$f" ] || continue
+    while read -r name; do
+      [ -n "$name" ] || continue
+      awk -v allowed="$repo_notes" -v name="$name" '
+        { while ((i = index($0, allowed)) > 0) $0 = substr($0, 1, i - 1) substr($0, i + length(allowed)) }
+        index($0, name) { found = 1; exit }
+        END { exit !found }' "$f" && problem "$f cites the repository-only name $name (it belongs in $repo_notes)"
+    done <<<"$names"
+  done
+fi
+
+# Issue templates are Markdown, not issue forms (design §8.2): only config.yml is YAML.
+for f in .github/ISSUE_TEMPLATE/*.yml .github/ISSUE_TEMPLATE/*.yaml; do
+  [ -e "$f" ] || continue
+  [ "$f" = .github/ISSUE_TEMPLATE/config.yml ] && continue
+  problem "$f is an issue form (issue templates are Markdown; only config.yml is YAML)"
+done
 
 [ "$fail" = 0 ] && echo "ok: docs within limits"
 exit "$fail"

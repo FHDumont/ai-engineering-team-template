@@ -90,9 +90,9 @@ project_set_status() {
 #   project_set_phase_filter <filter>
 #   project_refresh_phase_filter <root of the main checkout> [issue to include] [issue to exclude]
 #
-# Same rule as the status (top of the file): no board, nothing; with a board, a failure
-# becomes `error:` + `fix:` and return 1. Success is only declared after reading the
-# filter back.
+# Same rule as the status (top of the file): no board, nothing; with a board, a
+# failure becomes `error:` + `fix:` and return 1. Success is only declared after
+# the filter is read back.
 # ---------------------------------------------------------------------------
 PROJECT_PHASE_VIEW="Fase atual"
 PROJECT_NEUTRAL_FILTER="is:open"
@@ -104,7 +104,7 @@ project_has_scopes() {
   gh auth status 2>&1 | grep "Token scopes:" | grep -qF "'project'"
 }
 
-# `id<TAB>filter` of the view by name (empty if it does not exist or the read fails).
+# `id<TAB>filter` of the view by name (empty when it does not exist or the read fails).
 project_view_row() { # project_view_row <owner> <num> <view name>
   local kind=user
   [ "$(project_owner_type "$1")" = "Organization" ] && kind=organization
@@ -230,7 +230,7 @@ project_list_views() { # project_list_views <owner> <num>
 }
 
 # Default set: name|layout|filter|group by (fields, comma)|vertical grouping (board).
-# "Fase atual" starts with a neutral filter; new-phase.sh swaps it for the group:* of the open phase.
+# "Fase atual" starts with a neutral filter; new-phase.sh swaps in the group:* of the open phase.
 project_default_views() {
   cat <<'V'
 Board por Status|board|||Status
@@ -243,8 +243,8 @@ Bugs abertos|table|is:open label:"type:bug"||
 V
 }
 
-# JSON array of numeric ids of the requested fields (names separated by comma);
-# returns 1 if any field does not exist.
+# JSON array of the numeric ids of the requested fields (comma-separated names);
+# returns 1 when a field does not exist.
 project_field_ids() { # project_field_ids <tsv name<TAB>id> <names>
   local f id out="[]"
   [ -n "$2" ] || { echo "[]"; return 0; }

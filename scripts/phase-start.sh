@@ -12,8 +12,11 @@
 #: spec from the main checkout and prints the exact start_session arguments of
 #: each phase, followed by the manager steps: create the manager heartbeat (a
 #: recurring agent task, every 4 minutes), open every session in this turn and
-#: delete the heartbeat in the single end step. --no-check skips check-env.sh; --dry-run
-#: only checks and lists.
+#: delete the heartbeat in the single end step. The loose copy stays while the spec
+#: cites another open issue whose phase is not open yet. The --need sentence takes
+#: the title of the session read back from the app, never a guessed one; with no
+#: way to read it, "a sessão que abriu a fase". --no-check skips check-env.sh;
+#: --dry-run only checks and lists.
 set -euo pipefail
 HERE="$(cd "$(dirname "$0")" && pwd)"
 # shellcheck source=scripts/lib/common.sh
@@ -55,11 +58,22 @@ fi
 
 # The spec now lives on the phase branches; a loose copy in the main checkout would
 # block the update of main after the merge. It only goes away when a branch holds it.
+# A group spec whose other phases open later stays: the loose copy is the only spec
+# the main checkout has for them until the first phase of the group is merged.
+open_issues="$(gh issue list --state open --limit 1000 --json number --jq '.[].number' 2>/dev/null || true)"
 for n in "${issues[@]}"; do
   while IFS= read -r rel; do
     [ -n "$rel" ] || continue
     status="$(git status --porcelain -- "$rel")"
     [ -n "$status" ] || continue
+    later=""
+    for o in $(spec_open_issues "$rel" "$open_issues"); do
+      [ -d "$main_root/.worktrees/issue-$o" ] || later="$later #$o"
+    done
+    if [ -n "$later" ]; then
+      echo "kept the loose copy of $rel in the main checkout: phase(s)$later of the same spec are not open yet"
+      continue
+    fi
     if [ "$(git -C "$main_root/.worktrees/issue-$n" rev-parse --quiet --verify "HEAD:$rel" 2>/dev/null || true)" != "$(git hash-object "$rel")" ]; then
       echo "warn: $rel differs from the phase branch: left in the main checkout"
       continue
@@ -107,9 +121,9 @@ cat <<STEPS
 Manager steps. Do all four, in this order:
 1. NOW, before any start_session, create the manager heartbeat: one recurring agent task, every 4 minutes, with the text below (in Claude Code: the CronCreate tool, cron "*/4 * * * *", recurring). Create it once, not once per phase. Do not wait for a session to open. The tool does not exist: write in "Você precisa" (scripts/status.sh --need) that the owner must write here when a phase ends.
    Heartbeat text, copy it as is:
-   Manager heartbeat of $label: read the state of the linked sessions and of the pull request of each open phase (scripts/status.sh --state trabalhando). A child session not started yet (its card was not clicked): only repeat the same "Você precisa" (the card, the exact title of this session and where it is in the sidebar) and end the turn. Otherwise do the next step: answer a child session that asked something, or, when every pull request is MERGED, run the integrate skill. An action of the end step denied by the app (scripts/deploy.sh, archiving a session): open a choice card (AskUserQuestion) that starts with "Fase #n — título" and offers to authorize it (for example "Autorizar o deploy"), and with the ok of the owner run the action again yourself; never ask the owner to run a script or to archive in the sidebar. Nothing changed: end the turn.
+   Manager heartbeat of $label: read the state of the linked sessions and of the pull request of each open phase (scripts/status.sh --state trabalhando). A child session not started yet (its card was not clicked): only repeat the same "Você precisa" (the card, the title of this session read back and where it is in the sidebar) and end the turn. Otherwise do the next step: answer a child session that asked something, or, when every pull request is MERGED, run the integrate skill. An action of the end step denied by the app (scripts/deploy.sh, archiving a session): open a choice card (AskUserQuestion) that starts with "Fase #n — título" and offers to authorize it (for example "Autorizar o deploy"), and with the ok of the owner run the action again yourself; never ask the owner to run a script or to archive in the sidebar. Nothing changed: end the turn.
 2. Open every session above in this same turn. start_session refused (the turn was not started by an owner message): call it again with initiation: own_initiative and the same fields. It becomes a card that the owner clicks.
-3. Only now, and only when a session became a card, stop with the command below. Replace TITULO with the exact title of this session, as the sidebar shows it. Change nothing else:
+3. Only now, and only when a session became a card, stop with the command below. Replace TITULO with the title of this session read back from the app (the tool that describes the session itself; in Claude Code: get_session, or list_sessions), never a guessed one: a session opened by another session does not know its own title. No way to read it: replace na sessão "TITULO" with na sessão que abriu a fase. Change nothing else:
    scripts/status.sh --state esperando --need '$need'
 4. Delete the heartbeat in the single end step (integrate skill), before scripts/end-check.sh (in Claude Code: the CronDelete tool).
 STEPS

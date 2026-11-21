@@ -2,11 +2,10 @@
 """gen-roadmap.py: generate ROADMAP.md from open issues, by area and priority, with links.
 
 Usage:
-  gen-roadmap.py [--closing 12,13] [--output ROADMAP.md]
-  gen-roadmap.py --input issues.json [--closing ...]   (no network; tests)
+  gen-roadmap.py [--output ROADMAP.md]
+  gen-roadmap.py --input issues.json   (no network; tests)
 
---closing drops the issues the closing PR will close (the file is generated
-as if the PR were already merged). Issues labeled `test` are left out.
+Issues labeled `test` are left out.
 Debt (`debt`) gets its own section; the rest goes by area.
 """
 
@@ -38,8 +37,8 @@ def line(issue):
     return "- [#%d](%s) %s · %s" % (issue["number"], issue["url"], issue["title"], tail)
 
 
-def render(issues, closing):
-    issues = [i for i in issues if i["number"] not in closing and "test" not in labels_of(i)]
+def render(issues):
+    issues = [i for i in issues if "test" not in labels_of(i)]
     issues.sort(key=lambda i: (priority_rank(labels_of(i)), i["number"]))
     out = ["# Roadmap", "",
            "<!-- Gerado por scripts/gen-roadmap.py; não editar à mão. -->", ""]
@@ -63,10 +62,8 @@ def main():
                                  formatter_class=argparse.RawDescriptionHelpFormatter,
                                  epilog="\n".join(__doc__.splitlines()[2:]))
     ap.add_argument("--input")
-    ap.add_argument("--closing", default="")
     ap.add_argument("--output", default="ROADMAP.md")
     a = ap.parse_args()
-    closing = {int(n) for n in a.closing.replace("#", "").split(",") if n.strip()}
     if a.input:
         issues = json.load(open(a.input, encoding="utf-8"))
     else:
@@ -74,7 +71,7 @@ def main():
                               "--json", "number,title,labels,url"],
                              check=True, text=True, capture_output=True).stdout
         issues = json.loads(out)
-    text = render(issues, closing)
+    text = render(issues)
     if a.output == "-":
         sys.stdout.write(text)
     else:
