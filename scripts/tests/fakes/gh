@@ -11,6 +11,29 @@ if [ -n "${FAKE_GH_FAIL:-}" ] && printf '%s' "$*" | grep -qE -- "$FAKE_GH_FAIL";
   echo "${FAKE_GH_FAIL_MSG:-gh: forced failure}" >&2
   exit "${FAKE_GH_FAIL_STATUS:-1}"
 fi
+# The merged PR of the base commit (phase-start.sh): FAKE_BASE_PR is none (default), green,
+# red, tree (CI green but another tree) or open (not merged). The check-runs of its head
+# (sha headpr1) and the tree of its head commit are answered here.
+case "$*" in
+  "api repos/$GH_REPO/commits/"*"/pulls")
+    case "${FAKE_BASE_PR:-none}" in
+      none) echo '[]' ;;
+      *) merged='"2026-01-02T00:00:00Z"'; [ "$FAKE_BASE_PR" != open ] || merged=null
+         printf '[{"number":30,"merged_at":%s,"head":{"sha":"headpr1"}}]\n' "$merged" ;;
+    esac
+    exit 0 ;;
+  "api repos/$GH_REPO/commits/headpr1/check-runs?per_page=100")
+    if [ "$FAKE_BASE_PR" = red ]; then
+      echo '{"check_runs":[{"name":"CI","status":"completed","conclusion":"failure","started_at":"2026-01-01T00:00:00Z","html_url":"https://github.com/owner/repo/actions/runs/30"}]}'
+    else
+      echo '{"check_runs":[{"name":"CI","status":"completed","conclusion":"success","started_at":"2026-01-01T00:00:00Z","html_url":"https://github.com/owner/repo/actions/runs/30"}]}'
+    fi
+    exit 0 ;;
+  "api repos/$GH_REPO/git/commits/headpr1")
+    if [ "$FAKE_BASE_PR" = tree ]; then echo '{"tree":{"sha":"0000000000000000000000000000000000000000"}}'
+    else printf '{"tree":{"sha":"%s"}}\n' "$(git rev-parse 'origin/main^{tree}')"; fi
+    exit 0 ;;
+esac
 # The check "CI" of the base commit (phase-start.sh): FAKE_BASE_CI is green (default), red,
 # running or absent.
 case "$*" in

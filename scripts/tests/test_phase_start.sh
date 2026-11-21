@@ -64,6 +64,16 @@ assert_status 1 "a red base refuses the group too" env FAKE_BASE_CI=red sh -c "c
 assert_eq "" "$(ls "$repo/.worktrees" 2>/dev/null || true)" "the group creates nothing on a red base"
 assert_contains "$(last_output)" "actions/runs/3" "names the run of the red CI"
 assert_status 1 "a red base refuses --dry-run" env FAKE_BASE_CI=red sh -c "cd '$repo' && scripts/phase-start.sh 7 --dry-run"
+# The ci.yml runs only on pull_request and the rebase merge creates commits without a check: a base
+# with no check CI is accepted when the merged PR that holds it had CI green on its head with the same tree.
+assert_status 0 "phase-start accepts a base without CI whose merged PR has green CI and the same tree" env FAKE_BASE_CI=absent FAKE_BASE_PR=green CLAUDE_CODE_SESSION_ID=manager sh -c "cd '$repo' && scripts/phase-start.sh 7 --dry-run"
+assert_contains "$(last_output)" "PR #30" "says the PR that vouches for the base"
+git -C "$repo" worktree list | grep -q issue-7 && git -C "$repo" worktree remove --force "$repo/.worktrees/issue-7" || true
+for pr in none red tree open; do
+  assert_status 1 "phase-start refuses a base without CI when the PR is $pr" env FAKE_BASE_CI=absent FAKE_BASE_PR=$pr sh -c "cd '$repo' && scripts/phase-start.sh 7 --no-check"
+  assert_contains "$(last_output)" "nothing was created" "says nothing was created (PR $pr)"
+  assert_eq "" "$(ls "$repo/.worktrees" 2>/dev/null || true)" "no worktree (PR $pr)"
+done
 rm "$repo/docs/specs/seven.md"
 
 # Opening never runs the suite: with check-env.sh active the output has the environment

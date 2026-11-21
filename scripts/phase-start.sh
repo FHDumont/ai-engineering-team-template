@@ -24,7 +24,9 @@
 #: say ("configurar o repo"), creating nothing. No option skips this, not even --no-check.
 #: It never runs the test suite: it reads from GitHub the check "CI" of the base commit
 #: (origin/main) before creating any branch or worktree, and refuses, creating
-#: nothing, when it is red, still running or absent, naming the run. The merge gate
+#: nothing, when it is red, still running or absent, naming the run. Absent is accepted when
+#: the merged PR that holds the commit (gh api commits/<sha>/pulls) had CI green on its head
+#: with the same tree (ci.yml runs only on pull_request; a rebase merge creates commits with no check). The merge gate
 #: already requires a green CI on main; the suite runs at the end (close-phase.sh
 #: --prepare) and in CI. The environment is checked by check-env.sh (tools and
 #: declared dependencies, no tests). A failure in the middle of the opening undoes
@@ -53,6 +55,30 @@ require_cmd git gh jq python3
 main_root="$(git worktree list --porcelain | sed -n '1s/^worktree //p')"
 cd "$main_root"
 
+# Prints the number of the merged PR whose head had CI green and the same tree as commit $1
+# (returns 0), or the reason (returns 1).
+base_pr_vouches() {
+  local sha="$1" slug prs n head tree htree ci
+  slug="$(repo_slug)"
+  prs="$(gh api "repos/$slug/commits/$sha/pulls" 2>/dev/null |
+    jq -r '.[]? | select(.merged_at != null) | "\(.number) \(.head.sha)"' 2>/dev/null || true)"
+  [ -n "$prs" ] || { echo "no merged PR holds it"; return 1; }
+  tree="$(git rev-parse "$sha^{tree}")"
+  while read -r n head; do
+    [ -n "$n" ] || continue
+    ci="$(gh api "repos/$slug/commits/$head/check-runs?per_page=100" 2>/dev/null |
+      jq -r '[.check_runs[]? | select(.name == "CI")] | sort_by(.started_at // "") | last
+        | if . == null then "absent" else "\(.status)/\(.conclusion // "none")" end' 2>/dev/null || true)"
+    [ "$ci" = "completed/success" ] || { echo "the CI of its PR #$n is ${ci:-absent}"; return 1; }
+    htree="$(gh api "repos/$slug/git/commits/$head" 2>/dev/null | jq -r '.tree.sha // empty' 2>/dev/null || true)"
+    [ "$htree" = "$tree" ] || { echo "the tree of its PR #$n differs from the commit of main"; return 1; }
+    echo "$n"; return 0
+  done <<EOF2
+$prs
+EOF2
+  echo "no merged PR holds it"; return 1
+}
+
 # The base of every branch is origin/main: its CI check must be green before anything is created.
 git fetch --quiet origin main || die "cannot fetch origin/main: nothing was created"
 base="$(git rev-parse origin/main)"
@@ -61,7 +87,14 @@ ci="$(gh api "repos/$(repo_slug)/commits/$base/check-runs?per_page=100" 2>/dev/n
     | if . == null then "absent" else "\(.status)/\(.conclusion // "none") \(.html_url // "")" end' 2>/dev/null || true)"
 case "$ci" in
   completed/success*) echo "ok: CI of the base commit ${base:0:9} is green" ;;
-  ""|absent) die "no check 'CI' on the base commit ${base:0:9} of main: no phase opens; wait for the run of main or start it (gh workflow run), then open again; nothing was created" ;;
+  ""|absent)
+    # ci.yml runs only on pull_request and a rebase merge creates commits with no check:
+    # the base is accepted when the merged PR that holds it had CI green on its head, same tree.
+    if pr="$(base_pr_vouches "$base")"; then
+      echo "ok: no check 'CI' on the base commit ${base:0:9}, but its merged PR #$pr had CI green on the same tree"
+    else
+      die "no check 'CI' on the base commit ${base:0:9} of main and ${pr}: no phase opens; wait for the run of main or start it (gh workflow run), then open again; nothing was created"
+    fi ;;
   *) die "check 'CI' of the base commit ${base:0:9} of main is ${ci%% *} (${ci#* }): no phase opens on a red or unfinished base; fix main or wait for the run, then open again; nothing was created" ;;
 esac
 
