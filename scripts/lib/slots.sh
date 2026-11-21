@@ -130,6 +130,7 @@ slots_wait() { # slots_wait <class> <issue> <worktree>
   while :; do
     now="$(now_epoch)"
     if slots_try "$1" "$2" "$3" "$((now - start))"; then
+      # shellcheck disable=SC2034  # read by the scripts that source this file
       SLOT_WAIT=$((now - start))
       return 0
     fi

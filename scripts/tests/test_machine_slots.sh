@@ -86,7 +86,7 @@ assert_contains "$(last_output)" "tests: 1 passed, 0 failed" "the second call pr
 wait
 assert_eq "1" "$(wc -l <"$RUNS" | tr -d ' ')" "the suite ran once for the two calls"
 assert_eq "0" "$(cat "$TMP/first.rc")" "the first call finished"
-assert_eq "" "$(ls "$AI_METHOD_CACHE/locks" | grep '\.lock$' || true)" "the lock is freed at the end"
+assert_eq "" "$(find "$AI_METHOD_CACHE/locks" -name '*.lock' -maxdepth 1)" "the lock is freed at the end"
 
 # Incremental lint: only the files changed against main. A fake shellcheck (the machine
 # may not have the real one) fails on any file with the word BAD and logs what it was given.

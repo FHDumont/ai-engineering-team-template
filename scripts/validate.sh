@@ -87,11 +87,13 @@ run_validate() {
     files="$(printf '%s\n' "$cands" | bash_files)"
     if [ -z "$files" ]; then
       echo "ok: shellcheck (0 files$scope)"
-    # shellcheck disable=SC2086
-    elif shellcheck -x -S warning $files; then
-      echo "ok: shellcheck ($(echo "$files" | wc -l | tr -d ' ') files$scope)"
     else
-      fail=1
+      # shellcheck disable=SC2086
+      if shellcheck -x -S warning $files; then
+        echo "ok: shellcheck ($(echo "$files" | wc -l | tr -d ' ') files$scope)"
+      else
+        fail=1
+      fi
     fi
     pyfiles="$(printf '%s\n' "$cands" | grep -E '\.py$' | while read -r f; do [ -f "$f" ] && echo "$f"; done || true)"
     # shellcheck disable=SC2086
