@@ -108,6 +108,18 @@ As melhorias do template chegam como um PR de atualização, feito pelo agente. 
 
 - `scripts/validate.sh`: lint (shellcheck) e todos os testes.
 - `scripts/check-docs.sh`: limites dos docs e o desenho contra o repositório.
+- Limites da máquina (vagas de validação e de fase, tempo de espera, avisos de carga): `~/.config/ai-method/machine-limits.env`, criado na primeira execução. `scripts/machine-slots.sh --status` mostra quem ocupa as vagas e `--report` compara espera e duração. Mesma tabela de parâmetros no `docs/process-design.md` §6.4.
+
+| Parâmetro | Padrão | Unidade | Efeito |
+|---|---|---|---|
+| `AI_METHOD_SLOTS_VALIDATE` | 2 | execuções | `validate.sh` ao mesmo tempo na máquina |
+| `AI_METHOD_SLOTS_FASE` | 3 | fases | fases abertas ao mesmo tempo |
+| `AI_METHOD_WAIT_TIMEOUT_SECONDS` | 1200 | segundos | espera máxima por vaga |
+| `AI_METHOD_POLL_SECONDS` | 2 | segundos | pausa entre olhadas na fila |
+| `AI_METHOD_WARN_LOAD1` | 8 | load de 1 min | aviso de carga |
+| `AI_METHOD_WARN_FREE_MEM_MB` | 1024 | MB | aviso de memória livre baixa |
+| `AI_METHOD_WARN_SWAP_MB` | 2048 | MB | aviso de swap alto |
+| `AI_METHOD_LINT_BASE` | main | ref do git | base do lint incremental |
 - Todo script tem `--help`.
 
 ## Idioma
