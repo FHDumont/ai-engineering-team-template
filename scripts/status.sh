@@ -12,7 +12,9 @@
 #: session (on main, no issue) prints, before the block, each open phase
 #: (.worktrees/issue-<n>) as "#n — title — state", from the last phase_status of
 #: the phase, and puts in "Você precisa" the pending action of each phase that is
-#: in "esperando você".
+#: in "esperando você". Each line ends with the real pair of the child session
+#: ("modelo/esforço: sonnet/medium", from the phase_session the check-env.sh recorded);
+#: with no phase_session yet, the pair the spec asks, marked "(pedido)".
 #:
 #: Without --issue, the number comes from the branch name (...issue-12...). The
 #: end mode (end:lab-test / end:auto-close) is read from the issue and used as the
@@ -80,7 +82,7 @@ if [ -z "$issue" ] && is_main_branch "$branch"; then
   while read -r wt; do
     p="$(phase_of_path "$wt")"
     [ -n "$p" ] || continue
-    n="${p%%"$TAB"*}" title="" p_state=trabalhando p_need=""
+    n="${p%%"$TAB"*}" title="" p_state=trabalhando p_need="" p_pair=""
     if [ "$offline" = 0 ] && command -v gh >/dev/null 2>&1; then
       title="$(gh issue view "$n" --json title --jq .title 2>/dev/null || true)"
     fi
@@ -89,8 +91,17 @@ if [ -z "$issue" ] && is_main_branch "$branch"; then
       last="$(jq -rs --arg i "$n" '[.[] | select(type == "object" and .event == "phase_status" and (.issue | tostring) == $i)]
         | last | select(. != null) | "\(.state)\t\(.need // "")"' "$trace" 2>/dev/null || true)"
       if [ -n "$last" ]; then p_state="${last%%"$TAB"*}"; p_need="${last#*"$TAB"}"; fi
+      p_pair="$(jq -rs --arg i "$n" '[.[] | select(type == "object" and .event == "phase_session" and (.issue | tostring) == $i)]
+        | last | select(. != null) | "\(.model)/\(.effort)"' "$trace" 2>/dev/null || true)"
     fi
-    phases="$phases- #$n — $title — $p_state"$'\n'
+    if [ -n "$p_pair" ]; then
+      p_pair="modelo/esforço: $p_pair"
+    else
+      # shellcheck disable=SC2046  # spec paths have no space
+      p_pair="$(spec_pairs "$n" $(specs_citing "$n" "$wt" | sed "s#^#$wt/#") 2>/dev/null | head -1 | tr ' ' '/')" || p_pair=""
+      [ -z "$p_pair" ] || p_pair="modelo/esforço: $p_pair (pedido)"
+    fi
+    phases="$phases- #$n — $title — $p_state${p_pair:+ — $p_pair}"$'\n'
     if [ "$p_state" = "esperando você" ] && [ -n "$p_need" ]; then
       pending="${pending:+$pending; }Fase #$n — $title: $p_need"
     fi
