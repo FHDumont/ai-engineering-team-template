@@ -39,7 +39,7 @@ Onde cada regra está descrita: 1 e 2 na §4.3; 3 na §9.4; 4 na §6.1; 5 na §2
 
 ## 2. Regras para todo agente
 
-1. **O dono do repo nunca roda script nem mexe em configuração do repo.** O setup do método (labels, proteção de branch, configurações) é pré-aprovado: o agente roda `scripts/setup-repo.sh` sozinho sempre que algo sair do padrão. **O setup é obrigatório:** nada do método funciona antes dele. A conferência é uma só, `scripts/setup-repo.sh --check`: lê uma vez as labels, os ajustes do repo, a proteção da `main` e as ofertas (§8.3) e sai 0 só com tudo conferido e nenhuma oferta sem resposta. Faltou algo, sai 7 com uma linha `missing:` por parte e a frase a dizer, "configurar o repo" (skill `setup`); plano sem proteção de branch, sai 6 com a mensagem da §10.1. Travas: o `scripts/phase-start.sh` roda a conferência antes de tudo e recusa sem criar nada (nenhuma opção a pula, nem `--no-check`); o `scripts/open-issue.sh` dá a mesma mensagem quando o `gh` recusa a issue por falta das labels; o hook `session-setup-check.sh` avisa o agente no início da sessão (§6.2).
+1. **O dono do repo nunca roda script nem mexe em configuração do repo.** O setup do método (labels, proteção de branch, configurações) é pré-aprovado: o agente roda `scripts/setup-repo.sh` sozinho sempre que algo sair do padrão. **O setup é obrigatório:** nada do método funciona antes dele. A conferência é uma só, `scripts/setup-repo.sh --check`: lê uma vez as labels, os ajustes do repo, a proteção da `main` e as ofertas (§8.3) e sai 0 só com tudo conferido e nenhuma oferta sem resposta. Faltou algo, sai 7 com uma linha `missing:` por parte e a frase a dizer, "configurar o repo" (skill `setup`); plano sem proteção de branch, sai 0 em modo sem proteção depois de registrá-lo (§10.5), e sai 7 só enquanto o modo não está registrado. Travas: o `scripts/phase-start.sh` roda a conferência antes de tudo e recusa sem criar nada (nenhuma opção a pula, nem `--no-check`); o `scripts/open-issue.sh` dá a mesma mensagem quando o `gh` recusa a issue por falta das labels; o hook `session-setup-check.sh` avisa o agente no início da sessão (§6.2).
 2. **Idioma** conforme a §1.
 3. **Toda decisão do dono é um quadro de escolha** (`AskUserQuestion`), uma pergunta por decisão, que começa por `Fase #n — título`. O hook `block-card-title.sh` barra o quadro sem esse começo quando há fase aberta. Nunca peça ao dono para digitar o número de um item.
    - Só a sessão principal pergunta. A sessão filha manda a dúvida por mensagem e recebe `respondido: <decisão>`.
@@ -324,6 +324,7 @@ Os hooks do agente saem 2 quando barram; os do git saem 1. Todo hook tem teste. 
 | `.githooks/pre-commit` | git | Commit na `main`; commit da sessão que abriu a fase |
 | `.githooks/pre-merge-commit` | git | Merge feito pela sessão que abriu a fase |
 | `.githooks/pre-rebase` | git | Rebase feito pela sessão que abriu a fase |
+| `.githooks/pre-push` | git | Push para a `main` no modo sem proteção (§10.5) |
 | `.githooks/reference-transaction` | git, em toda atualização de ref | Mover a branch da fase e o `HEAD` do worktree dela pela sessão que abriu a fase, por qualquer comando (commit, cherry-pick, merge, rebase, `reset`, `update-ref`). Criar e apagar a branch passam |
 | `.githooks/commit-msg` | git | Mensagem de commit com assinatura de IA |
 | `.githooks/phase-guard.sh` | incluído pelos quatro hooks acima que barram a sessão que abriu a fase | Não é hook: guarda a regra comum, lida de `CLAUDE_CODE_SESSION_ID` e do trace |
@@ -551,7 +552,17 @@ Aplicadas e lidas de volta pelo `setup-repo.sh`:
 - 0 aprovações exigidas: os agentes usam a conta do dono, que não aprova o próprio PR.
 - Histórico linear obrigatório; vale para admins; sem force-push; sem deleção.
 - Repo: auto-merge ligado; só rebase (merge commit e squash desligados); branch apagada no merge.
-- Sem a proteção não há merge: o `close-phase.sh --merge` recusa. Plano sem proteção de branch (repo privado em conta gratuita): o `setup-repo.sh` sai 6 e indica a correção.
+- Sem a proteção não há merge: o `close-phase.sh --merge` recusa, salvo no modo sem proteção (§10.5).
+
+### 10.5 Modo sem proteção de branch
+
+Repositório privado em conta gratuita não tem proteção de branch. Nele o `setup-repo.sh` não falha: grava a variável do repositório `PROCESS_BRANCH_MODE=unprotected` (lida de volta), avisa e sai 0; `--check` e `end-check.sh` aceitam o modo. As travas passam a ser de script:
+
+- `close-phase.sh --merge` lê pela API, no HEAD, que o check run `CI` terminou com `success` e que o status `review/independent` é `success`; senão recusa com saída 11. Os demais portões (revisão no trace, sessão filha, `needs-owner-ok`) não mudam.
+- O hook `.githooks/pre-push` recusa push para a `main` quando a variável existe.
+- Com a proteção disponível (repo público ou plano pago) a variável é ignorada: vale a proteção do servidor (§10.1).
+
+O que o modo não garante: o servidor não impede um merge feito à mão pelo GitHub, um push que não passe pelo hook (clone sem `core.hooksPath`, `--no-verify`) nem um merge sem CI verde por quem tem acesso de escrita. É salvaguarda contra engano do agente, não barreira (§6.2). Tornar o repo público ou pagar o plano devolve a barreira do servidor.
 
 ### 10.2 Revisão independente
 
