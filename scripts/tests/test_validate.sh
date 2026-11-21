@@ -8,7 +8,7 @@ source "$(dirname "$0")/lib.sh"
 repo="$(make_repo)"
 mkdir -p "$repo/scripts/lib" "$repo/scripts/tests"
 cp "$SCRIPTS/validate.sh" "$repo/scripts/validate.sh"
-cp "$SCRIPTS/lib/common.sh" "$repo/scripts/lib/common.sh"
+cp "$SCRIPTS/lib/common.sh" "$SCRIPTS/lib/slots.sh" "$SCRIPTS/lib/machine-limits.env.example" "$repo/scripts/lib/"
 PROBE="$TMP/probe.out"
 cat >"$repo/scripts/tests/test_probe.sh" <<P
 #!/usr/bin/env bash

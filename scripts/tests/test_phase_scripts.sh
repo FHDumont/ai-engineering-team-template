@@ -68,6 +68,16 @@ out="$(cd "$repo" && scripts/open-parallel.sh 8 9 --dry-run 2>&1 || true)"
 assert_contains "$out" "fix/issue-8" "parallel dry-run lists the phases"
 assert_status 2 "parallel needs 2 issues" sh -c "cd '$repo' && scripts/open-parallel.sh 8"
 
+# Phase slots: the phase of #7 holds one; with a limit of 1 nothing else opens and nothing is created.
+assert_eq "1" "$(ls "$AI_METHOD_CACHE/slots/fase" | wc -l | tr -d ' ')" "the open phase holds a slot"
+assert_status 75 "new-phase.sh exits 75 without a free slot" env AI_METHOD_SLOTS_FASE=1 sh -c "cd '$repo' && scripts/new-phase.sh 8 --no-check"
+assert_contains "$(last_output)" "no free phase slot" "new-phase.sh says why"
+assert_contains "$(last_output)" "#7" "new-phase.sh says who holds the slot"
+assert_eq "" "$(git -C "$repo" branch --list 'fix/issue-8-*')" "no branch is created without a slot"
+assert_status 75 "open-parallel.sh exits 75 without enough slots" env AI_METHOD_SLOTS_FASE=2 sh -c "cd '$repo' && scripts/open-parallel.sh 8 9 --no-check"
+assert_eq "" "$(git -C "$repo" branch --list 'fix/issue-*')" "open-parallel.sh creates nothing without slots"
+assert_eq "no" "$([ -e "$repo/.worktrees/issue-8" ] && echo yes || echo no)" "no worktree without a slot"
+
 printf '7\tfeat/issue-7-listar-issues-por-area\t%s\n' "$path" >"$repo/.worktrees/parallel-active.tsv"
 assert_status 3 "integrate waits and times out while a phase is open" env FAKE_PR_STATE=OPEN sh -c "cd '$repo' && scripts/integrate-parallel.sh --timeout 0 --interval 0"
 assert_status 0 "integrate proceeds when all merged" sh -c "cd '$repo' && scripts/integrate-parallel.sh --dry-run --interval 0"
