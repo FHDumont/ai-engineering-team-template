@@ -4,6 +4,7 @@
 
 ## Funcionalidades
 
+- feat(setup): ask the time target and the machine limits in setup ([#64](https://github.com/FHDumont/ai-engineering-team-template/pull/64)) · 2026-11-21
 - feat(scripts): per-project time targets, lab-test without owner scripts, close-phase progress ([#51](https://github.com/FHDumont/ai-engineering-team-template/pull/51)) · 2026-11-21
 - feat(scripts): visible progress of long scripts, headless spec from worktree, CI read failure ([#49](https://github.com/FHDumont/ai-engineering-team-template/pull/49)) · 2026-11-21
 - feat: heartbeat only writes when the state changed ([#21](https://github.com/FHDumont/ai-engineering-team-template/pull/21)) · 2026-11-21
