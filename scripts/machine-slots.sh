@@ -10,6 +10,10 @@
 #: --report [--days N]: median and p90 of wait and duration per class and per
 #:           repository from ~/.cache/ai-method/history.tsv (default 7 days), to
 #:           compare before and after a change.
+#:           Also compares the median of this repository with its time targets
+#:           (.github/time-targets.tsv: measure, value, unit; the method default
+#:           applies when the file or a line is missing) and prints one
+#:           "over-target: ..." line per measure above its target.
 #: Limits live in ~/.config/ai-method/machine-limits.env (created from
 #: scripts/lib/machine-limits.env.example on the first run); see process-design §6.
 set -euo pipefail
@@ -51,10 +55,11 @@ case "$1" in
     case "$days" in ''|*[!0-9]*) die "--days needs a number" 2 ;; esac
     f="$(slots_home)/history.tsv"
     [ -f "$f" ] || { echo "no history yet: $f"; exit 0; }
-    python3 -I - "$f" "$days" <<'PY'
+    repo_name="$(basename "$(dirname "$(git -C "$HERE" rev-parse --path-format=absolute --git-common-dir 2>/dev/null || echo "$HERE/../.git")")")"
+    python3 -I - "$f" "$days" "$repo_name" "$HERE/../.github/time-targets.tsv" <<'PY'
 import csv, sys, time
 
-path, days = sys.argv[1], int(sys.argv[2])
+path, days, me, tpath = sys.argv[1], int(sys.argv[2]), sys.argv[3], sys.argv[4]
 since = time.time() - days * 86400
 
 def pct(vals, p):
@@ -74,6 +79,18 @@ with open(path, encoding="utf-8") as fh:
                 rows.append((r["class"], r["repo"], float(r["wait_s"]), float(r["duration_s"])))
         except (ValueError, KeyError, TypeError):
             continue
+# Time targets: method default, overridden per measure by the project file.
+targets = {"phase": (45.0, "min"), "validate": (240.0, "s")}
+try:
+    with open(tpath, encoding="utf-8") as fh:
+        for line in fh:
+            if line.startswith("#") or not line.strip():
+                continue
+            cols = line.rstrip("\n").split("\t")
+            if len(cols) >= 3 and cols[0] in targets and cols[2] in ("s", "min"):
+                targets[cols[0]] = (float(cols[1]), cols[2])
+except (OSError, ValueError):
+    pass
 print(f"history of the last {days} days: {len(rows)} runs")
 if not rows:
     sys.exit(0)
@@ -85,6 +102,15 @@ for c, repo, w, d in rows:
 for (c, repo), v in sorted(groups.items()):
     ws, ds = [x[0] for x in v], [x[1] for x in v]
     print(f"{c:<10}{repo:<28}{len(v):>5}  {med(ws):>9.0f}{pct(ws, .9):>9.0f}  {med(ds):>9.0f}{pct(ds, .9):>9.0f}")
+for c, key in (("fase", "phase"), ("validate", "validate")):
+    v = groups.get((c, me))
+    if not v:
+        continue
+    val, unit = targets[key]
+    target_s = val * 60 if unit == "min" else val
+    m = med([x[1] for x in v])
+    if m > target_s:
+        print(f"over-target: {key} median {m:.0f} s above the target {val:g} {unit} ({me})")
 PY
     ;;
   *) die "unknown option: $1 (see --help)" 2 ;;

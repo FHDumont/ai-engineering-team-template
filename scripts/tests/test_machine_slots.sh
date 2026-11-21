@@ -152,6 +152,20 @@ assert_contains "$alpha" "30" "median duration of alpha is 30"
 assert_contains "$alpha" "100" "p90 duration of alpha is 100"
 assert_status 0 "--report --days 60 widens the window" "$repo/scripts/machine-slots.sh" --report --days 60
 assert_contains "$(last_output)" "7 runs" "the older run joins in a wider window"
+# Time targets: method default, own target and over-target (per repository).
+me="$(basename "$repo")"
+rm -f "$H"
+printf 'ts\tclass\trepo\tissue\twait_s\tduration_s\n' >"$H"
+printf '%s\tvalidate\t%s\t1\t0\t300\n%s\tfase\t%s\t1\t0\t600\n' "$now" "$me" "$now" "$me" >>"$H"
+assert_status 0 "--report with the method default (no file)" "$repo/scripts/machine-slots.sh" --report
+assert_contains "$(last_output)" "over-target: validate median 300 s above the target 240 s" "default target: validate over"
+assert_not_contains "$(last_output)" "over-target: phase" "default target: phase within 45 min"
+mkdir -p "$repo/.github"
+printf 'validate\t400\ts\nphase\t5\tmin\n' >"$repo/.github/time-targets.tsv"
+assert_status 0 "--report with the project target" "$repo/scripts/machine-slots.sh" --report
+assert_not_contains "$(last_output)" "over-target: validate" "own target: validate within 400 s"
+assert_contains "$(last_output)" "over-target: phase median 600 s above the target 5 min" "own target: phase over"
+rm -f "$repo/.github/time-targets.tsv"
 rm -f "$H"
 assert_status 0 "validate.sh records wait and duration" validate "$V" --tests
 assert_contains "$(cat "$H")" "$(printf 'validate\t')" "validate.sh wrote a history line"
