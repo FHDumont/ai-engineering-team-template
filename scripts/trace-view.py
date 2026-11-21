@@ -14,6 +14,11 @@ phase_session event) and one row for each subagent of those sessions (pair asked
 in the Agent call x model and effort it ran with). A used value that differs
 from the requested one is marked "(diverge)"; a value the trace does not hold
 is "?". close-phase.sh --prepare writes this table in the PR body.
+With --timings [--issue N] it only prints, in Markdown, where the time of each
+phase went (all phases of the trace, or the one of the issue): opening, work
+(steps, minus the waits for the owner), wait for the owner, validate.sh of
+--prepare, push to review (CI and reviewer, one row for each round), review to
+merge, and cleanup. Each row is the time between two events of the trace.
 Invalid JSON lines are skipped and counted ("skipped N bad line").
 
 Tree: planning -> triage -> phase #N -> subagents -> reviewer -> bots.
@@ -372,6 +377,80 @@ def render_pairs(events, issue):
     return "\n".join(out) + "\n"
 
 
+def fmt_secs(sec):
+    sec = int(round(sec))
+    if sec < 60:
+        return "%ds" % sec
+    if sec < 3600:
+        return "%dm%02ds" % (sec // 60, sec % 60)
+    return "%dh%02dm" % (sec // 3600, sec % 3600 // 60)
+
+
+def phase_timings(evs):
+    """Rows (label, seconds) of one phase, from its events in time order."""
+    rows = []
+    t_open = next((e["_t"] for e in evs if e["event"] == "phase_opened"), None)
+    t_sess = next((e["_t"] for e in evs if e["event"] == "phase_session"), None)
+    if t_open and t_sess:
+        rows.append(("abertura", (t_sess - t_open).total_seconds()))
+    # Waits for the owner: from a phase_status "esperando" to the next event of the phase.
+    wait, validate = 0.0, 0.0
+    for i, e in enumerate(evs):
+        if e["event"] == "phase_status" and str(e.get("state", "")).startswith("esperando") and i + 1 < len(evs):
+            wait += (evs[i + 1]["_t"] - e["_t"]).total_seconds()
+        if e["event"] == "phase_validate":
+            try:
+                validate += float(e.get("secs") or 0)
+            except ValueError:
+                pass
+    pushes = [e for e in evs if e["event"] == "phase_push"]
+    if t_sess and pushes:
+        work = (pushes[0]["_t"] - t_sess).total_seconds()
+        rows.append(("trabalho (etapas, sem esperas)", max(0.0, work - wait - validate)))
+        if wait:
+            rows.append(("espera pelo dono", wait))
+        if validate:
+            rows.append(("validate.sh do --prepare", validate))
+    last = pushes[0]["_t"] if pushes else None
+    rnd = 0
+    for e in evs:
+        if last is None or e["_t"] < last:
+            continue
+        if e["event"] == "phase_push" and e is not pushes[0]:
+            last = e["_t"]
+        elif e["event"] == "review_round":
+            rnd += 1
+            rows.append(("push até revisão, rodada %d (CI e revisor)" % rnd, (e["_t"] - last).total_seconds()))
+            last = e["_t"]
+    closed = next((e for e in evs if e["event"] == "phase_closed"), None)
+    if closed and rnd:
+        rows.append(("revisão até merge", (closed["_t"] - last).total_seconds()))
+        end = next((e["_t"] for e in evs if e["event"] == "phase_status" and e["_t"] > closed["_t"]), None)
+        if end:
+            rows.append(("limpeza (merge até o fim)", (end - closed["_t"]).total_seconds()))
+    return rows
+
+
+def render_timings(events, issue=None):
+    """Markdown tables of the time of each phase (or of the issue), from the trace."""
+    by = {}
+    for ev in events:
+        i = str(ev.get("issue") or "")
+        if i and ev["event"].startswith("phase_") or ev["event"] == "review_round":
+            if i and (issue is None or i == str(issue)):
+                by.setdefault(i, []).append(ev)
+    out = []
+    for i in sorted(by, key=lambda x: int(x) if x.isdigit() else 0):
+        rows = phase_timings(by[i])
+        if not rows:
+            continue
+        out += ["#### Fase #%s" % i, "", "| trecho | tempo |", "|---|---|"]
+        out += ["| %s | %s |" % (label, fmt_secs(sec)) for label, sec in rows]
+        out.append("| total medido | %s |" % fmt_secs(sum(sec for _, sec in rows)))
+        out.append("")
+    return "\n".join(out) if out else "Sem fase com eventos no trace.\n"
+
+
 def default_dir():
     """Root of the main checkout (dirname of the git-common-dir), where .process/ lives."""
     common = subprocess.run(["git", "rev-parse", "--path-format=absolute", "--git-common-dir"],
@@ -389,12 +468,14 @@ def main(argv=None):
     ap.add_argument("--out", help="HTML file to write (default: .process/tree.html in the main checkout)")
     ap.add_argument("--text", action="store_true", help="also print the tree as text on stdout")
     ap.add_argument("--pairs", metavar="ISSUE", help="only print the requested x used table of the phase (Markdown)")
+    ap.add_argument("--timings", action="store_true", help="only print where the time of the phases went (Markdown)")
+    ap.add_argument("--issue", metavar="N", help="with --timings: only the phase of this issue")
     a = ap.parse_args(argv)
     base = None
-    if not (a.events and (a.out or a.pairs)):
+    if not (a.events and (a.out or a.pairs or a.timings)):
         base = os.path.join(default_dir(), ".process")
     events_path = a.events or os.path.join(base, "events.jsonl")
-    out_path = a.out or (None if a.pairs else os.path.join(base, "tree.html"))
+    out_path = a.out or (None if a.pairs or a.timings else os.path.join(base, "tree.html"))
     try:
         with open(events_path, encoding="utf-8", errors="replace") as f:
             lines = f.read().splitlines()
@@ -402,6 +483,9 @@ def main(argv=None):
         print("cannot read %s: %s" % (events_path, e.strerror), file=sys.stderr)
         return 1
     events, bad = load_events(lines)
+    if a.timings:
+        sys.stdout.write(render_timings(events, a.issue))
+        return 0
     if a.pairs:
         sys.stdout.write(render_pairs(events, a.pairs))
         return 0
