@@ -11,8 +11,12 @@
 #: records phase_headless in the trace (pid, child_session, log, model, effort).
 #: The child runs check-env.sh like an app session and records phase_session itself.
 #: It has no choice board: a question for the owner goes as a comment on the issue
-#: and the manager answers with: claude -p --resume <child_session> "<answer>"
-#: (run inside the worktree; the id is in the phase_headless event).
+#: and the manager answers with: CLAUDE_CODE_PRINT_BG_WAIT_CEILING_MS=0 claude -p "<answer>" --resume <child_session>
+#: (run inside the worktree; the id is in the phase_headless event). The prompt goes
+#: right after -p: after --allowedTools it becomes a tool name and the resume fails with
+#: "No deferred tool marker found". The variable (also set for the child here) makes
+#: claude -p wait for background tasks instead of stopping them 10m after the last turn;
+#: even so the child runs the close-reviewer in the foreground.
 #: --brief / --brief-file: the same background the manager gives start_session (extra
 #: scope, findings to solve, file limits). It is appended to the prompt, after the
 #: execute prompt, under "Brief of the manager:"; phase_headless records brief=yes
@@ -65,13 +69,14 @@ cmd=(claude -p "$prompt" --session-id "$sid" --model "$model" --effort "$effort"
   --permission-mode "$mode" --allowedTools Bash)
 if [ "$dry" = 1 ]; then
   echo "cwd: $wt"
+  echo "env: CLAUDE_CODE_PRINT_BG_WAIT_CEILING_MS=0"
   printf '%q ' "${cmd[@]}"; echo
   echo "log: $log"
   exit 0
 fi
 
 mkdir -p "$wt/.process"
-(cd "$wt" && nohup "${cmd[@]}" </dev/null >"$log" 2>&1 &
+(cd "$wt" && CLAUDE_CODE_PRINT_BG_WAIT_CEILING_MS=0 nohup "${cmd[@]}" </dev/null >"$log" 2>&1 &
   echo $! >"$wt/.process/headless.pid")
 pid="$(cat "$wt/.process/headless.pid")"
 sleep 1
