@@ -227,4 +227,14 @@ assert_contains "$plan" "num quadro só" "plan grilling puts every question in o
 assert_not_contains "$plan" "quadro por decisão" "plan grilling has no card per decision"
 assert_not_contains "$agents" "relate." "AGENTS no longer reports a doubt only in the status"
 
+# setup: the time target and the machine limits are explained and asked only here.
+setup="$(cat "$REPO/.claude/skills/setup/SKILL.md")"
+assert_contains "$setup" ".github/time-targets.tsv" "setup writes the time target file"
+assert_contains "$setup" "Meta de tempo" "setup asks the time target"
+assert_contains "$setup" "machine-limits.env" "setup shows the machine limits"
+assert_contains "$setup" "# setup: confirmed" "setup asks the machine limits only the first time on a machine"
+assert_contains "$setup" "AI_METHOD_SLOTS_FASE" "setup explains each machine limit"
+assert_contains "$setup" "over-target" "setup says the owner is called again only on over-target"
+assert_contains "$(cat "$REPO/README.md")" "meta de tempo" "the quick start mentions the time target"
+
 finish
