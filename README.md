@@ -48,7 +48,26 @@ Antes da primeira fase, troque o que é exemplo: a pasta `app/`, o passo de depl
 
 ## Mínimo suportado
 
-Validação com Sonnet: PENDENTE
+O método foi validado de ponta a ponta com o modelo Sonnet em esforço `low` nas sessões de fase e na sessão principal, e com o revisor em Sonnet em esforço `medium`. É o padrão de `scripts/lib/weights.tsv` e o mínimo suportado.
+
+Cenários que passaram nesse mínimo, num repositório criado a partir deste template:
+
+| Cenário | O que foi conferido |
+|---|---|
+| "executar #n" sozinho | a spec é escrita e commitada antes de a fase abrir |
+| Fase em sessão filha | a sessão principal não escreve na fase; a tabela pedido × usado do PR confere |
+| Fases paralelas com conflito | o PR em conflito é refeito por script, sem pergunta ao dono |
+| Deploy único no fim | um deploy por grupo, disparado pela sessão principal |
+| Fim coerente | `scripts/end-check.sh` limpo: só a `main`, sem spec, worktree ou branch sobrando |
+
+Também rodou com a sessão principal em Sonnet em esforço `medium` e com tudo em Opus em esforço `medium` (pesos trocados em `scripts/lib/weights.tsv`).
+
+Limites conhecidos:
+
+- **Abertura das sessões filhas.** O app só abre a sessão filha sozinho quando o pedido ("executar #n") vem do dono, na sessão principal. Num turno automático a filha vira um cartão que o dono clica; com o Remote Control ligado, nem o cartão aparece. Fases em sequência pedem um toque do dono por fase; um grupo paralelo abre todas de uma vez.
+- **Batimento da sessão principal.** A tarefa recorrente que acorda a sessão principal é uma instrução impressa pelo `scripts/phase-start.sh`; nenhum script confere que ela existe.
+- **Ação do passo de fim negada pelo app.** O caminho (quadro de autorização ao dono) está nas skills e tem teste de texto, mas não apareceu em nenhuma rodada de validação.
+- **Proteção de branch.** Sem ela o portão recusa todo merge (veja Requisitos).
 
 ## Rodar e testar
 
