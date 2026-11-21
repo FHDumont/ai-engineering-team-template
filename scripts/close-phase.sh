@@ -9,7 +9,8 @@
 #:   close-phase.sh --cleanup
 #:   close-phase.sh --abort [--discard]
 #:
-#: --prepare: runs validate.sh and check-docs.sh and pushes ONCE per round; opens
+#: --prepare: runs validate.sh (not again when the trace holds a green run of this
+#:   branch on the same HEAD, with no change in the tree) and check-docs.sh and pushes ONCE per round; opens
 #:   the PR, or edits it only if the title or body changed; copies the issue
 #:   labels to the PR. It does not regenerate CHANGELOG.md or ROADMAP.md (the
 #:   main session generates them once at the end, with gen-docs.sh) and does not
@@ -137,10 +138,35 @@ pr_number() {
 
 SENSITIVE_AREAS='area:billing area:auth area:migration area:credentials'
 
+# True when the trace holds a green validate.sh of this branch on exactly HEAD and the
+# tree has no change: the suite would run again on the same bytes (minutes for nothing).
+validated_head() {
+  local events head
+  events="$(events_file "$ROOT")" || return 1
+  [ -f "$events" ] || return 1
+  git diff --quiet && git diff --cached --quiet || return 1
+  head="$(git rev-parse HEAD)"
+  [ "$(jq -rs --arg b "$branch" '[.[] | select(type == "object" and .event == "phase_validate" and .branch == $b)] | last | .sha // ""' "$events" 2>/dev/null)" = "$head" ]
+}
+
+# validate.sh once per HEAD: a second --prepare on the same commit (a retry after a
+# failed push or PR edit) does not run the suite again; a green run is recorded.
+run_validate() {
+  if validated_head; then
+    echo "skipped validate.sh: HEAD $(git rev-parse --short HEAD) already validated green in this phase"
+    return 0
+  fi
+  local t0 secs
+  t0="$(date +%s)"
+  "$HERE/validate.sh" || die "validate.sh failed"
+  secs=$(( $(date +%s) - t0 ))
+  trace_event phase_validate sha="$(git rev-parse HEAD)" secs="$secs"
+}
+
 prepare() {
   [ -n "$body_file" ] && [ -f "$body_file" ] || die "--body-file is required (fill .github/pull_request_template.md)"
   "$HERE/check-attribution.sh" --text-file "$body_file" >/dev/null || die "PR body has AI attribution"
-  "$HERE/validate.sh" || die "validate.sh failed"
+  run_validate
   "$HERE/check-docs.sh" || die "check-docs.sh failed"
   git fetch --quiet origin main
   git diff --quiet && git diff --cached --quiet || die "uncommitted changes: commit each step first"

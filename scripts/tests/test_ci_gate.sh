@@ -4,14 +4,14 @@
 source "$(dirname "$0")/lib.sh"
 GATE="$SCRIPTS/ci-gate.sh"
 
-needs() { # needs <code> <app> <workflows> <lint> <tests> <workflows-result> [policy]
-  jq -cn --arg c "$1" --arg pg "$2" --arg w "$3" --arg l "$4" --arg t "$5" --arg wr "$6" --arg p "${7:-success}" '{
-    changes: {result: "success", outputs: {code: $c, app: $pg, workflows: $w, docs_only: "false"}},
+needs() { # needs <code> <app> <workflows> <lint> <tests> <workflows-result> [policy] [run_tests]
+  jq -cn --arg c "$1" --arg pg "$2" --arg w "$3" --arg l "$4" --arg t "$5" --arg wr "$6" --arg p "${7:-success}" --arg rt "${8:-}" '{
+    changes: {result: "success", outputs: ({code: $c, app: $pg, workflows: $w, docs_only: "false"} + (if $rt == "" then {} else {run_tests: $rt} end))},
     policy: {result: $p}, lint: {result: $l}, tests: {result: $t}, workflows: {result: $wr}}'
 }
 gate() { NEEDS="$1" "$GATE"; }
 
-# A docs-only PR still runs the tests job: tests read AGENTS.md, the skills and the design.
+# Without the run_tests output the tests job is required (a missing output proves nothing).
 assert_status 1 "docs-only PR fails when tests are skipped" gate "$(needs false false false skipped skipped skipped)"
 assert_status 0 "docs-only PR passes with tests run and lint skipped" gate "$(needs false false false skipped success skipped)"
 assert_status 1 "docs-only PR fails when tests fail" gate "$(needs false false false skipped failure skipped)"
@@ -29,3 +29,10 @@ assert_status 1 "app PR fails when tests fail" gate "$(needs false true false sk
 assert_status 1 "fails when the changes outputs are missing" gate '{"changes": {"result": "success", "outputs": {}}, "policy": {"result": "success"}, "lint": {"result": "skipped"}, "tests": {"result": "skipped"}, "workflows": {"result": "skipped"}}'
 assert_status 1 "fails when NEEDS is missing" env -u NEEDS "$GATE"
 finish
+
+# run_tests=false (only inert docs, or code already tested on an earlier commit): tests may be skipped.
+assert_status 0 "inert docs PR passes with tests skipped" gate "$(needs false false false skipped skipped skipped success false)"
+assert_status 1 "inert docs PR still fails when policy fails" gate "$(needs false false false skipped skipped skipped failure false)"
+assert_status 1 "run_tests=true requires the tests" gate "$(needs false false false skipped skipped skipped success true)"
+assert_status 0 "code already tested: lint runs, tests skipped" gate "$(needs true false false success skipped skipped success false)"
+assert_status 1 "code already tested: lint still required" gate "$(needs true false false skipped skipped skipped success false)"

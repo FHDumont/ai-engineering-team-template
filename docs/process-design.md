@@ -285,7 +285,7 @@ Todo script tem `--help`, um teste em `scripts/tests/` e saída curta em inglês
 | `scripts/notify-bot.sh` | Chama o webhook do bot (§5.1) | `ask-bot.sh` |
 | `scripts/wait-reply.sh` | Espera a resposta marcada (§5.1) | `ask-bot.sh` |
 | `scripts/summarize-thread.sh` | Mantém o comentário de resumo de um fio longo (§5.1) | agentes |
-| `scripts/trace-view.py` | Lê o trace (§6.3): árvore de agentes e tabela de pares do PR | `close-phase.sh --prepare`, agentes |
+| `scripts/trace-view.py` | Lê o trace (§6.3): árvore de agentes, tabela de pares do PR e tempo por fase | `close-phase.sh --prepare`, agentes |
 | `scripts/measure-session.py` | Mede palavras lidas, toques do dono e acerto da triagem de uma sessão | sessão principal, sob pedido |
 | `scripts/CLAUDE.md` | Regras da pasta `scripts/` | lido ao tocar a pasta |
 
@@ -378,7 +378,7 @@ O hook `trace-event.sh` acrescenta uma linha JSON por evento em `.process/events
 | `phase_push` | `close-phase.sh --prepare`, `redo-phase.sh` | marca o push; a revisão precisa vir depois dele |
 | eventos do harness | `trace-event.sh` | sessões e subagentes abertos, com o par |
 
-`scripts/trace-view.py` gera `.process/tree.html`; com `--text`, a árvore em texto; com `--pairs <issue>`, a tabela pedido × usado do PR. O `effort` do `SubagentStart` vem sempre "medium"; o valor pedido está no `PreToolUse` do Agent.
+`scripts/trace-view.py` gera `.process/tree.html`; com `--text`, a árvore em texto; com `--pairs <issue>`, a tabela pedido × usado do PR; com `--timings [--issue n]`, onde foi o tempo de cada fase (abertura, trabalho, espera pelo dono, `validate.sh` do `--prepare`, cada rodada de CI e revisão, merge, limpeza). O `--prepare` grava `phase_validate` (sha, secs) e não roda a suíte de novo no mesmo HEAD limpo. O `effort` do `SubagentStart` vem sempre "medium"; o valor pedido está no `PreToolUse` do Agent.
 
 ---
 
@@ -546,7 +546,7 @@ O arquivo é a fonte. Jobs: `changes`, `policy`, `lint`, `tests`, `workflows` e 
 | CI só no PR | roda em `pull_request` (`opened`, `synchronize`, `reopened`, `ready_for_review`); nada de CI no push da `main` |
 | Um run por rodada | editar título, corpo e labels do PR não gera run. O corpo final é conferido pelo `close-phase.sh --merge` |
 | Filtro de mudanças | o job `changes` decide o que roda, por `git diff` da base ao HEAD; o gatilho não usa `paths-ignore`, para o `CI` sempre reportar |
-| Jobs condicionais | filtro por exclusão: doc é arquivo em `docs/` e `.md` (fora os templates de issue); todo o resto é código e roda `lint`. O job `tests` roda em todo PR, inclusive no só de docs: os testes leem `AGENTS.md`, as skills e este desenho. PR só de docs pula só o `lint`; o `ci-gate.sh` exige `tests` sempre e só dispensa o `lint` com `code` exatamente `false` |
+| Jobs condicionais | filtro por exclusão: doc é arquivo em `docs/` e `.md` (fora os templates de issue); todo o resto é código e roda `lint`. O job `tests` pula (`run_tests=false`) em duas situações, sem perguntar ao dono (decisão da #39): só mudou doc inerte (`docs/` exceto `process-design.md`, `CHANGELOG.md`, `ROADMAP.md` e `.md` da raiz exceto `AGENTS.md` e `CLAUDE.md`, que os testes leem), ou o código não mudou desde um commit do PR cujo `Tests` já passou (olha até 15 commits). Skills, scripts, hooks, workflows e app nunca são inertes. O `ci-gate.sh` exige `tests` salvo com `run_tests` exatamente `false`; `lint` só é dispensado com `code` exatamente `false` |
 | `policy` | sempre roda: assinatura de IA nos commits e no corpo do PR, `.github/sensitive-paths` → label `needs-owner-ok`, `check-docs.sh` (o da base, sobre os docs do PR) |
 | Verificadores da base | `ci-gate.sh`, `check-attribution.sh`, `check-docs.sh`, `sensitive_paths.py` e `.github/sensitive-paths` são lidos do commit base do PR: o PR não enfraquece a checagem que o julga |
 | Agregador | o job `CI`, com `if: always()`, é o único check exigido além de `review/independent`; falha se um job necessário falhou ou foi pulado sem motivo |

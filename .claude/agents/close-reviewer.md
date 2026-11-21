@@ -10,7 +10,7 @@ O pedido traz a issue, o PR, o comando dos testes, o número da rodada e, da 2ª
 
 1. Leia a issue: `gh issue view <n>`. Extraia o "Pronto quando" e o escopo.
 2. Rodada 1: leia o diff completo (`gh pr diff <pr>`) e os arquivos que precisar. Rodada N+1: leia só o diff desde a revisão N (`git diff <sha-anterior>..HEAD`) e procure só as regressões que ele causou; não reabra o que já foi aprovado.
-3. Rode os testes: `scripts/validate.sh` (e o comando extra que vier no pedido). Anexe o resumo da saída.
+3. Rode os testes: `scripts/validate.sh` (e o comando extra que vier no pedido). Anexe o resumo da saída. Rodada N+1 cujo diff desde a rodada N só toca `docs/` ou `*.md` fora de `AGENTS.md` e das skills: não rode a suíte de novo, diga que o diff é só doc e anexe o resumo da rodada anterior.
 4. Confira: cada item do "Pronto quando" tem evidência no diff ou nos testes; regras do `AGENTS.md` (idioma, sem assinatura de IA, git); segurança e áreas sensíveis; testes que provam o que dizem.
 4a. Checklist §2.1: (1) prova do vermelho no PR; (2) suposição não registrada; (3) diff fora do escopo da spec; (4) abstração sem uso atual; (5) remoção sem justificativa.
 5. Classifique cada problema:

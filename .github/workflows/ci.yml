@@ -31,11 +31,13 @@ jobs:
     timeout-minutes: 5
     permissions:
       contents: read
+      checks: read
     outputs:
       code: ${{ steps.detect.outputs.code }}
       workflows: ${{ steps.detect.outputs.workflows }}
       app: ${{ steps.detect.outputs.app }}
       docs_only: ${{ steps.detect.outputs.docs_only }}
+      run_tests: ${{ steps.detect.outputs.run_tests }}
     steps:
       - name: "Checkout"
         uses: actions/checkout@v4
@@ -46,6 +48,7 @@ jobs:
         env:
           BASE_SHA: ${{ github.event.pull_request.base.sha }}
           HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          GH_TOKEN: ${{ github.token }}
         run: |
           # Files of the PR (since the merge-base), one per line.
           files="$(git diff --name-only "$BASE_SHA...$HEAD_SHA")"
@@ -58,9 +61,30 @@ jobs:
           nondocs="$(echo "$files" | grep -vE '(^docs/|\.md$)' || true)"
           templates="$(echo "$files" | grep -E '^\.github/ISSUE_TEMPLATE/' || true)"
           if [ -z "$nondocs" ] && [ -z "$templates" ]; then code=false; else code=true; fi
+          # The tests job (the slow one) runs unless the PR changes nothing that
+          # tests read. Inert: docs/ (except the design), CHANGELOG.md, ROADMAP.md
+          # and the .md at the root (except AGENTS.md and CLAUDE.md, which tests
+          # read). Skills, hooks, scripts, workflows and app are never inert.
+          needs_tests() { # needs_tests <files>: true when any file is not inert
+            if echo "$1" | grep -vE '^$' | grep -vE '^(docs/|[^/]+\.md$)' | grep -q .; then echo true
+            elif echo "$1" | grep -E '^(docs/process-design\.md|AGENTS\.md|CLAUDE\.md)$' | grep -q .; then echo true
+            else echo false; fi
+          }
+          run_tests="$(needs_tests "$files")"
+          # Code unchanged since a commit of this PR whose Tests already passed:
+          # the suite would run again on the same code. Looks back 15 commits.
+          if [ "$run_tests" = true ]; then
+            for c in $(git rev-list --max-count=15 "$BASE_SHA..$HEAD_SHA" | tail -n +2); do
+              delta="$(git diff --name-only "$c" "$HEAD_SHA" 2>/dev/null || echo "?")"
+              [ "$(needs_tests "$delta")" = false ] || break
+              done_ok="$(gh api "repos/$GITHUB_REPOSITORY/commits/$c/check-runs" --jq '[.check_runs[] | select(.name == "Tests" and .conclusion == "success")] | length' 2>/dev/null || echo 0)"
+              if [ "${done_ok:-0}" -gt 0 ]; then run_tests=false; echo "tests already passed on $c, code unchanged since"; break; fi
+            done
+          fi
           {
             echo "code=$code"
             echo "workflows=$(has '^\.github/workflows/')"
+            echo "run_tests=$run_tests"
             echo "app=$(has '^(app/|\.github/workflows/deploy-example\.yml)')"
             if [ "$code" = true ]; then echo "docs_only=false"; else echo "docs_only=true"; fi
           } >>"$GITHUB_OUTPUT"
@@ -133,6 +157,7 @@ jobs:
   tests:
     name: "Tests"
     needs: changes
+    if: needs.changes.outputs.run_tests != 'false'
     runs-on: ${{ fromJSON(vars.CI_RUNS_ON || '"ubuntu-latest"') }}
     timeout-minutes: 15
     permissions:

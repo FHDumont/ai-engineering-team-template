@@ -436,6 +436,24 @@ assert_not_contains "$calls" "--state merged" "prepare does not read the merged 
 assert_eq "1" "$(pushes)" "one push per round"
 assert_eq "$(git -C "$repo" rev-parse HEAD)" "$(git -C "$remote" rev-parse chore/no-number)" "the push carries the branch HEAD"
 assert_eq "chore/no-number $(git -C "$repo" rev-parse HEAD)" "$(jq -r 'select(.event == "phase_push") | [.branch, .sha] | join(" ")' "$PROCESS_EVENTS_FILE" | tail -1)" "prepare records the push in the trace"
+# validate.sh runs once per HEAD: --prepare again on the same commit skips the suite
+# (the trace holds the green run).
+VAL_LOG="$TMP/validate-runs.log"; : >"$VAL_LOG"
+assert_eq "1" "$(jq -s '[.[] | select(.event == "phase_validate" and .sha == "'"$(git -C "$repo" rev-parse HEAD)"'")] | length' "$PROCESS_EVENTS_FILE")" "a green validate.sh is recorded with the HEAD sha"
+printf '#!/usr/bin/env bash\necho run >>"%s"\n' "$VAL_LOG" >"$TMP/validate-counter.sh"
+cp "$repo/scripts/validate.sh" "$TMP/validate-stub.sh"
+cp "$TMP/validate-counter.sh" "$repo/scripts/validate.sh"; chmod +x "$repo/scripts/validate.sh"
+git -C "$repo" update-index --assume-unchanged scripts/validate.sh
+assert_status 0 "prepare again on the same HEAD" sh -c "cd '$repo' && scripts/close-phase.sh --prepare --body-file '$TMP/body.md'"
+assert_contains "$(last_output)" "skipped validate.sh" "the same HEAD does not run the suite again"
+assert_eq "0" "$(wc -l <"$VAL_LOG" | tr -d ' ')" "validate.sh not called on the same HEAD"
+# A change in the tree (not a validated commit) runs the suite again (then it refuses: uncommitted).
+echo y >>"$repo/work.txt"
+assert_status 1 "prepare with a dirty tree" sh -c "cd '$repo' && scripts/close-phase.sh --prepare --body-file '$TMP/body.md'"
+assert_eq "1" "$(wc -l <"$VAL_LOG" | tr -d ' ')" "a dirty tree runs validate.sh"
+git -C "$repo" checkout --quiet work.txt
+git -C "$repo" update-index --no-assume-unchanged scripts/validate.sh
+cp "$TMP/validate-stub.sh" "$repo/scripts/validate.sh"
 # The "Modelo e esforço" section of the body is written by the script, from the trace.
 sent="$(echo "$calls" | sed -n 's/^pr edit 12 --repo owner\/repo --title chore: x --body-file //p' | tail -1)"
 assert_eq 1 "$([ -n "$sent" ] && [ -f "$sent" ] && echo 1)" "edits the PR when the body changed"
