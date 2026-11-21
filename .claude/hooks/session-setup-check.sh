@@ -1,7 +1,6 @@
 #!/usr/bin/env bash
 # session-setup-check.sh: SessionStart hook. Once per session, when the repository
-# is not configured for the method (scripts/setup-repo.sh --check exits 7, or 6 on
-# a plan without branch protection), it adds to the context that the setup is
+# is not configured for the method (scripts/setup-repo.sh --check exits 7), it adds to the context that the setup is
 # pending and that the first step is the setup skill.
 # It only warns; the lock is scripts/phase-start.sh. It never blocks or delays a
 # session: without jq, gh, a remote or network, or when the check takes longer
@@ -41,7 +40,6 @@ case "$rc" in
   0) [ -z "$main_root" ] || { mkdir -p "$main_root/.process" 2>/dev/null && : >"$main_root/.process/setup-ok" 2>/dev/null; }
      exit 0 ;;
   7) echo "Setup pending: this repository is not configured for the method. First step, before any other work: load the setup skill (the owner's sentence is \"configurar o repo\"). Until then scripts/phase-start.sh and scripts/open-issue.sh refuse. What scripts/setup-repo.sh --check found:" ;;
-  6) echo "Setup pending: the GitHub plan of this repository has no branch protection, so the gate of the method cannot be enforced. First step, before any other work: tell the owner the fix below. What scripts/setup-repo.sh --check found:" ;;
   *) exit 0 ;;
 esac
 cat "$out"

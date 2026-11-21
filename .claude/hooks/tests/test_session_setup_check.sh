@@ -36,11 +36,15 @@ assert_status 0 "never blocks (configured, next session)" run s-ok2
 assert_eq "" "$(last_output)$(gh_calls)" "a configured repository is not read again"
 rm "$repo/.process/setup-ok"
 
-# A plan without branch protection: the message of setup-repo.sh, not the skill.
+# A plan without branch protection and no recorded mode is a pending setup like any other;
+# with the unprotected mode recorded it is configured and the hook says nothing.
 fake_setup freeplan
 assert_status 0 "never blocks (plan)" run s-plan
-assert_contains "$(last_output)" "branch protection is not available" "plan: carries the message of setup-repo.sh"
-assert_not_contains "$(last_output)" "load the setup skill" "plan: does not point to the setup skill"
+assert_contains "$(last_output)" "load the setup skill" "plan: points to the setup skill"
+assert_contains "$(last_output)" "missing: protection of main" "plan: names what is missing"
+fake_setup unprotected
+assert_status 0 "never blocks (unprotected mode)" run s-unprotected
+assert_eq "" "$(last_output)" "unprotected mode: says nothing"
 
 # No remote, gh failing (no network or no login), no gh, slow gh: silent, and quick.
 fake_setup nolabels
