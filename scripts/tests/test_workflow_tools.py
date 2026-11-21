@@ -239,23 +239,43 @@ class CiStepsTests(unittest.TestCase):
         out = self.detect({"docs/x.md": "x\n", "README.md": "x\n"})
         self.assertEqual((out["code"], out["docs_only"], out["app"]), ("false", "true", "false"))
 
-    def test_docs_only_pr_runs_the_tests(self):
-        # The tests read AGENTS.md, the skills and the design: a PR that only
-        # changes them still runs the tests job, and the gate requires it.
-        out = self.detect({"AGENTS.md": "x\n", ".claude/skills/plan/SKILL.md": "x\n",
-                           "docs/process-design.md": "x\n"})
-        self.assertEqual((out["code"], out["docs_only"]), ("false", "true"))
+    def test_tests_skip_only_for_inert_docs(self):
+        # Generated docs, specs and the docs/ pages skip the tests job; what the tests
+        # read (AGENTS.md, CLAUDE.md, the design, skills, scripts) never does.
+        out = self.detect({"docs/x.md": "x\n", "CHANGELOG.md": "x\n", "ROADMAP.md": "x\n",
+                           "docs/specs/s.md": "x\n", "README.md": "x\n"})
+        self.assertEqual((out["code"], out["run_tests"]), ("false", "false"))
+        for rel in ("AGENTS.md", "CLAUDE.md", "docs/process-design.md", ".claude/skills/plan/SKILL.md",
+                    "scripts/x.sh", "app/README.md"):
+            self.assertEqual(self.detect({rel: "x\n"})["run_tests"], "true", rel)
+
+    def test_tests_skip_when_code_already_tested(self):
+        # A docs-only push on top of a commit whose Tests passed does not run the suite again.
+        first = self.commit({"scripts/x.sh": "x\n"})
+        head = self.commit({"docs/x.md": "x\n"})
+        fake = os.path.join(self.tmp, "bin")
+        os.makedirs(fake)
+        gh = os.path.join(fake, "gh")
+        open(gh, "w").write('#!/bin/sh\ncase "$*" in *"commits/%s/check-runs"*) echo "$GH_TESTS" ;; *) echo 0 ;; esac\n' % first)
+        os.chmod(gh, 0o755)
+        env = {"PATH": fake + os.pathsep + os.environ["PATH"]}
+        for passed, want in (("1", "false"), ("0", "true")):
+            r = self.run_step("changes", "Detect changed paths", head, dict(env, GH_TESTS=passed))
+            self.assertEqual(r.returncode, 0, r.stderr)
+            out = dict(l.split("=", 1) for l in open(os.path.join(self.tmp, "output")).read().split())
+            self.assertEqual(out["run_tests"], want, passed)
+        # Code changed after the tested commit: the suite runs, whatever the check says.
+        head2 = self.commit({"scripts/y.sh": "y\n"})
+        r = self.run_step("changes", "Detect changed paths", head2, dict(env, GH_TESTS="1"))
+        out = dict(l.split("=", 1) for l in open(os.path.join(self.tmp, "output")).read().split())
+        self.assertEqual(out["run_tests"], "true")
+
+    def test_tests_job_runs_unless_run_tests_is_false(self):
         wf = cw.load(os.path.join(ROOT, ".github", "workflows", "ci.yml"))
         tests = wf["jobs"]["tests"]
-        self.assertNotIn("if", tests, "the tests job must run on every PR")
+        self.assertEqual(tests["if"], "needs.changes.outputs.run_tests != 'false'")
         self.assertIn("scripts/validate.sh --tests", [s.get("run") for s in tests["steps"]])
         self.assertEqual(wf["jobs"]["lint"]["if"], "needs.changes.outputs.code == 'true'")
-        gate = os.path.join(ROOT, "scripts", "ci-gate.sh")
-        for result, status in (("skipped", 1), ("success", 0)):
-            needs = {"changes": {"result": "success", "outputs": out}, "policy": {"result": "success"},
-                     "lint": {"result": "skipped"}, "tests": {"result": result}, "workflows": {"result": "skipped"}}
-            r = subprocess.run([gate], env=dict(os.environ, NEEDS=json.dumps(needs)), text=True, capture_output=True)
-            self.assertEqual(r.returncode, status, r.stdout + r.stderr)
 
     def test_filter_issue_template_is_code(self):
         out = self.detect({".github/ISSUE_TEMPLATE/bug.md": "x\n"})

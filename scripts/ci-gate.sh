@@ -4,9 +4,10 @@
 #: Usage (in the workflow, job `ci` with if: always()):
 #:   NEEDS='${{ toJSON(needs) }}' ci-gate.sh
 #:
-#: `changes`, `policy` and `tests` must succeed on every PR (the tests read
-#: AGENTS.md, the skills and the design, so a docs-only PR runs them too). The
-#: other jobs are required according to the `changes` outputs:
+#: `changes` and `policy` must succeed on every PR; `tests` must too, unless the
+#: `changes` output run_tests is exactly "false" (only docs that tests do not
+#: read changed, or the code was already tested on an earlier commit of the PR;
+#: a missing output requires the tests). The other jobs follow the outputs:
 #:   lint <- code (everything that is not a doc); workflows <- workflows.
 #: `code` only waives lint when it is exactly "false": a missing output proves
 #: nothing and requires lint. A required job must succeed in this
@@ -34,7 +35,8 @@ check changes
 check policy
 
 required="tests"
-[ "$(output code)" = false ] || required="lint tests"
+[ "$(output run_tests)" != false ] || required=""
+[ "$(output code)" = false ] || required="lint $required"
 [ "$(output workflows)" = true ] && required="$required workflows"
 
 for job in $required; do
