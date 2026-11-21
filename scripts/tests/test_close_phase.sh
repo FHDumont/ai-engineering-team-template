@@ -424,6 +424,7 @@ esac
 H
 use_fake_gh "$TMP/handler.sh"
 : >"$PUSH_LOG"
+rm -rf "$AI_METHOD_CACHE/progress"
 assert_status 0 "prepare runs on a branch without issue number" sh -c "cd '$repo' && scripts/close-phase.sh --prepare --body-file '$TMP/body.md'"
 calls="$(gh_calls)"
 assert_contains "$calls" "issue view 1" "reads the issue from Closes #1"
@@ -436,6 +437,13 @@ assert_not_contains "$calls" "--state merged" "prepare does not read the merged 
 assert_eq "1" "$(pushes)" "one push per round"
 assert_eq "$(git -C "$repo" rev-parse HEAD)" "$(git -C "$remote" rev-parse chore/no-number)" "the push carries the branch HEAD"
 assert_eq "chore/no-number $(git -C "$repo" rev-parse HEAD)" "$(jq -r 'select(.event == "phase_push") | [.branch, .sha] | join(" ")' "$PROCESS_EVENTS_FILE" | tail -1)" "prepare records the push in the trace"
+# Progress (process-design §6.4): --prepare records start, its steps and end; the output has none.
+pfile="$(ls "$AI_METHOD_CACHE"/progress/*.jsonl 2>/dev/null | head -1 || true)"
+assert_eq "close-phase.sh" "$(jq -r .script "$pfile" | head -1)" "prepare records its progress as close-phase.sh"
+assert_eq "start" "$(jq -r .state "$pfile" | head -1)" "progress starts with state start"
+assert_eq "end" "$(jq -r .state "$pfile" | tail -1)" "progress ends with state end"
+assert_contains "$(jq -r .step "$pfile")" "pushing the branch" "progress has the push step"
+assert_not_contains "$(cat "$TMP/last.out" 2>/dev/null; last_output)" "jsonl" "the output has no progress"
 # validate.sh runs once per HEAD: --prepare again on the same commit skips the suite
 # (the trace holds the green run).
 VAL_LOG="$TMP/validate-runs.log"; : >"$VAL_LOG"
