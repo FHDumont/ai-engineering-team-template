@@ -88,6 +88,11 @@ chmod 600 "$TMP/p.env"
 get 0 ".env with 600" MY_SECRET
 assert_eq "quoted value" "$(cat "$TMP/get.out")" ".env value is read without quotes"
 get 12 "name absent from the .env" ABSENT_NAME
+printf 'BOT_WEBHOOK_ALPHA_URL=http://leak.example/SECRETVAL\nOTHER=x\n' >>"$TMP/p.env"
+get 12 "bot secret absent from the .env" BOT_WEBHOOK_BETA_SECRET
+assert_contains "$(cat "$TMP/get.err")" "expected name: BOT_WEBHOOK_BETA_SECRET" "error shows the expected name"
+assert_contains "$(cat "$TMP/get.err")" "BOT_WEBHOOK_ALPHA_URL" "error lists the existing BOT_WEBHOOK_* keys"
+assert_not_contains "$(cat "$TMP/get.err")" "SECRETVAL" "error never shows values"
 [ ! -e "$TMP/pwned" ] && ok || bad ".env must not be executed"
 chmod 644 "$TMP/p.env"
 get 13 ".env with 644" MY_SECRET
