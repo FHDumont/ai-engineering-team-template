@@ -25,6 +25,7 @@ case "\$*" in
   "issue list"*"number,title,labels,url"*) echo "\${FAKE_ISSUES:-\$(cat "$TMP/issues.json")}" ;;
   "issue list"*) echo "\${FAKE_ISSUES:-\$(cat "$TMP/issues.json")}" | jq -r "\$(jq_arg "\$@")" ;;
   "run list"*) echo "\${FAKE_RUNS:-[]}" ;;
+  "variable list"*) [ -z "\${FAKE_MODE:-}" ] || echo PROCESS_BRANCH_MODE ;;
 esac
 H
 use_fake_gh "$TMP/handler.sh"
@@ -45,6 +46,9 @@ assert_contains "$(last_output)" "Usage: end-check.sh" "--help shows the usage"
 check 0 "a clean end passes"
 assert_contains "$(last_output)" "ok: end-check" "says the end is clean"
 assert_not_contains "$(gh_calls)" "workflow run" "end-check dispatches nothing"
+assert_not_contains "$(last_output)" "mode: unprotected" "protected mode: no mode note"
+check 0 "the unprotected mode is not an error" FAKE_MODE=1
+assert_contains "$(last_output)" "mode: unprotected" "unprotected mode: named in the ok line"
 
 # Extra local branch.
 git -C "$repo" branch feat/issue-5-x

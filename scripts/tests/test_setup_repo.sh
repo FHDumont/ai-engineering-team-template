@@ -45,6 +45,8 @@ J
     else
       echo '{"message":"Branch not protected"}'; exit 1
     fi ;;
+  "variable list"*) [ ! -f "$TMP/mode" ] || echo PROCESS_BRANCH_MODE ;;
+  "variable set PROCESS_BRANCH_MODE"*) touch "$TMP/mode" ;;
   "api -X PUT"*) cat >"$FAKE_GH_LOG.body.$RANDOM"; [ -n "${FAKE_PUT_LOST:-}" ] || touch "$TMP/protected" ;;
   "api -X PATCH"*) cat >"$FAKE_GH_LOG.body.$RANDOM" ;;
 esac
@@ -74,15 +76,20 @@ assert_contains "$out" "(read back)" "protection is declared after reading back"
 
 # Protection: a plan without branch protection has its own message; a PUT that does not
 # show up on read-back is not declared done.
-for flags in "--only protection" "--only protection --dry-run"; do
-  : >"$FAKE_GH_LOG"
-  # shellcheck disable=SC2086
-  assert_status 6 "plan without branch protection exits 6 ($flags)" env FAKE_PLAN=free "$SETUP" $flags
-  assert_contains "$(last_output)" "branch protection is not available for owner/repo on the current GitHub plan" "plan: own message ($flags)"
-  assert_contains "$(last_output)" "make the repository public or upgrade the plan" "plan: says the fix ($flags)"
-  assert_not_contains "$(last_output)" "done: protect" "plan: never declares the protection done ($flags)"
-  assert_not_contains "$(gh_calls)" "-X PUT" "plan: never tries the write ($flags)"
-done
+# A plan without branch protection: the "unprotected" mode is recorded (never a PUT), exit 0.
+: >"$FAKE_GH_LOG"; rm -f "$TMP/mode"
+assert_status 0 "plan without protection: dry-run exits 0" env FAKE_PLAN=free "$SETUP" --only protection --dry-run
+assert_contains "$(last_output)" "would: record the unprotected branch mode" "plan: dry-run says it would record"
+assert_not_contains "$(gh_calls)" "variable set" "plan: dry-run writes nothing"
+assert_status 0 "plan without protection: exits 0" env FAKE_PLAN=free "$SETUP" --only protection
+assert_contains "$(last_output)" "done: record the unprotected branch mode" "plan: records the mode, read back"
+assert_contains "$(last_output)" "warning:" "plan: warns"
+assert_contains "$(gh_calls)" "variable set PROCESS_BRANCH_MODE --repo owner/repo --body unprotected" "plan: sets the variable"
+assert_not_contains "$(gh_calls)" "-X PUT" "plan: never tries the write"
+: >"$FAKE_GH_LOG"
+assert_status 0 "plan without protection: second run exits 0" env FAKE_PLAN=free "$SETUP" --only protection
+assert_not_contains "$(gh_calls)" "variable set" "plan: second run is idempotent"
+rm -f "$TMP/mode"
 rm -f "$TMP/protected"
 assert_status 1 "protection not confirmed on read back fails" env FAKE_PUT_LOST=1 "$SETUP" --only protection
 assert_contains "$(last_output)" "not confirmed on read back" "unconfirmed protection: says so"

@@ -13,7 +13,8 @@ if [ -n "${FAKE_GH_FAIL:-}" ] && printf '%s' "$*" | grep -qE -- "$FAKE_GH_FAIL";
 fi
 # FAKE_SETUP (set by fake_setup of lib.sh) answers the four reads of
 # `setup-repo.sh --check` before the handler of the test: ok (configured),
-# nolabels, noprotection, offer (an unanswered offer) or freeplan (no branch protection).
+# nolabels, noprotection, offer (an unanswered offer), freeplan (no branch protection,
+# mode not recorded) or unprotected (no branch protection, PROCESS_BRANCH_MODE recorded).
 if [ -n "${FAKE_SETUP:-}" ]; then
   case "$*" in
     "label list --repo $GH_REPO --limit 500 --json name,color,description")
@@ -25,7 +26,7 @@ if [ -n "${FAKE_SETUP:-}" ]; then
     "api repos/$GH_REPO/branches/main/protection")
       case "$FAKE_SETUP" in
         noprotection) echo '{"message":"Branch not protected"}'; exit 1 ;;
-        freeplan)
+        freeplan|unprotected)
           echo "gh: Upgrade to GitHub Pro or make this repository public to enable this feature. (HTTP 403)" >&2
           exit 1 ;;
       esac
@@ -33,6 +34,7 @@ if [ -n "${FAKE_SETUP:-}" ]; then
       exit 0 ;;
     "variable list --repo $GH_REPO --json name --jq .[].name")
       [ "$FAKE_SETUP" = offer ] || printf 'PROCESS_OFFER_PROJECT\nPROCESS_OFFER_RUNNER\n'
+      [ "$FAKE_SETUP" != unprotected ] || echo PROCESS_BRANCH_MODE
       exit 0 ;;
   esac
 fi
