@@ -151,8 +151,22 @@ _secret_from_env_file() {
   printf '%s\n' "$val"
 }
 
+# Names (never values) of the BOT_WEBHOOK_* keys in the .env, comma separated.
+_secret_webhook_keys() {
+  local f line k out=""
+  f="$(secret_env_file)"
+  [ -f "$f" ] || return 0
+  while IFS= read -r line || [ -n "$line" ]; do
+    line="${line#export }"
+    case "$line" in
+      BOT_WEBHOOK_*=*) k="${line%%=*}"; out="${out:+$out, }$k" ;;
+    esac
+  done <"$f"
+  printf '%s' "$out"
+}
+
 _secret_get() {
-  local name="$1" ref="${2:-}" v tok="" rc configured=0 operr
+  local name="$1" ref="${2:-}" v tok="" rc configured=0 operr keys
   _SECRET_SA_HINT=""
   case "$name" in
     ''|[0-9]*|*[!A-Za-z0-9_]*) _secret_err "invalid secret name: $name"; return 2 ;;
@@ -202,6 +216,11 @@ _secret_get() {
 
   if [ "$configured" = 0 ]; then _secret_msg_none; _secret_hint; return "$SECRET_NONE"; fi
   _secret_err "secret $name not found in any configured provider"
+  case "$name" in
+    BOT_WEBHOOK_*)
+      keys="$(_secret_webhook_keys)"
+      _secret_err "expected name: $name; BOT_WEBHOOK_* keys in the .env: ${keys:-none}" ;;
+  esac
   _secret_hint
   return "$SECRET_MISSING"
 }
