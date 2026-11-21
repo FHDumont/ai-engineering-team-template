@@ -4,6 +4,8 @@
 
 ## Funcionalidades
 
+- feat(scripts): per-project time targets, lab-test without owner scripts, close-phase progress ([#51](https://github.com/FHDumont/ai-engineering-team-template/pull/51)) · 2026-11-21
+- feat(scripts): visible progress of long scripts, headless spec from worktree, CI read failure ([#49](https://github.com/FHDumont/ai-engineering-team-template/pull/49)) · 2026-11-21
 - feat: heartbeat only writes when the state changed ([#21](https://github.com/FHDumont/ai-engineering-team-template/pull/21)) · 2026-11-21
 - feat: unprotected branch mode for private repos on a free plan ([#14](https://github.com/FHDumont/ai-engineering-team-template/pull/14)) · 2026-11-21
 - feat: require the repository setup before a phase or an issue ([#5](https://github.com/FHDumont/ai-engineering-team-template/pull/5)) · 2026-11-21
@@ -15,6 +17,7 @@
 
 ## Manutenção
 
+- perf: measure phase time and cut the CI and prepare reruns ([#48](https://github.com/FHDumont/ai-engineering-team-template/pull/48)) · 2026-11-21
 - feat: stop leftover processes and add sessions.sh at the end of a phase ([#25](https://github.com/FHDumont/ai-engineering-team-template/pull/25)) · 2026-11-21
 - feat: machine-wide slots, queue and history for validations and phases ([#15](https://github.com/FHDumont/ai-engineering-team-template/pull/15)) · 2026-11-21
 - feat: open phase children as headless claude when start_session is refused ([#13](https://github.com/FHDumont/ai-engineering-team-template/pull/13)) · 2026-11-21
