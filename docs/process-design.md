@@ -70,7 +70,7 @@ Baseados nas observações de Andrej Karpathy ([andrej-karpathy-skills](https://
 
 1. **Critério de sucesso verificável.** Antes de codar, defina o "pronto quando" que dá para checar.
 2. **Prova do vermelho.** Correção de bug começa com um teste que reproduz o bug e falha no código antigo. A prova é rodar o teste com o patch revertido, não raciocinar.
-3. **Nunca supor em silêncio.** Requisito ambíguo antes da spec: pergunte no grilling. Dúvida nova no meio da execução, em passo reversível: siga e registre a suposição no PR. Dúvida em item da lista "sempre perguntar" (§2.2): mande à sessão principal.
+3. **Nunca supor em silêncio.** Requisito ambíguo antes da spec: pergunte no grilling. Dúvida nova no meio da execução, em passo reversível: siga e liste a suposição em "Decisões tomadas sem perguntar" no PR. Dúvida em item da lista "sempre perguntar" (§2.2): mande à sessão principal.
 4. **Sem refatoração de carona.** A fase toca só o escopo da spec. O resto vira issue de achado (§4.2).
 5. **Sem over-engineering.** A solução mais simples que atende; nada de abstração "para um dia".
 6. **Preservar o contexto.** Leia o arquivo antes de mudar; remova função e import só com certeza de que não são usados; comentário que você não entendeu fica.
@@ -86,7 +86,7 @@ Baseados nas observações de Andrej Karpathy ([andrej-karpathy-skills](https://
 
 - **Sempre perguntar** (quadro de escolha): ação destrutiva e irreversível, gasto, dependência nova, mudança de arquitetura e de schema, segredos e credenciais, e todo item da lista da §10.3.
 - **Nunca perguntar** em passo rotineiro e reversível de uma spec aprovada: setup do método, labels, issue de achado, branch e PR.
-- **Dúvida num passo reversível:** siga e relate no bloco de status.
+- **Dúvida num passo reversível:** siga e liste a decisão na seção "Decisões tomadas sem perguntar" do PR, que o dono lê no fim; a fase só para para o dono nos itens "sempre perguntar" acima. O grilling do `plan` junta as perguntas num quadro só.
 
 ### 2.3 Regras de git
 

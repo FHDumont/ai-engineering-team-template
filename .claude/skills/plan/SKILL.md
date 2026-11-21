@@ -9,7 +9,7 @@ description: Planejamento nível 2 — lê por inteiro só as issues escolhidas 
 2. Sem issue: grilling, `open-issue.sh`.
 3. Leia só as issues escolhidas, `docs/STATE.md`, ADRs.
 3a. **Par da sessão:** `light` ou `medium` fica no atual. Com item `strong` (§3) ou ambiguidade: quadro com o par atual e o do peso `strong`.
-4. **Grilling único**: issues juntas, só o que muda a spec, quadro por decisão; o resto, suposição. Bot: `ask-bot`. "executar #<n>" cai aqui (também `size:small`, achado e `test`; esta pelo `triage.sh --issue <n>`): sem spec, uma curta.
+4. **Grilling único**: issues juntas, só o que muda a spec, num quadro só; o resto, suposição. Bot: `ask-bot`. "executar #<n>" cai aqui (também `size:small`, achado e `test`; esta pelo `triage.sh --issue <n>`): sem spec, uma curta.
 4a. §2.1: critério verificável, escopo explícito, solução simples.
 5. Escreva `docs/specs/AAAA-MM-DD-<group>.md`, seção por fase:
    - issue, objetivo, pronto quando, arquivos;
