@@ -4,7 +4,8 @@
 #: Usage (in the workflow, job `ci` with if: always()):
 #:   NEEDS='${{ toJSON(needs) }}' ci-gate.sh
 #:
-#: `changes` and `policy` must succeed on every PR; `tests` must too, unless the
+#: `changes` must succeed and `policy` too on every PR (on push to main, event "push", policy
+#: does not run); `tests` must too, unless the
 #: `changes` output run_tests is exactly "false" (only docs that tests do not
 #: read changed, or the code was already tested on an earlier commit of the PR;
 #: a missing output requires the tests). The other jobs follow the outputs:
@@ -32,7 +33,8 @@ check() { # check <job>
 }
 
 check changes
-check policy
+# Policy judges a PR: on push to main (output event exactly "push") it does not run.
+[ "$(output event)" = push ] || check policy
 
 required="tests"
 [ "$(output run_tests)" != false ] || required=""

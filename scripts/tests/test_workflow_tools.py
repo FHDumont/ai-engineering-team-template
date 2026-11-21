@@ -134,9 +134,17 @@ jobs:
             self.assertIn(part, problems)
 
     def test_ci_only_on_pull_request(self):
-        text = GOOD.replace("issues:\n    types: [opened]", "pull_request:\n  push:\n    branches: [main]")
-        problems = "\n".join(cw.check(self.write("ci.yml", text)))
-        self.assertIn("ci.yml must run only on pull_request", problems)
+        # ci.yml runs on pull_request and on push to main, nothing else.
+        both = GOOD.replace("issues:\n    types: [opened]", "pull_request:\n  push:\n    branches: [main]")
+        self.assertEqual(cw.check(self.write("ci.yml", both)), [])
+        for extra in ("schedule:\n    - cron: '0 3 * * *'", "workflow_dispatch:"):
+            text = both + "\n" if False else both.replace("  push:\n", "  %s\n  push:\n" % extra)
+            problems = "\n".join(cw.check(self.write("ci.yml", text)))
+            self.assertIn("ci.yml must run only on pull_request and push to main", problems, extra)
+        problems = "\n".join(cw.check(self.write("ci.yml", both.replace("[main]", "[dev]"))))
+        self.assertIn("ci.yml must run on push only to main", problems)
+        problems = "\n".join(cw.check(self.write("ci.yml", GOOD.replace("issues:\n    types: [opened]", "pull_request:"))))
+        self.assertIn("ci.yml must run only on pull_request and push to main", problems)
 
     def test_timeout_bounds(self):
         problems = "\n".join(cw.check(self.write("issues-x.yml", GOOD.replace("timeout-minutes: 5", "timeout-minutes: 60"))))
@@ -270,6 +278,56 @@ class CiStepsTests(unittest.TestCase):
         out = dict(l.split("=", 1) for l in open(os.path.join(self.tmp, "output")).read().split())
         self.assertEqual(out["run_tests"], "true")
 
+    def push_main(self, files, pr_head_tree_of=None, ci="success", tests="success"):
+        """Runs the detect step as a push to main: BASE is the previous main, HEAD the new one.
+        A fake gh answers the merged PR that holds HEAD; its head is pr_head_tree_of (a commit
+        whose tree is the PR head tree), with the CI and Tests conclusions given."""
+        head = self.commit(files)
+        fake = os.path.join(self.tmp, "binpush")
+        os.makedirs(fake, exist_ok=True)
+        pr_tree = git(self.repo, "rev-parse", (pr_head_tree_of or head) + "^{tree}")
+        gh = os.path.join(fake, "gh")
+        open(gh, "w").write("""#!/bin/sh
+case "$*" in
+  *"/commits/%s/pulls"*) echo prhead ;;
+  *"/git/commits/prhead"*) echo %s ;;
+  *"/commits/prhead/check-runs"*)
+    case "$*" in *'.name == "CI"'*) echo %d ;; *) echo %d ;; esac ;;
+  *) echo 0 ;;
+esac
+""" % (head, pr_tree, 1 if ci == "success" else 0, 1 if tests == "failure" else 0))
+        os.chmod(gh, 0o755)
+        env = {"PATH": fake + os.pathsep + os.environ["PATH"], "EVENT_NAME": "push"}
+        r = self.run_step("changes", "Detect changed paths", head, env)
+        self.assertEqual(r.returncode, 0, r.stderr)
+        return dict(l.split("=", 1) for l in open(os.path.join(self.tmp, "output")).read().split())
+
+    def test_push_main_skips_when_the_tree_is_the_head_of_a_merged_pr(self):
+        # The common case, one merge: main has the tree of the head of the PR, which had CI green.
+        out = self.push_main({"scripts/x.sh": "x\n"})
+        self.assertEqual((out["run_tests"], out["code"], out["workflows"], out["event"]), ("false", "false", "false", "push"))
+
+    def test_push_main_runs_the_suite_on_the_sum_of_two_merges(self):
+        # PR 56 and PR 57 rebased in a row (#59): the tree of main is the head of neither PR.
+        first = self.commit({"scripts/a.sh": "a\n"})
+        out = self.push_main({"scripts/b.sh": "b\n"}, pr_head_tree_of=first)
+        self.assertEqual((out["run_tests"], out["code"], out["event"]), ("true", "true", "push"))
+
+    def test_push_main_runs_when_the_pr_had_no_green_ci_or_failed_tests(self):
+        self.assertEqual(self.push_main({"scripts/x.sh": "x\n"}, ci="failure")["run_tests"], "true")
+        self.assertEqual(self.push_main({"scripts/y.sh": "y\n"}, tests="failure")["run_tests"], "true")
+
+    def test_push_main_skips_inert_docs(self):
+        out = self.push_main({"docs/x.md": "x\n"}, pr_head_tree_of=self.base)
+        self.assertEqual((out["run_tests"], out["code"]), ("false", "false"))
+
+    def test_ci_runs_on_push_to_main_without_policy(self):
+        wf = cw.load(os.path.join(ROOT, ".github", "workflows", "ci.yml"))
+        self.assertEqual(wf["on"]["push"], {"branches": ["main"]})
+        self.assertEqual(wf["jobs"]["policy"]["if"], "github.event_name == 'pull_request'")
+        # A run of main is never cancelled by the next one: phase-start.sh waits for it.
+        self.assertIn("github.event_name == 'pull_request'", wf["concurrency"]["cancel-in-progress"])
+
     def test_tests_job_runs_unless_run_tests_is_false(self):
         wf = cw.load(os.path.join(ROOT, ".github", "workflows", "ci.yml"))
         tests = wf["jobs"]["tests"]
@@ -359,7 +417,9 @@ class CiStepsTests(unittest.TestCase):
             steps = wf["jobs"][job]["steps"]
             base = [s for s in steps if (s.get("with") or {}).get("path") == "base"]
             self.assertEqual(len(base), 1, job)
-            self.assertEqual(base[0]["with"]["ref"], "${{ github.event.pull_request.base.sha }}", job)
+            want = "${{ github.event.pull_request.base.sha }}" if job == "policy" else \
+                "${{ github.event.pull_request.base.sha || github.event.before }}"
+            self.assertEqual(base[0]["with"]["ref"], want, job)
             self.assertFalse(base[0]["with"].get("persist-credentials", True), job)
 
 
