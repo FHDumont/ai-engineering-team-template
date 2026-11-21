@@ -13,6 +13,7 @@
 
 ## Correções
 
+- feat(ci): run CI on push to main and let phase-start wait for it ([#61](https://github.com/FHDumont/ai-engineering-team-template/pull/61)) · 2026-11-21
 - fix: accept a main base without CI when its merged PR had green CI and the same tree ([#37](https://github.com/FHDumont/ai-engineering-team-template/pull/37)) · 2026-11-21
 
 ## Manutenção
@@ -24,6 +25,10 @@
 
 ## Outros
 
+- docs(process): ask the owner only on sensitive actions ([#60](https://github.com/FHDumont/ai-engineering-team-template/pull/60)) · 2026-11-21
+- feat: run the validate.sh test suite in parallel ([#58](https://github.com/FHDumont/ai-engineering-team-template/pull/58)) · 2026-11-21
+- perf: faster phase opening and loose spec only for pending phases ([#57](https://github.com/FHDumont/ai-engineering-team-template/pull/57)) · 2026-11-21
+- docs: close-reviewer reads the CI Tests check instead of rerunning the suite ([#56](https://github.com/FHDumont/ai-engineering-team-template/pull/56)) · 2026-11-21
 - feat(bots): visible authorship header on agent and bot comments ([#38](https://github.com/FHDumont/ai-engineering-team-template/pull/38)) · 2026-11-21
 - feat: open phases without the test suite and undo a failed opening ([#30](https://github.com/FHDumont/ai-engineering-team-template/pull/30)) · 2026-11-21
 - fix(skills): use unique temp files for PR, issue and review texts ([#28](https://github.com/FHDumont/ai-engineering-team-template/pull/28)) · 2026-11-21
