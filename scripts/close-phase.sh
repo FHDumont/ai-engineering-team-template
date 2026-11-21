@@ -46,7 +46,11 @@
 #:   without the flag. Requires review/independent = success on HEAD and, in the
 #:   trace, the close-reviewer round of this session after the push of that HEAD
 #:   (a status posted by hand does not count); requires the protection of the
-#:   base branch with CI and review/independent (no protection, no merge); runs
+#:   base branch with CI and review/independent (no protection, no merge), except in
+#:   the unprotected mode (repository variable PROCESS_BRANCH_MODE, set by
+#:   setup-repo.sh on a plan with no branch protection): there it reads through the
+#:   API that the CI check run and review/independent are success on HEAD (exit 11
+#:   when not); runs
 #:   check-attribution.sh --pr N (final body and commits); then
 #:   gh pr merge --auto --rebase --delete-branch. Before that, requires the phase
 #:   to have run in a child session (phase_session event of the issue, from a session
@@ -370,6 +374,20 @@ phase_gate() {
   [ -z "$why" ] || die "phase #$branch_issue: $why"
 }
 
+# Unprotected mode: GitHub does not require the checks, so the merge reads them here.
+# CI must be a completed check run with conclusion success on HEAD and
+# review/independent a success status on HEAD; anything else exits 11.
+unprotected_gate() { # unprotected_gate <sha>
+  local sha="$1" ci rv
+  ci="$(gh api "repos/$repo/commits/$sha/check-runs" --jq '[.check_runs[] | select(.name == "CI")] | sort_by(.started_at) | last | if . == null then "missing" elif .status != "completed" then .status else .conclusion end')" ||
+    die "cannot read the check runs of ${sha:0:12}: merge blocked" 11
+  [ "$ci" = success ] || die "unprotected mode: CI is $ci on ${sha:0:12}: no merge until it is success" 11
+  rv="$(gh api "repos/$repo/commits/$sha/status" --jq '[.statuses[] | select(.context == "review/independent")][0].state // "missing"')" ||
+    die "cannot read the statuses of ${sha:0:12}: merge blocked" 11
+  [ "$rv" = success ] || die "unprotected mode: review/independent is $rv on ${sha:0:12}: no merge until it is success" 11
+  echo "unprotected mode: CI and review/independent are success on ${sha:0:12} (read through the API)"
+}
+
 merge() {
   local n info labels sha state
   n="$(pr_number)"; [ -n "$n" ] || die "no open PR for $branch"
@@ -427,13 +445,19 @@ Ok do dono do repo registrado (quadro de escolha) para:$reasons." >/dev/null
   review_after_push "$sha" "merge blocked"
 
   # The gate is the protection of the base branch: without it GitHub merges anything.
+  # Exception: the unprotected mode (PROCESS_BRANCH_MODE, a plan with no branch
+  # protection): there the gate is read through the API, below.
   local required c
-  required="$(gh api "repos/$repo/branches/$base/protection" --jq '.required_status_checks | ([.checks[]?.context] + (.contexts // [])) | unique | .[]' 2>/dev/null)" ||
-    die "$base is not protected, or its protection cannot be read: no merge without the gate; fix: scripts/setup-repo.sh --only protection"
-  for c in CI review/independent; do
-    printf '%s\n' "$required" | grep -qxF "$c" ||
-      die "the protection of $base does not require $c: no merge without the gate; fix: scripts/setup-repo.sh --only protection"
-  done
+  if required="$(gh api "repos/$repo/branches/$base/protection" --jq '.required_status_checks | ([.checks[]?.context] + (.contexts // [])) | unique | .[]' 2>/dev/null)"; then
+    for c in CI review/independent; do
+      printf '%s\n' "$required" | grep -qxF "$c" ||
+        die "the protection of $base does not require $c: no merge without the gate; fix: scripts/setup-repo.sh --only protection"
+    done
+  else
+    gh variable list --repo "$repo" --json name --jq '.[].name' 2>/dev/null | grep -qxF PROCESS_BRANCH_MODE ||
+      die "$base is not protected, or its protection cannot be read: no merge without the gate; fix: scripts/setup-repo.sh --only protection"
+    unprotected_gate "$sha"
+  fi
 
   # Conflict or CI missing on HEAD: exits before requesting the merge.
   check_pr "$n"

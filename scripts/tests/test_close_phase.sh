@@ -63,6 +63,9 @@ case "\$*" in
   "pr view 12"*"headRefOid --jq"*) echo "$SHA" ;;
   "issue view 5"*"labels"*) printf '%s\n' "\${FAKE_ISSUE_LABELS:-type:feature}" | tr ',' '\n' ;;
   "api repos/owner/repo/commits/$SHA/status"*) echo "$2" ;;
+  # Unprotected mode: FAKE_MODE=1 records it; FAKE_CI is the state of the CI check run on HEAD.
+  "variable list"*) [ -z "\${FAKE_MODE:-}" ] || echo PROCESS_BRANCH_MODE ;;
+  "api repos/owner/repo/commits/$SHA/check-runs"*"select(.name"*) echo "\${FAKE_CI:-success}" ;;
   # Protection of main: FAKE_PROTECTION=none answers like an unprotected branch;
   # any other value is the list of required contexts.
   "api repos/owner/repo/branches/main/protection"*)
@@ -230,6 +233,22 @@ handler "type:feature" success
 assert_status 1 "refuses merge when a required check is missing" env FAKE_PROTECTION="CI" sh -c "cd '$repo' && '$CLOSE' --merge"
 assert_contains "$(last_output)" "does not require review/independent" "names the missing check"
 assert_not_contains "$(gh_calls)" "pr merge" "never merges with a partial protection"
+
+# Unprotected mode (a plan with no branch protection): the merge reads CI and the review
+# through the API and exits 11 when either is not success; without the mode it still refuses.
+for ci in failure in_progress missing; do
+  handler "type:feature" success
+  assert_status 11 "unprotected mode: CI $ci refuses the merge" env FAKE_PROTECTION=none FAKE_MODE=1 FAKE_CI="$ci" sh -c "cd '$repo' && '$CLOSE' --merge"
+  assert_contains "$(last_output)" "unprotected mode: CI is $ci" "unprotected mode: says CI is $ci"
+  assert_not_contains "$(gh_calls)" "pr merge" "unprotected mode: never merges with CI $ci"
+done
+handler "type:feature" failure
+assert_status 1 "unprotected mode: a review that is not success still refuses" env FAKE_PROTECTION=none FAKE_MODE=1 sh -c "cd '$repo' && '$CLOSE' --merge"
+assert_not_contains "$(gh_calls)" "pr merge" "unprotected mode: never merges without the review"
+handler "type:feature" success
+assert_status 0 "unprotected mode: CI and review success merge" env FAKE_PROTECTION=none FAKE_MODE=1 CLOSE_PHASE_MERGEABLE_PAUSE=0 CLOSE_PHASE_CI_TIMEOUT=0 CLOSE_PHASE_CI_POLL=0 sh -c "cd '$repo' && '$CLOSE' --merge"
+assert_contains "$(last_output)" "unprotected mode: CI and review/independent are success" "unprotected mode: says what it read"
+assert_contains "$(gh_calls)" "pr merge" "unprotected mode: merges when both are green"
 
 # Conflicting PR: --check calls redo-phase.sh, asks nobody and exits 0 with the new PR.
 # redo-phase.sh is a stub here (its own behaviour is in test_redo_phase.sh).
