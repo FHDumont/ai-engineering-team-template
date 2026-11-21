@@ -66,7 +66,9 @@
 #: --prepare, --publish-review, --check and --merge exit 9 in the session that
 #:   opened the phase (phase_opened): it forwards the request to the child
 #:   session and stops.
-#: --cleanup: after the merge, records phase_closed in the trace, sets the issue
+#: --cleanup: after the merge, stops the processes whose directory is in the worktree
+#:   and the headless child of the trace (with its MCPs; never a child of the
+#:   Claude.app), then, like the rest below, records phase_closed in the trace, sets the issue
 #:   to Done and resets the "Fase atual" view filter (or leaves the group of
 #:   another active phase), takes out of .worktrees/parallel-active.tsv the line
 #:   of the phase and every line whose worktree is gone, removes the local
@@ -488,6 +490,15 @@ Ok do dono do repo registrado (quadro de escolha) para:$reasons." >/dev/null
   fi
 }
 
+# Last words of the phase: what the owner archives (never deletes) in the app.
+cleanup_message() { # cleanup_message <main checkout> <phase worktree>
+  [ "$2" != "$1" ] || return 0
+  echo "Archive this session in the Claude app (menu ... -> Archive) to free its process, about 100-180 MB, and its MCPs. Do not delete it: the history is gone for good. Closing the tab is not enough."
+  local stale
+  stale="$("$1/scripts/sessions.sh" --stale 2>/dev/null || true)"
+  [ -z "$stale" ] || printf 'Other sessions of this repository, not archived and idle (archive them too):\n%s\n' "$stale"
+}
+
 cleanup() {
   local main_root here n board=0
   main_root="$(git worktree list --porcelain | sed -n '1s/^worktree //p')"
@@ -520,6 +531,9 @@ cleanup() {
   done
   git -C "$main_root" pull --quiet --ff-only origin main
   if [ "$here" != "$main_root" ]; then
+    # shellcheck source=scripts/lib/procs.sh
+    source "$HERE/lib/procs.sh"
+    procs_cleanup_worktree "$here" "$(issue_from_branch "$branch")" "$(events_file "$here" 2>/dev/null || true)"
     git -C "$main_root" worktree remove --force "$here"
     echo "removed worktree $here"
   fi
@@ -530,6 +544,7 @@ cleanup() {
   fi
   git -C "$main_root" fetch --quiet --prune origin
   git -C "$main_root" branch
+  cleanup_message "$main_root" "$here"
   [ "$board" = 0 ] || die "the phase is closed and cleaned up, but the board was not updated (cause and fix above)"
 }
 
