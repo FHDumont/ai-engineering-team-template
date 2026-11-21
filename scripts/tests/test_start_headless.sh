@@ -90,7 +90,7 @@ git -C "$repo" worktree add --quiet -b feat/issue-8-y "$repo/.worktrees/issue-8"
 printf '# Spec\n\n## Fase #8 — y\n\n1. Etapa. modelo: opus · esforço: high · motivo: x\n' >"$repo/.worktrees/issue-8/docs/specs/eight.md"
 git -C "$repo/.worktrees/issue-8" add docs/specs/eight.md
 git -C "$repo/.worktrees/issue-8" commit --quiet -m "docs(specs): add the spec of issue #8"
-assert_eq "" "$(ls "$repo/docs/specs" | grep eight || true)" "the main checkout has no spec of #8"
+assert_eq "no" "$([ -e "$repo/docs/specs/eight.md" ] && echo yes || echo no)" "the main checkout has no spec of #8"
 assert_status 0 "reads the pair from the spec that exists only on the branch" sh -c "cd '$repo' && PATH='$bin:$PATH' scripts/start-headless.sh 8 --dry-run"
 assert_contains "$(last_output)" "--model opus --effort high" "the pair comes from the worktree spec"
 
