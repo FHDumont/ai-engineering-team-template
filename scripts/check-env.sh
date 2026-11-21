@@ -115,14 +115,18 @@ fi
 
 # Does the phase spec cite bots? Then a secret provider must exist (the bot notice reads the webhook).
 spec_cites_bots() {
-  local issue spec slugs
+  local issue spec slugs text
   issue="$(issue_from_branch "$branch")"
   [ -n "$issue" ] || return 1
   slugs="$(bot_slugs | paste -sd'|' -)"
   for spec in "$HERE"/../docs/specs/*.md; do
     [ -f "$spec" ] || continue
     grep -q -E "#$issue([^0-9]|$)" "$spec" || continue
-    if grep -q -E "ask-bot|^#+ .*Bots|\*\*Bots|\`($slugs)\`" "$spec"; then return 0; fi
+    # Only the general header (before the first phase section) and this phase's section count.
+    text="$(awk -v n="$issue" '
+      /^## Fase #[0-9]+/ { sec = ($0 ~ "^## Fase #" n "([^0-9]|$)"); seen = 1; next }
+      !seen || sec { print }' "$spec")"
+    if printf '%s\n' "$text" | grep -q -E "ask-bot([^/]|$)|^#+ .*Bots|\*\*Bots|\`($slugs)\`"; then return 0; fi
   done
   return 1
 }
