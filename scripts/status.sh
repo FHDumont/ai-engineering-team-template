@@ -21,6 +21,9 @@
 #: next step when none is given. On main it warns only when code edits are
 #: pending (outside docs/specs/ and .process/): planning and post-close do not warn.
 #: --offline does not call GitHub.
+#: When a long script of the phase is running (scripts/progress.sh), the current step
+#: goes at the end of the state ("trabalhando — validate.sh: tests 23/49 ..., 3m10s")
+#: and of the phase line on main: one line, read from the progress files, never the log.
 set -euo pipefail
 trap "" PIPE
 HERE="$(cd "$(dirname "$0")" && pwd)"
@@ -60,6 +63,13 @@ if [ "$state" = pronto ]; then
     die "pronto refused: the end is not clean (scripts/end-check.sh above); the state is trabalhando or esperando"
   fi
 fi
+
+# Current step of the long script of a phase (empty when none runs).
+step_of() { # step_of <issue>
+  local repo
+  repo="$(basename "$(dirname "$(git rev-parse --path-format=absolute --git-common-dir 2>/dev/null)")")"
+  "$HERE/progress.sh" --repo "$repo" --issue "$1" 2>/dev/null | sed -n '1p' | grep -v '^nothing running' | sed "s/^$repo #$1 //" || true
+}
 
 end=""
 if [ -n "$issue" ] && [ "$offline" = 0 ] && command -v gh >/dev/null 2>&1; then
@@ -101,7 +111,8 @@ if [ -z "$issue" ] && is_main_branch "$branch"; then
       p_pair="$(spec_pairs "$n" $(specs_citing "$n" "$wt" | sed "s#^#$wt/#") 2>/dev/null | head -1 | tr ' ' '/')" || p_pair=""
       [ -z "$p_pair" ] || p_pair="modelo/esforço: $p_pair (pedido)"
     fi
-    phases="$phases- #$n — $title — $p_state${p_pair:+ — $p_pair}"$'\n'
+    p_step="$(step_of "$n")"
+    phases="$phases- #$n — $title — $p_state${p_step:+ ($p_step)}${p_pair:+ — $p_pair}"$'\n'
     if [ "$p_state" = "esperando você" ] && [ -n "$p_need" ]; then
       pending="${pending:+$pending; }Fase #$n — $title: $p_need"
     fi
@@ -136,4 +147,7 @@ if is_main_branch "$branch" &&
   warn=$'\n\nAviso: há edição de código pendente na main; não se trabalha na main (use phase-start.sh).'
 fi
 [ -z "$phases" ] || phases="Fases abertas:"$'\n'"$phases"$'\n'
+cur=""
+[ -z "$issue" ] || cur="$(step_of "$issue")"
+[ -z "$cur" ] || [ "$state" != trabalhando ] || state="$state — $cur"
 printf '%s**Estado:** %s\n\n**Você precisa:** %s\n\n**Próximo passo:** %s%s\n' "$phases" "$state" "$need" "$next" "$warn" 2>/dev/null || true

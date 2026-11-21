@@ -11,8 +11,7 @@
 #
 # Use: progress_start <script> [issue]; progress_step <step> [done total]; the end is
 # recorded by progress_end <rc> (call it from the EXIT trap of the script).
-# A file of a phase that ended goes away with its worktree cleanup or after 7 days
-# (progress_prune, run at every start).
+# A file untouched for 7 days goes away (progress_prune, run at every start).
 
 PROGRESS_SCRIPT="" PROGRESS_ISSUE="" PROGRESS_REPO="" PROGRESS_T0=0 PROGRESS_FILE="" PROGRESS_ON=0
 
@@ -21,11 +20,6 @@ progress_dir() { printf '%s\n' "${AI_METHOD_CACHE:-$HOME/.cache/ai-method}/progr
 # Removes the files untouched for more than 7 days.
 progress_prune() {
   find "$(progress_dir)" -name '*.jsonl' -type f -mtime +7 -exec rm -f {} + 2>/dev/null || true
-}
-
-# Removes the file of one phase (the cleanup of the phase calls it).
-progress_remove() { # progress_remove <repo> <issue>
-  rm -f "$(progress_dir)/$1-$2.jsonl" 2>/dev/null || true
 }
 
 progress_emit() { # progress_emit <state> <step> <done> <total>
