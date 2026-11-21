@@ -29,7 +29,6 @@ Código, comentários, identificadores, nomes de arquivos, labels, workflows/job
 - Critério de sucesso verificável antes de codar.
 - Verificar antes de declarar feito: saída 0 não prova "criado", "vinculado", "autorizado" nem "acabou"; leia o fato de volta (`process-design` §2.1); falhou, Estado `trabalhando` ou `esperando você`.
 - Bug começa com um teste que falha no código antigo.
-- Nunca supor em silêncio: registre no PR ou pergunte.
 - Sem refatoração de carona nem over-engineering; preserve comentários.
 - Um commit por etapa. Achados: `scripts/open-issue.sh --type finding` com `size:*`.
 
@@ -37,7 +36,7 @@ Código, comentários, identificadores, nomes de arquivos, labels, workflows/job
 
 - Sempre: ação destrutiva ou irreversível, gasto, dependência nova, arquitetura ou schema, segredos, cobrança, autenticação, migração, credenciais, infraestrutura de produção, lockfiles.
 - Nunca: passo rotineiro e reversível de spec aprovada, setup, labels, issue de achado, branch e PR.
-- Dúvida em passo reversível: siga e relate.
+- Dúvida em passo reversível: siga e liste em "Decisões tomadas sem perguntar" no PR; nunca suponha em silêncio.
 
 ## Git
 

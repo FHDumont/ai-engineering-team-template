@@ -215,4 +215,16 @@ assert_contains "$reviewer" "check-runs" "close-reviewer reads the Tests check o
 assert_contains "$reviewer" "só rode a suíte se o check \`Tests\` faltar ou falhar" "close-reviewer runs the suite only when the Tests check is missing or failed"
 assert_contains "$close" "revisor lê o check \`Tests\` do SHA" "close-phase says the reviewer reads the CI result"
 
+# Questions to the owner: only the sensitive list stops a phase; the rest goes to the PR.
+agents="$(cat "$REPO/AGENTS.md")"
+execute="$(cat "$REPO/.claude/skills/execute/SKILL.md")"
+plan="$(cat "$REPO/.claude/skills/plan/SKILL.md")"
+design="$(cat "$REPO/docs/process-design.md")"
+for t in "$agents" "$execute" "$design"; do
+  assert_contains "$t" "Decisões tomadas sem perguntar" "a reversible doubt is listed in the PR section"
+done
+assert_contains "$plan" "num quadro só" "plan grilling puts every question in one card"
+assert_not_contains "$plan" "quadro por decisão" "plan grilling has no card per decision"
+assert_not_contains "$agents" "relate." "AGENTS no longer reports a doubt only in the status"
+
 finish
