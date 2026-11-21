@@ -14,6 +14,7 @@ Repositório criado a partir do template do método (`docs/process-design.md`). 
 - **Runner:** hospedado pelo GitHub (`ubuntu-latest`); a variável `CI_RUNS_ON` não está definida.
 - **Bots (caminho B):** nenhum webhook configurado; `docs/BOTS.md` e `.github/bots.tsv` trazem só exemplos.
 - **Projects:** sem quadro.
+- **Progresso:** `validate.sh`, `phase-start.sh` e `new-phase.sh` gravam o andamento em `~/.cache/ai-method/progress/` (formato na `process-design` §6.4); `scripts/progress.sh` mostra ao dono, `status.sh` cita o passo. O `close-phase.sh` ainda não grava (#39).
 
 ## Pendente
 
