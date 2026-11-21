@@ -6,11 +6,13 @@ source "$(dirname "$0")/lib.sh"
 
 repo="$(make_repo)"
 copy_scripts "$repo"
+# phase-start.sh checks the setup against the labels file of the repository.
+mkdir -p "$repo/.github" && cp "$REPO/.github/labels.tsv" "$repo/.github/labels.tsv"
 # The git hooks are active and the trace is the one the phase locks read: the
 # session that opens the phase (phase_opened) cannot commit in the worktree.
 cp -R "$REPO/.githooks" "$repo/.githooks"
 printf '.worktrees/\n.process/\n' >"$repo/.gitignore"
-git -C "$repo" add scripts .githooks .gitignore
+git -C "$repo" add scripts .githooks .gitignore .github
 git -C "$repo" commit --quiet -m "chore: scripts"
 git -C "$repo" config core.hooksPath .githooks
 export PROCESS_EVENTS_FILE="$repo/.process/events.jsonl"
@@ -27,6 +29,7 @@ case "$*" in
 esac
 H
 use_fake_gh "$TMP/handler.sh"
+fake_setup ok
 events() { cat "$PROCESS_EVENTS_FILE" 2>/dev/null || true; }
 spec() { # spec <file> <issue> [pair line]
   mkdir -p "$repo/docs/specs"

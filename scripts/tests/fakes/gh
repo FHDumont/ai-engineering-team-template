@@ -11,6 +11,31 @@ if [ -n "${FAKE_GH_FAIL:-}" ] && printf '%s' "$*" | grep -qE -- "$FAKE_GH_FAIL";
   echo "${FAKE_GH_FAIL_MSG:-gh: forced failure}" >&2
   exit "${FAKE_GH_FAIL_STATUS:-1}"
 fi
+# FAKE_SETUP (set by fake_setup of lib.sh) answers the four reads of
+# `setup-repo.sh --check` before the handler of the test: ok (configured),
+# nolabels, noprotection, offer (an unanswered offer) or freeplan (no branch protection).
+if [ -n "${FAKE_SETUP:-}" ]; then
+  case "$*" in
+    "label list --repo $GH_REPO --limit 500 --json name,color,description")
+      if [ "$FAKE_SETUP" = nolabels ]; then echo '[]'; else cat "$FAKE_SETUP_LABELS"; fi
+      exit 0 ;;
+    "api repos/$GH_REPO")
+      echo '{"private":true,"allow_auto_merge":true,"allow_merge_commit":false,"allow_squash_merge":false,"allow_rebase_merge":true,"delete_branch_on_merge":true}'
+      exit 0 ;;
+    "api repos/$GH_REPO/branches/main/protection")
+      case "$FAKE_SETUP" in
+        noprotection) echo '{"message":"Branch not protected"}'; exit 1 ;;
+        freeplan)
+          echo "gh: Upgrade to GitHub Pro or make this repository public to enable this feature. (HTTP 403)" >&2
+          exit 1 ;;
+      esac
+      echo '{"required_status_checks":{"strict":false,"checks":[{"context":"review/independent","app_id":null},{"context":"CI","app_id":15368}]},"enforce_admins":{"enabled":true},"required_pull_request_reviews":{"required_approving_review_count":0},"required_linear_history":{"enabled":true},"allow_force_pushes":{"enabled":false},"allow_deletions":{"enabled":false}}'
+      exit 0 ;;
+    "variable list --repo $GH_REPO --json name --jq .[].name")
+      [ "$FAKE_SETUP" = offer ] || printf 'PROCESS_OFFER_PROJECT\nPROCESS_OFFER_RUNNER\n'
+      exit 0 ;;
+  esac
+fi
 if [ -n "${FAKE_GH_HANDLER:-}" ] && [ -f "$FAKE_GH_HANDLER" ]; then
   # shellcheck disable=SC1090
   source "$FAKE_GH_HANDLER"

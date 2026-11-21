@@ -17,6 +17,9 @@
 #: the title of the session read back from the app, never a guessed one; with no
 #: way to read it, "a sessão que abriu a fase". --no-check skips check-env.sh;
 #: --dry-run only checks and lists.
+#: Before anything else it runs setup-repo.sh --check: on a repository that is not
+#: configured for the method it refuses with what is missing and the sentence to
+#: say ("configurar o repo"), creating nothing. No option skips this, not even --no-check.
 set -euo pipefail
 HERE="$(cd "$(dirname "$0")" && pwd)"
 # shellcheck source=scripts/lib/common.sh
@@ -34,6 +37,9 @@ while [ $# -gt 0 ]; do
 done
 [ ${#issues[@]} -ge 1 ] || { print_help "$0"; exit 2; }
 require_cmd git gh jq python3
+
+# Mandatory setup: nothing of the method opens on a repository that is not configured.
+"$HERE/setup-repo.sh" --check >/dev/null
 
 main_root="$(git worktree list --porcelain | sed -n '1s/^worktree //p')"
 cd "$main_root"

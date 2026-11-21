@@ -49,6 +49,13 @@ use_fake_gh() { # use_fake_gh <handler-file>
   : >"$FAKE_GH_LOG"
 }
 gh_calls() { cat "$FAKE_GH_LOG"; }
+# State of the repository setup the fake gh answers to `setup-repo.sh --check`:
+# ok (default), nolabels, noprotection, offer or freeplan. Call it after use_fake_gh.
+fake_setup() { # fake_setup [<state>]
+  export FAKE_SETUP="${1:-ok}" FAKE_SETUP_LABELS="$TMP/setup-labels.json"
+  [ -f "$FAKE_SETUP_LABELS" ] || bash -c 'source "$1/lib/common.sh"; label_rows "$2"' _ "$SCRIPTS" "$REPO/.github/labels.tsv" |
+    jq -R -s -c 'split("\n") | map(select(length > 0) | split("\t") | {name: .[0], color: .[1], description: .[2]})' >"$FAKE_SETUP_LABELS"
+}
 
 # Temporary git repository with one commit on main; prints the path.
 make_repo() {
