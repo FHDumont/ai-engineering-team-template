@@ -115,9 +115,23 @@ esac
 
 # Everything is checked before anything opens: issue open and spec (new-phase.sh --dry-run), then the pair.
 progress_step "checking the issues and the specs" 0 "${#issues[@]}"
+# The guards of every issue (gh and the board) run at the same time: the wait is the
+# slowest one, not the sum. open-parallel.sh does not repeat them (PHASE_START_CHECKED).
+guard_dir="$(mktemp -d)"
+guard_pids=()
+for n in "${issues[@]}"; do
+  "$HERE/new-phase.sh" "$n" --dry-run >/dev/null 2>"$guard_dir/$n.err" &
+  guard_pids+=($!)
+done
+guard_fail=0
+for i in "${!issues[@]}"; do
+  wait "${guard_pids[$i]}" || { guard_fail=1; cat "$guard_dir/${issues[$i]}.err" >&2; }
+done
+rm -rf "$guard_dir"
+[ "$guard_fail" = 0 ] || exit 1
+export PHASE_START_CHECKED=1
 pairs=()
 for n in "${issues[@]}"; do
-  "$HERE/new-phase.sh" "$n" --dry-run >/dev/null
   specs="$(specs_citing "$n" "$main_root")"
   # shellcheck disable=SC2086
   pair="$(spec_pairs "$n" $specs | head -1)" && [ -n "$pair" ] ||

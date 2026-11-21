@@ -51,9 +51,12 @@ if [ "$dry" = 0 ]; then
 fi
 
 # Every issue must pass the guards of new-phase.sh (open, with a spec) before any phase opens.
-for n in "${issues[@]}"; do
-  "$HERE/new-phase.sh" "$n" --dry-run >/dev/null
-done
+# phase-start.sh already ran them (PHASE_START_CHECKED=1).
+if [ "${PHASE_START_CHECKED:-}" != 1 ]; then
+  for n in "${issues[@]}"; do
+    "$HERE/new-phase.sh" "$n" --dry-run >/dev/null
+  done
+fi
 opened=()
 # Half a group never stays: undo the phases already opened.
 undo() {

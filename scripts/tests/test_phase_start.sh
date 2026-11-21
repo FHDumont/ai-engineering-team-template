@@ -267,5 +267,10 @@ rm "$repo/docs/specs/passing.md"
 source "$SCRIPTS/lib/common.sh"
 printf '# Spec (issues #1 e #2)\n\nIntro #9.\n\n## Fase #1 — a\n\nVer #3.\n\n## Notas\n\n#4\n' >"$TMP/cites.md"
 assert_eq "1 2 4 9" "$(spec_open_issues "$TMP/cites.md" "1 2 3 4 9 33" | paste -sd' ' -)" "title, intro, heading and a section without issue cite; the section of another phase does not"
+# The guards of a group run at the same time; the failure of one still refuses the whole group, saying why.
+spec guards.md 19
+assert_status 1 "a group with a closed issue is refused by the parallel guards" sh -c "cd '$repo' && scripts/phase-start.sh 19 9 --no-check"
+assert_contains "$(last_output)" "issue #9 is not open" "the guard of the closed issue says why"
+rm "$repo/docs/specs/guards.md"
 assert_status 2 "phase-start needs an issue number" sh -c "cd '$repo' && scripts/phase-start.sh"
 finish
