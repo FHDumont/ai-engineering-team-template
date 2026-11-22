@@ -43,7 +43,9 @@ assert_eq "" "$by_hand" "no test copies scripts/ without copy_scripts"
 assert_eq 600 "$(AI_METHOD_TEST_TIMEOUT_SECONDS=600 AI_METHOD_FAKE_LOAD1=3 slots_test_timeout)" "the limit is the parameter on a free machine"
 assert_eq 1800 "$(AI_METHOD_TEST_TIMEOUT_SECONDS=600 AI_METHOD_WARN_LOAD1=8 AI_METHOD_FAKE_LOAD1=20 slots_test_timeout)" "the limit triples with load1 20 over warn 8"
 assert_eq 7 "$(AI_METHOD_TEST_TIMEOUT_SECONDS=7 AI_METHOD_WARN_LOAD1=8 AI_METHOD_FAKE_LOAD1=8 slots_test_timeout)" "the limit does not grow at the warn load"
+# shellcheck disable=SC2016  # the script of bash -c expands in the child shell
 assert_status 142 "an alarm of the limit kills a slow command" env AI_METHOD_TEST_TIMEOUT_SECONDS=1 AI_METHOD_FAKE_LOAD1=1 bash -c 'source "$1/lib.sh"; test_limited sleep 5' _ "$TESTS_DIR"
+# shellcheck disable=SC2016
 assert_status 0 "the same slow command passes when the load stretches the limit" env AI_METHOD_TEST_TIMEOUT_SECONDS=1 AI_METHOD_WARN_LOAD1=1 AI_METHOD_FAKE_LOAD1=9 bash -c 'source "$1/lib.sh"; test_limited sleep 2' _ "$TESTS_DIR"
 # test_close_phase.sh never runs from here (issue #71): it runs once, in the normal suite.
 # A stub in its place stands for it, and the real validate.sh refuses under the mark, so
@@ -52,8 +54,9 @@ nested="$(make_repo)"
 mkdir -p "$nested/scripts/lib" "$nested/scripts/tests"
 cp "$SCRIPTS/validate.sh" "$nested/scripts/validate.sh"
 cp "$SCRIPTS/lib/common.sh" "$SCRIPTS/lib/slots.sh" "$SCRIPTS/lib/progress.sh" "$SCRIPTS/lib/procs.sh" "$SCRIPTS/lib/machine-limits.env.example" "$nested/scripts/lib/"
+# shellcheck disable=SC2016  # the stub expands in its own shell
 printf '#!/usr/bin/env bash\n"$(dirname "$0")/../validate.sh" --tests\n' >"$nested/scripts/tests/test_close_phase.sh"
-assert_status 1 "a test that reaches validate.sh from the suite fails at once" env -u PROCESS_VALIDATE_RUNNING "$nested/scripts/validate.sh" --tests
+assert_status 1 "a test that reaches validate.sh from the suite fails at once" test_limited env -u PROCESS_VALIDATE_RUNNING "$nested/scripts/validate.sh" --tests
 assert_contains "$(last_output)" "already running" "the nested validate.sh says why it refuses"
 
 # Missing product dependency: outside the CI the failure names the folder, the module
@@ -79,6 +82,7 @@ case "$(last_output)" in *"missing dependency"*) bad "the CI output has no depen
 # Tests run in parallel: AI_METHOD_TEST_JOBS at once, each one in its own folder, and the
 # report keeps the order. Two tests that wait for each other only pass when concurrent.
 par="$(make_repo)"
+LIMIT="$(slots_test_timeout)"   # the wait of the peer follows the parameter, not a fixed 5 s
 mkdir -p "$par/scripts/lib" "$par/scripts/tests"
 cp "$SCRIPTS/validate.sh" "$par/scripts/validate.sh"
 cp "$SCRIPTS/lib/common.sh" "$SCRIPTS/lib/slots.sh" "$SCRIPTS/lib/progress.sh" "$SCRIPTS/lib/procs.sh" "$SCRIPTS/lib/machine-limits.env.example" "$par/scripts/lib/"
@@ -86,7 +90,7 @@ for n in a b; do
   cat >"$par/scripts/tests/test_$n.sh" <<P
 #!/usr/bin/env bash
 touch "$TMP/started-$n"
-for i in \$(seq 1 50); do [ -e "$TMP/started-$([ $n = a ] && echo b || echo a)" ] && exit 0; sleep 0.1; done
+end=\$(( \$(date +%s) + $LIMIT )); while [ "\$(date +%s)" -lt "\$end" ]; do [ -e "$TMP/started-$([ $n = a ] && echo b || echo a)" ] && exit 0; sleep 0.1; done
 echo "no peer: test_$n ran alone"; exit 1
 P
 done
