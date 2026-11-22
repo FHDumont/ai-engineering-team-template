@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Tests of close-phase.sh --merge, part 2: conflicts, CI on HEAD, no deploy from the phase, sensitive paths.
+# Tests of close-phase.sh --merge: conflicts, CI on HEAD, no deploy from the phase, sensitive paths.
 # shellcheck source=scripts/tests/close_phase_common.sh
 source "$(dirname "$0")/close_phase_common.sh"
 
