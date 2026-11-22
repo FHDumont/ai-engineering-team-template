@@ -39,7 +39,20 @@ slots_load_limits() {
     [ "$AI_METHOD_TEST_JOBS" -ge 1 ] || AI_METHOD_TEST_JOBS=1
   fi
   export AI_METHOD_TEST_JOBS
+  : "${AI_METHOD_TEST_TIMEOUT_SECONDS:=600}"
   : "${AI_METHOD_LINT_BASE:=main}" "${AI_METHOD_IDLE_HOURS:=4}"
+}
+
+# Time limit of a test that waits or sets an alarm: AI_METHOD_TEST_TIMEOUT_SECONDS times
+# the load factor, so a loaded machine never fails a test by time (issue #71). The factor
+# is 1 up to AI_METHOD_WARN_LOAD1 and grows with the load above it (load1 / warn, rounded up).
+slots_test_timeout() {
+  local load free swap
+  read -r load free swap <<<"$(slots_load_numbers)"
+  awk -v base="$AI_METHOD_TEST_TIMEOUT_SECONDS" -v l="$load" -v w="$AI_METHOD_WARN_LOAD1" 'BEGIN {
+    f = 1
+    if (w + 0 > 0 && l + 0 > w + 0) { f = int(l / w); if (f < l / w) f++ }
+    print base * f }'
 }
 
 # Number of slots of a class.
