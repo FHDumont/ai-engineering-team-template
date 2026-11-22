@@ -71,8 +71,10 @@ assert_not_contains "$(last_output)" "jsonl" "validate.sh prints no progress pat
 vf="$dir/$vname-55.jsonl"
 assert_eq "start step step end" "$(jq -r .state "$vf" | paste -sd' ' -)" "validate.sh records start, two tests, end"
 assert_eq "validate.sh" "$(sed -n 1p "$vf" | jq -r .script)" "validate.sh names itself"
-assert_eq "tests test_a.sh 1 2" "$(sed -n 2p "$vf" | jq -r '"\(.step) \(.done) \(.total)"')" "first test with its count"
-assert_eq "tests test_b.sh 2 2" "$(sed -n 3p "$vf" | jq -r '"\(.step) \(.done) \(.total)"')" "second test with its count"
+# The two tests run in parallel: which one finishes first is not fixed, the counts are.
+assert_eq "1 2" "$(sed -n 2,3p "$vf" | jq -r '"\(.done)"' | paste -sd' ' -)" "the tests count 1 then 2"
+assert_eq "tests test_a.sh tests test_b.sh" "$(sed -n 2,3p "$vf" | jq -r '.step' | sort | tr '\n' ' ' | sed 's/ $//')" "both tests are reported"
+assert_eq "2 2" "$(sed -n 2,3p "$vf" | jq -r '"\(.total)"' | paste -sd' ' -)" "each step carries the total"
 printf '#!/usr/bin/env bash\nexit 1\n' >"$vrepo/scripts/tests/test_b.sh"
 assert_status 1 "validate.sh --tests fails with a failing test" env -u PROCESS_VALIDATE_RUNNING "$vrepo/scripts/validate.sh" --tests
 assert_eq "fail" "$(jq -r .state "$vf" | tail -1)" "a failed validate.sh ends with state fail"

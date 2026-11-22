@@ -11,7 +11,7 @@ source "$SCRIPTS/lib/procs.sh"
 export AI_METHOD_ORPHAN_ROOT="$TMP"
 PIDF="$TMP/pids"
 : >"$PIDF"
-trap 'xargs kill -KILL <"$PIDF" 2>/dev/null || true; rm -rf "$TMP"' EXIT
+trap 'xargs kill -KILL <"$PIDF" 2>/dev/null || true; test_sweep; rm -rf "$TMP"' EXIT
 alive() { case "$(ps -o stat= -p "$1" 2>/dev/null)" in ""|Z*) echo dead ;; *) echo alive ;; esac; }
 # A detached process (parent 1) with its cwd in <dir>; its pid goes to $PIDF.
 orphan() { # orphan <dir> [command...]

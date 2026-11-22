@@ -12,6 +12,9 @@ git -C "$repo" add .gitignore scripts docs
 git -C "$repo" commit --quiet -m "chore: scripts and spec"
 export PROCESS_EVENTS_FILE="$repo/.process/events.jsonl"
 events() { cat "$PROCESS_EVENTS_FILE" 2>/dev/null || true; }
+# The fake claude of every start is stopped at the end, also when an assertion fails
+# (the pid is in the trace); then the sweep of lib.sh catches what is left.
+trap 'for p in $(events | jq -r "select(.event == \"phase_headless\") | .pid"); do kill "$p" 2>/dev/null || true; done; test_sweep; rm -rf "$TMP"' EXIT
 
 # A fake claude that records its arguments and cwd, then stays alive a little.
 bin="$TMP/bin"; mkdir -p "$bin"
