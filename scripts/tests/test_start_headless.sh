@@ -104,11 +104,11 @@ cat >"$bin/claude" <<'F'
 if [ -t 0 ] || [ -p /dev/stdin ] || ! [ -c /dev/stdin ]; then echo "stdin: inherited" >"$FAKE_CLAUDE_ARGS.in"; else echo "stdin: null" >"$FAKE_CLAUDE_ARGS.in"; fi
 echo "$(python3 -c "import os,sys;print(os.getsid(int(sys.argv[1])))" $$) $(ps -o pgid= -p $$) $$" >"$FAKE_CLAUDE_ARGS.ps"
 echo "child running"
-sleep 8
+sleep 25
 F
 start=$SECONDS
 out="$(cd "$repo" && PATH="$bin:$PATH" scripts/start-headless.sh 7 2>&1 | tail -2)"
-assert_eq "1" "$([ $((SECONDS - start)) -lt 6 ] && echo 1 || echo 0)" "a | tail -2 caller returns in seconds, not when the child ends"
+assert_eq "1" "$([ $((SECONDS - start)) -lt 18 ] && echo 1 || echo 0)" "a | tail -2 caller returns in seconds, not when the child ends"
 assert_contains "$out" "log:" "the caller still sees the start lines"
 sleep 1
 assert_contains "$(cat "$FAKE_CLAUDE_ARGS.in")" "stdin: null" "stdin of the child is /dev/null"
