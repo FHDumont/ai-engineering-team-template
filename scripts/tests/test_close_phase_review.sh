@@ -39,4 +39,18 @@ assert_contains "$calls" "api -X POST repos/owner/repo/statuses/$SHA -f state=su
 printf 'Co-Authored-By: Claude <noreply@anthropic.com>\n' >"$TMP/signed.md"
 assert_status 1 "refuses a signed review" sh -c "cd '$repo' && '$CLOSE' --publish-review '$TMP/signed.md' --verdict success"
 
+# No session id: the push of this branch at HEAD plus a clean pre_review of that SHA
+# is enough to publish and to merge. A set session id still needs the harness round.
+reset_phase_evidence
+push_ev "$SHA"
+jq -cn --arg sha "$SHA" --arg b feat/issue-5-x '{event: "pre_review", verdict: "clean", sha: $sha, branch: $b}' >>"$TRACE"
+handler "type:feature" success
+: >"$FAKE_GH_LOG"
+assert_status 0 "publishes without a session id when HEAD was pushed and pre-reviewed clean" \
+  env -u CLAUDE_CODE_SESSION_ID sh -c "cd '$repo' && '$CLOSE' --publish-review '$TMP/review.md' --verdict success --round 1"
+assert_contains "$(gh_calls)" "api -X POST repos/owner/repo/statuses/$SHA -f state=success -f context=review/independent" "sets review/independent without a session id"
+assert_status 0 "merges without a session id when HEAD was pushed and pre-reviewed clean" \
+  env -u CLAUDE_CODE_SESSION_ID sh -c "cd '$repo' && '$CLOSE' --merge"
+assert_contains "$(gh_calls)" "pr merge 12" "merges without a session id"
+
 finish
