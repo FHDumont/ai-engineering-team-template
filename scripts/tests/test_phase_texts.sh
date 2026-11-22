@@ -260,6 +260,7 @@ assert_contains "$execute" "Filha do app e headless" "execute reads notes in the
 assert_contains "$execute" "antes de cada etapa, da parada de lab-test e do \`close-phase.sh --merge\`" "execute reads them before each step, lab-test and --merge"
 assert_contains "$plan" "Segurar o merge é comentário" "plan holds a merge with a note on the issue"
 assert_contains "$close" "--owner-ok <sha>" "close-phase binds the owner ok to a SHA"
+assert_contains "$close" "sem resumo nem reescrita" "close-phase publishes the reviewer output whole"
 assert_contains "$close" "close-phase.sh --pre-review" "close-phase records the pre-review before --prepare"
 assert_contains "$close" "no máximo 2 vezes" "close-phase limits the pre-review fixes to 2"
 assert_contains "$reviewer" "Pré-revisão" "close-reviewer knows the pre-review mode"

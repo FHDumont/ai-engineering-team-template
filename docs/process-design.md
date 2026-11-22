@@ -312,7 +312,7 @@ Roda só na sessão filha; na sessão que abriu a fase, `--prepare`, `--publish-
    | 8 | `mergeable` segue `UNKNOWN` após 5 leituras | olha o PR no GitHub e diz no status |
 
 3. **PR em conflito com a `main` (regra-base 4).** O `--check` chama o `scripts/redo-phase.sh` sem esperar CI e sem pergunta ao dono: branch nova a partir da `main`, cherry-pick dos commits da fase, PR novo com `Closes #n`, PR antigo fechado, branch remota antiga apagada, linha do registro paralelo regravada; cada passo lido de volta, sem push forçado. Conflito só em arquivo gerado é resolvido pelo script. Conflito real para o cherry-pick e sai 4: a filha resolve os arquivos listados, faz `git add` pelo nome, `git cherry-pick --continue` e roda `scripts/redo-phase.sh` de novo. PR só atrasado, sem conflito, não é refeito.
-4. **Revisão independente** (§10.2) e **`--publish-review <arquivo> --verdict success|failure`**: publica o status `review/independent` no SHA do HEAD e o parecer como comentário. Recusa parecer sem rodada do `close-reviewer` desta sessão posterior ao último push (lê `phase_push` e `SubagentStart` no trace).
+4. **Revisão independente** (§10.2) e **`--publish-review <arquivo> --verdict success|failure`**: publica o status `review/independent` no SHA do HEAD e o parecer como comentário. O arquivo tem de ser a saída gravada do `close-reviewer` (`.process/reviewer-<sha>.md`); texto reescrito ou `--verdict` diferente de `.process/reviewer-<sha>.verdict` é recusado. Recusa parecer sem rodada do `close-reviewer` desta sessão posterior ao último push (lê `phase_push` e `SubagentStart` no trace).
 5. **`--merge --wait`**. Recusa se um destes itens falhar:
    - a regra da sessão filha (§4.3);
    - o `--check` (com PR refeito sai 6: o PR novo ainda não tem CI nem revisão);
@@ -624,7 +624,7 @@ O que o modo não garante: o servidor não impede um merge feito à mão pelo Gi
 
 ### 10.2 Revisão independente
 
-O agente `close-reviewer`, aberto com o par do peso `reviewer` (§3), lê a issue, o diff e a saída dos testes, nunca o resumo do executor. A sessão filha salva o parecer num arquivo e o publica com `close-phase.sh --publish-review` (§6.1, passo 4). Todo push novo gera SHA sem o status: a revisão roda de novo. É salvaguarda de processo, não barreira de segurança (mesma conta).
+O agente `close-reviewer`, aberto com o par do peso `reviewer` (§3), lê a issue, o diff e a saída dos testes, nunca o resumo do executor. A sessão filha grava o parecer inteiro em `.process/reviewer-<sha>.md` e o publica com `close-phase.sh --publish-review` (§6.1, passo 4), que recusa reescrita. Todo push novo gera SHA sem o status: a revisão roda de novo. É salvaguarda de processo, não barreira de segurança (mesma conta).
 
 | Situação | Regra |
 |---|---|
