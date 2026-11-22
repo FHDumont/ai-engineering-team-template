@@ -3,6 +3,19 @@
 # shellcheck source=scripts/tests/lib.sh
 source "$(dirname "$0")/lib.sh"
 
+# A script that is not part of the method must not be executed (issue #92).
+sentinel="$SCRIPTS/zz-not-a-method-script.sh"
+marker="$TMP/sentinel-ran"
+rm -f "$sentinel" "$marker"
+cat >"$sentinel" <<EOF
+#!/bin/sh
+echo ran >"$marker"
+echo "usage: not a method script"
+exit 0
+EOF
+chmod +x "$sentinel"
+trap 'rm -f "$sentinel"; test_sweep; rm -rf "$TMP"' EXIT
+
 # Every script has --help, exits 0 and prints something.
 for s in "$SCRIPTS"/*.sh "$SCRIPTS"/*.py; do
   out="$("$s" --help 2>&1)" && rc=0 || rc=$?
@@ -12,6 +25,8 @@ for s in "$SCRIPTS"/*.sh "$SCRIPTS"/*.py; do
   assert_contains "$(printf '%s' "$out" | tr '[:upper:]' '[:lower:]')" "usage" "$(basename "$s") --help shows usage in English"
   assert_not_contains "$out" "Uso:" "$(basename "$s") --help has no Portuguese usage"
 done
+[ ! -f "$marker" ] && ok || bad "a sentinel script in scripts/ was executed"
+rm -f "$sentinel"
 
 repo="$(make_repo)"
 mkdir -p "$repo/docs/adr/archive"
