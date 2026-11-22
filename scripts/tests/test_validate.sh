@@ -86,18 +86,25 @@ LIMIT="$(slots_test_timeout)"   # the wait of the peer follows the parameter, no
 mkdir -p "$par/scripts/lib" "$par/scripts/tests"
 cp "$SCRIPTS/validate.sh" "$par/scripts/validate.sh"
 cp "$SCRIPTS/lib/common.sh" "$SCRIPTS/lib/slots.sh" "$SCRIPTS/lib/progress.sh" "$SCRIPTS/lib/procs.sh" "$SCRIPTS/lib/machine-limits.env.example" "$par/scripts/lib/"
-for n in a b; do
-  cat >"$par/scripts/tests/test_$n.sh" <<P
+# The peer wait is a parameter of the generated tests: long in parallel, short in series.
+gen_pair() {
+  for n in a b; do
+    cat >"$par/scripts/tests/test_$n.sh" <<P
 #!/usr/bin/env bash
 touch "$TMP/started-$n"
-end=\$(( \$(date +%s) + $LIMIT )); while [ "\$(date +%s)" -lt "\$end" ]; do [ -e "$TMP/started-$([ $n = a ] && echo b || echo a)" ] && exit 0; sleep 0.1; done
+end=\$(( \$(date +%s) + $1 )); while [ "\$(date +%s)" -lt "\$end" ]; do [ -e "$TMP/started-$([ $n = a ] && echo b || echo a)" ] && exit 0; sleep 0.1; done
 echo "no peer: test_$n ran alone"; exit 1
 P
-done
+  done
+}
+gen_pair "$LIMIT"
 assert_status 0 "two tests wait for each other: they run in parallel" env -u PROCESS_VALIDATE_RUNNING AI_METHOD_TEST_JOBS=2 "$par/scripts/validate.sh" --tests
 assert_contains "$(last_output)" "tests: 2 passed, 0 failed" "the parallel run counts every test"
 rm -f "$TMP"/started-*
+gen_pair 3   # series only proves the failure: a short explicit wait, not the parameter
+t0=$(date +%s)
 assert_status 1 "with one job the same tests run in series and fail" env -u PROCESS_VALIDATE_RUNNING AI_METHOD_TEST_JOBS=1 "$par/scripts/validate.sh" --tests
+[ $(( $(date +%s) - t0 )) -lt 30 ] && ok || bad "the series case does not wait for the parameter limit"
 assert_contains "$(last_output)" "FAIL scripts/tests/test_a.sh" "a failing test is reported by name"
 
 finish
