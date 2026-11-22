@@ -28,7 +28,9 @@
 #:   (requested x used table, scripts/trace-view.py --pairs): what the body file
 #:   has in that section is replaced.
 #: --publish-review: posts the independent review (file, in Portuguese) as a PR
-#:   comment and sets the review/independent status on the HEAD SHA. Refuses an
+#:   comment and sets the review/independent status on the HEAD SHA. The file must
+#:   be the saved close-reviewer output (.process/reviewer-<sha>.md) and --verdict
+#:   must match .process/reviewer-<sha>.verdict; a rewrite is refused. Refuses an
 #:   opinion without a reviewer round after the last push: the trace of the main
 #:   checkout must hold the phase_push of the branch (recorded by --prepare and
 #:   by redo-phase.sh) on the PR head SHA and, after it, a SubagentStart of the
@@ -412,11 +414,19 @@ publish_review() {
   [ -f "$review_file" ] || die "review file not found: $review_file"
   case "$verdict" in success|failure) ;; *) die "--verdict must be success or failure" 2 ;; esac
   "$HERE/check-attribution.sh" --text-file "$review_file" >/dev/null || die "review has AI attribution"
-  local n sha
+  local n sha events saved savedv got
   n="$(pr_number)"; [ -n "$n" ] || die "no open PR for $branch"
   sha="$(gh pr view "$n" --repo "$repo" --json headRefOid --jq .headRefOid)"
   [ "$sha" = "$(git rev-parse HEAD)" ] || die "local HEAD differs from PR head $sha: push or pull first"
   review_after_push "$sha"
+  events="$(phase_trace_file "$ROOT")" || die "cannot locate the trace: review refused"
+  saved="$(dirname "$events")/reviewer-$sha.md"
+  savedv="$(dirname "$events")/reviewer-$sha.verdict"
+  [ -f "$saved" ] || die "no saved reviewer output for ${sha:0:12}: write the close-reviewer output to $saved without rewriting it"
+  cmp -s "$saved" "$review_file" || die "review file differs from the saved close-reviewer output"
+  [ -f "$savedv" ] || die "no saved reviewer verdict for ${sha:0:12}"
+  got="$(tr -d '[:space:]' <"$savedv")"
+  [ "$got" = "$verdict" ] || die "review --verdict $verdict does not match the saved reviewer verdict $got"
   gh pr comment "$n" --repo "$repo" --body-file "$review_file" >/dev/null
   local desc="Revisão independente aprovada"
   [ "$verdict" = success ] || desc="Revisão independente pediu mudanças"
