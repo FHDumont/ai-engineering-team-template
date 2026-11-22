@@ -15,10 +15,12 @@
 #:   temporary folder of a test or a worktree that no longer exists gets the mark
 #:   "orphan" at the end of its line. The mark only informs: close-phase.sh
 #:   --cleanup does not stop an orphan outside the phase worktree.
-#: --close-idle: stops the headless sessions (never a child of the Claude.app,
-#:   never this process or its ancestors) idle for more than N hours (CPU under 1%)
-#:   with their MCPs. --under limits it to sessions whose directory is <dir> or
-#:   inside it. --dry-run lists what it would stop.
+#: --close-idle: stops the headless sessions of this checkout and its worktrees
+#:   (never a child of the Claude.app, never this process or its ancestors) whose
+#:   age is more than N hours (ps etime, not time since the last activity) and
+#:   whose CPU is under 1%, with their MCPs. --under only narrows that set; the
+#:   directory is canonicalized and a path outside this repository is refused
+#:   (exit 2) before any signal. --dry-run lists what it would stop.
 #: N: --older-than, else AI_METHOD_IDLE_HOURS of ~/.config/ai-method/machine-limits.env
 #:   (default 4).
 set -euo pipefail
@@ -85,16 +87,46 @@ case "$mode" in
         "$(rss_mb "$rss")" "$n (+$(rss_mb "$kr") MB)$mark"
     done ;;
   --close-idle)
+    # Default scope is this checkout and its worktrees. --under only narrows, and
+    # a path outside the repository is refused before the loop that signals.
+    git rev-parse --is-inside-work-tree >/dev/null 2>&1 || die "--close-idle runs inside a repository" 2
+    roots=""
+    while IFS= read -r line; do
+      case "$line" in
+        "worktree "*)
+          canon="$(cd "${line#worktree }" 2>/dev/null && pwd -P)" || continue
+          roots="${roots}${roots:+$'\n'}${canon}"
+          ;;
+      esac
+    done < <(git worktree list --porcelain)
+    [ -n "$roots" ] || die "cannot list the worktrees of this repository" 2
+    if [ -n "$under" ]; then
+      under="$(cd "$under" 2>/dev/null && pwd -P)" || die "--under is not a directory" 2
+      ok=0
+      while IFS= read -r r; do
+        [ -n "$r" ] || continue
+        case "$under" in "$r"|"$r"/*) ok=1 ;; esac
+      done <<<"$roots"
+      [ "$ok" = 1 ] || die "--under is outside this repository" 2
+    fi
     stopped=0
     prot="$(proc_chain "$$" | tr '\n' ' ')"
     while IFS=$'\t' read -r pid et cpu rss kind; do
       [ "$kind" = headless ] || continue
+      c="$(proc_cwd "$pid")"
+      [ -n "$c" ] || continue
+      c="$(cd "$c" 2>/dev/null && pwd -P)" || continue
+      ok=0
+      while IFS= read -r r; do
+        [ -n "$r" ] || continue
+        case "$c" in "$r"|"$r"/*) ok=1 ;; esac
+      done <<<"$roots"
+      [ "$ok" = 1 ] || continue
+      if [ -n "$under" ]; then
+        case "$c" in "$under"|"$under"/*) ;; *) continue ;; esac
+      fi
       # shellcheck disable=SC2086
       proc_stoppable "$pid" $prot || continue
-      if [ -n "$under" ]; then
-        c="$(proc_cwd "$pid")"
-        case "$c" in "${under%/}"|"${under%/}"/*) ;; *) continue ;; esac
-      fi
       awk -v s="$(etime_seconds "$et")" -v h="$hours" -v c="$cpu" 'BEGIN { exit !(s > h * 3600 && c < 1) }' || continue
       all="$pid $(proc_descendants "$pid" | tr '\n' ' ')"
       echo "idle headless session $pid ($et, $(rss_mb "$rss") MB): $(proc_cmd "$pid" | cut -c1-80)"
