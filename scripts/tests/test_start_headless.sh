@@ -106,11 +106,12 @@ echo "$(python3 -c "import os,sys;print(os.getsid(int(sys.argv[1])))" $$) $(ps -
 echo "child running"
 # Lives until the test releases it (capped at 2 minutes): no timing decides the assertion below.
 for _ in $(seq 600); do [ -e "$FAKE_CLAUDE_ARGS.release" ] && break; sleep 0.2; done
+touch "$FAKE_CLAUDE_ARGS.ended"
 F
-rm -f "$FAKE_CLAUDE_ARGS.release"
+rm -f "$FAKE_CLAUDE_ARGS.release" "$FAKE_CLAUDE_ARGS.ended"
 out="$(cd "$repo" && PATH="$bin:$PATH" scripts/start-headless.sh 7 2>&1 | tail -2)"
-# The pipe closed while the child still waits for the release: the caller did not wait for it, however loaded the machine is.
-assert_eq "0" "$([ -e "$FAKE_CLAUDE_ARGS.release" ] && echo 1 || echo 0)" "a | tail -2 caller returns while the child is still running, not when it ends"
+# The pipe closed before the child ended (it only ends on the release, or after 2 minutes): the caller did not wait for it, however loaded the machine is.
+assert_eq "0" "$([ -e "$FAKE_CLAUDE_ARGS.ended" ] && echo 1 || echo 0)" "a | tail -2 caller returns while the child is still running, not when it ends"
 assert_contains "$out" "log:" "the caller still sees the start lines"
 # The fake writes its report after the caller returned: wait for it (not a fixed delay).
 for _ in $(seq 150); do [ -s "$FAKE_CLAUDE_ARGS.ps" ] && break; sleep 0.2; done
