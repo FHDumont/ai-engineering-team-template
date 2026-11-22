@@ -7,7 +7,9 @@
 #: must already be open (phase-start.sh). It reads the pair "modelo/esforço" of the
 #: spec in the worktree of the phase (the spec may exist only on its branch), then starts in the background, inside .worktrees/issue-<n>:
 #:   claude -p <execute prompt> --session-id <uuid> --model <m> --effort <e>
-#: with the log in .worktrees/issue-<n>/.process/headless.log (outside git) and
+#: with stdin from /dev/null, stdout and stderr only in the log
+#: .worktrees/issue-<n>/.process/headless.log (outside git), in a session of its own
+#: (it holds no pipe of the caller and does not die with the caller's process group), and
 #: records phase_headless in the trace (pid, child_session, log, model, effort).
 #: The child runs check-env.sh like an app session and records phase_session itself.
 #: It has no choice board: a question for the owner goes as a comment on the issue
@@ -78,8 +80,20 @@ if [ "$dry" = 1 ]; then
 fi
 
 mkdir -p "$wt/.process"
-(cd "$wt" && CLAUDE_CODE_PRINT_BG_WAIT_CEILING_MS=0 nohup "${cmd[@]}" </dev/null >"$log" 2>&1 &
-  echo $! >"$wt/.process/headless.pid")
+# The child gets its own session (setsid via python3: macOS has no setsid(1)), stdin from
+# /dev/null and stdout/stderr only in the log: it holds no pipe of the caller (a "| tail -2"
+# returns at once) and does not die with the process group of the caller.
+rm -f "$wt/.process/headless.pid"
+# The redirections sit on the whole group, not on the command: the subshell that waits for the
+# child would otherwise keep the pipe of the caller open; "exec" leaves no waiter behind.
+(cd "$wt" && CLAUDE_CODE_PRINT_BG_WAIT_CEILING_MS=0 exec nohup python3 -c '
+import os, sys
+os.setsid()
+with open(sys.argv[1], "w") as pidfile:
+    pidfile.write("%d\n" % os.getpid())
+os.execvp(sys.argv[2], sys.argv[2:])
+' "$wt/.process/headless.pid" "${cmd[@]}") </dev/null >"$log" 2>&1 3>&- 4>&- 5>&- 6>&- 7>&- 8>&- 9>&- &
+for _ in 1 2 3 4 5 6 7 8 9 10; do [ -s "$wt/.process/headless.pid" ] && break; sleep 0.2; done
 pid="$(cat "$wt/.process/headless.pid")"
 sleep 1
 if ! kill -0 "$pid" 2>/dev/null; then
