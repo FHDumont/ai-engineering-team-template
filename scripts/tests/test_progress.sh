@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Tests of the progress of the long scripts: lib/progress.sh (format, append only, prune)
-# and the calls of validate.sh. phase-start.sh and new-phase.sh are in test_phase_start.sh.
+# and the calls of validate.sh. phase-start.sh and new-phase.sh are in test_phase_start_*.sh.
 # shellcheck source=scripts/tests/lib.sh
 source "$(dirname "$0")/lib.sh"
 
