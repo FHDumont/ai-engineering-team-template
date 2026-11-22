@@ -17,6 +17,8 @@ cat >"$repo/scripts/tests/test_probe.sh" <<P
 #!/usr/bin/env bash
 echo run >>"$RUNS"
 sleep "\${PROBE_SLEEP:-0}"
+# PROBE_HOLD: a file the probe waits for (up to 60 s), so a test releases it by an event, not by time.
+[ -z "\${PROBE_HOLD:-}" ] || { i=0; while [ ! -e "\$PROBE_HOLD" ] && [ "\$i" -lt 600 ]; do sleep 0.1; i=\$((i + 1)); done; }
 P
 V="$repo/scripts/validate.sh"
 slot_info() { # slot_info <class> <n> <pid> <worktree> [issue]
@@ -78,12 +80,19 @@ assert_contains "$(cat "$AI_METHOD_CACHE/history.tsv")" "$(printf 'fase\tother-r
 # One run per worktree: the second call waits for the first and prints its result.
 : >"$RUNS"
 rm -rf "$SLOTS/fase"; mkdir -p "$SLOTS/fase"
-( PROBE_SLEEP=4 validate env AI_METHOD_SLOTS_VALIDATE=2 "$V" --tests >"$TMP/first.out" 2>&1; echo $? >"$TMP/first.rc" ) &
-sleep 1.5
-assert_status 0 "a second validate.sh in the same worktree waits and returns the result" validate env AI_METHOD_SLOTS_VALIDATE=2 "$V" --tests
+rm -f "$TMP/hold"
+( PROBE_HOLD="$TMP/hold" validate env AI_METHOD_SLOTS_VALIDATE=2 "$V" --tests >"$TMP/first.out" 2>&1; echo $? >"$TMP/first.rc" ) &
+# The first run is inside its test (the probe wrote its line) before the second call starts.
+i=0; while [ ! -s "$RUNS" ] && [ "$i" -lt 600 ]; do sleep 0.1; i=$((i + 1)); done
+# The second call runs in the background; the first one is released only once it says it waits.
+( validate env AI_METHOD_SLOTS_VALIDATE=2 "$V" --tests >"$TMP/second.out" 2>&1; echo $? >"$TMP/second.rc" ) &
+i=0; while ! grep -q "already running" "$TMP/second.out" 2>/dev/null && [ "$i" -lt 600 ]; do sleep 0.1; i=$((i + 1)); done
+: >"$TMP/hold"
+wait
+assert_eq "0" "$(cat "$TMP/second.rc")" "a second validate.sh in the same worktree waits and returns the result"
+cp "$TMP/second.out" "$TMP/last.out"
 assert_contains "$(last_output)" "already running in this worktree" "the second call says it waits"
 assert_contains "$(last_output)" "tests: 1 passed, 0 failed" "the second call prints the result of the first"
-wait
 assert_eq "1" "$(wc -l <"$RUNS" | tr -d ' ')" "the suite ran once for the two calls"
 assert_eq "0" "$(cat "$TMP/first.rc")" "the first call finished"
 assert_eq "" "$(find "$AI_METHOD_CACHE/locks" -name '*.lock' -maxdepth 1)" "the lock is freed at the end"
