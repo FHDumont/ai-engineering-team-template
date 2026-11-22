@@ -158,6 +158,34 @@ if [ -f "$repo_notes" ]; then
   done
 fi
 
+# A hook cited in .claude/settings.json must exist: a missing path fails closed.
+if [ -f .claude/settings.json ]; then
+  python3 - "$ROOT" <<'PY' || problem ".claude/settings.json cites a hook that does not exist"
+import json, os, re, sys
+root = sys.argv[1]
+data = json.load(open(os.path.join(root, ".claude/settings.json"), encoding="utf-8"))
+fail = 0
+def walk(obj):
+    if isinstance(obj, dict):
+        for k, v in obj.items():
+            if k == "command" and isinstance(v, str):
+                yield v
+            else:
+                yield from walk(v)
+    elif isinstance(obj, list):
+        for item in obj:
+            yield from walk(item)
+for cmd in walk(data.get("hooks") or {}):
+    path = re.sub(r'^"?\$\{CLAUDE_PROJECT_DIR\}"?/?', "", cmd).strip().strip('"')
+    if not path or path.startswith("$"):
+        continue
+    if not os.path.isfile(os.path.join(root, path)):
+        print("missing hook cited in settings.json:", path)
+        fail = 1
+sys.exit(fail)
+PY
+fi
+
 # Issue templates are Markdown, not issue forms (design §8.2): only config.yml is YAML.
 for f in .github/ISSUE_TEMPLATE/*.yml .github/ISSUE_TEMPLATE/*.yaml; do
   [ -e "$f" ] || continue

@@ -131,6 +131,18 @@ assert_contains "$(last_output)" ".claude/skills/ask-bot/notes.md cites the repo
 d="$(fixture)"; mkdir -p "$d/.claude/skills/ask-bot"; echo "Pergunte ao AcmeBot." >"$d/.claude/skills/ask-bot/SKILL.md"
 assert_status 0 "with no docs/repo-notes.md there is no list to check" env REPO_ROOT="$d" "$CHECK"
 
+# A hook cited in settings.json that does not exist fails the check.
+d="$(fixture)"
+mkdir -p "$d/.claude/hooks"
+printf '%s\n' '{"hooks":{"PreToolUse":[{"hooks":[{"type":"command","command":"\"${CLAUDE_PROJECT_DIR}\"/.claude/hooks/gone.sh"}]}]}}' >"$d/.claude/settings.json"
+assert_status 1 "fails a settings.json that cites a missing hook" env REPO_ROOT="$d" "$CHECK"
+assert_contains "$(last_output)" "gone.sh" "names the missing hook cited in settings.json"
+d="$(fixture)"
+mkdir -p "$d/.claude/hooks"
+: >"$d/.claude/hooks/block-x.sh"
+printf '%s\n' '{"hooks":{"PreToolUse":[{"hooks":[{"type":"command","command":"\"${CLAUDE_PROJECT_DIR}\"/.claude/hooks/block-x.sh"}]}]}}' >"$d/.claude/settings.json"
+assert_status 0 "passes when every cited hook exists" env REPO_ROOT="$d" "$CHECK"
+
 # Issue templates are Markdown: a YAML issue form is refused; only config.yml may be YAML.
 d="$(fixture)"; mkdir -p "$d/.github/ISSUE_TEMPLATE"
 printf 'blank_issues_enabled: false\n' >"$d/.github/ISSUE_TEMPLATE/config.yml"; : >"$d/.github/ISSUE_TEMPLATE/bug.md"
