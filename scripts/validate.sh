@@ -86,7 +86,7 @@ lint_candidates() {
     local base
     base="$(git merge-base HEAD "$AI_METHOD_LINT_BASE" 2>/dev/null || true)"
     if [ -n "$base" ]; then
-      { git diff --name-only --diff-filter=ACMR "$base"; git ls-files -o --exclude-standard; } | sort -u
+      { git diff --name-only --no-renames -z --diff-filter=ACMR "$base" | tr '\0' '\n'; git ls-files -z -o --exclude-standard | tr '\0' '\n'; } | sort -u
       return
     fi
     echo "warn: no merge-base with $AI_METHOD_LINT_BASE: linting everything" >&2

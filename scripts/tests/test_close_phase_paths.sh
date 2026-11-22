@@ -89,6 +89,33 @@ handler "type:feature" success
 assert_status 5 "refuses merge touching sensitive paths" sh -c "cd '$repo' && '$CLOSE' --merge"
 assert_contains "$(last_output)" "src/auth/login.py" "names the sensitive path"
 
+git -C "$repo" switch --quiet main
+mkdir -p "$repo/db/migrations"
+echo sql >"$repo/db/migrations/001.sql"
+git -C "$repo" add db/migrations/001.sql
+git -C "$repo" commit --quiet -m "feat: migration on main"
+git -C "$repo" push --quiet origin main
+git -C "$repo" switch --quiet feat/issue-5-x
+git -C "$repo" merge --quiet --no-edit main
+mkdir -p "$repo/docs"
+git -C "$repo" mv db/migrations/001.sql docs/001.md
+git -C "$repo" commit --quiet -m "docs: move migration"
+git -C "$repo" push --quiet origin feat/issue-5-x
+SHA="$(git -C "$repo" rev-parse HEAD)"
+handler "type:feature" success
+assert_status 5 "refuses merge of a rename into docs/" sh -c "cd '$repo' && '$CLOSE' --merge"
+assert_contains "$(last_output)" "db/migrations/001.sql" "a rename still names the sensitive source"
+
+mkdir -p "$repo/infra/production"
+printf 'x\n' >"$repo/infra/production/configuração.yml"
+git -C "$repo" add "infra/production/configuração.yml"
+git -C "$repo" commit --quiet -m "feat: production config"
+git -C "$repo" push --quiet origin feat/issue-5-x
+SHA="$(git -C "$repo" rev-parse HEAD)"
+handler "type:feature" success
+assert_status 5 "refuses merge of an accented sensitive path" sh -c "cd '$repo' && '$CLOSE' --merge"
+assert_contains "$(last_output)" "infra/production/configuração.yml" "names the accented path"
+
 # The list is the union of the base's and the PR's: a PR that drops an entry
 # from .github/sensitive-paths (and the entry of the list itself) still needs the ok
 # for the path it took out; an entry the PR adds already counts for the new path.

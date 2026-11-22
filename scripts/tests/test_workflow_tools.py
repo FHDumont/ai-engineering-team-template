@@ -232,7 +232,8 @@ class CiStepsTests(unittest.TestCase):
         self.repo = os.path.join(self.tmp, "repo")
         os.makedirs(self.repo)
         git(self.repo, "init", "--quiet", "-b", "main")
-        for key, value in (("user.email", "t@example.org"), ("user.name", "t"), ("commit.gpgsign", "false")):
+        for key, value in (("user.email", "t@example.org"), ("user.name", "t"),
+                           ("commit.gpgsign", "false"), ("core.quotepath", "true")):
             git(self.repo, "config", key, value)
         # The base has the verifiers of this checkout.
         for rel in ("scripts/lib/sensitive_paths.py", ".github/sensitive-paths"):
@@ -376,6 +377,52 @@ esac
     def test_filter_issue_template_is_code(self):
         out = self.detect({".github/ISSUE_TEMPLATE/bug.md": "x\n"})
         self.assertEqual((out["code"], out["docs_only"]), ("true", "false"))
+
+    def test_rename_to_docs_still_runs_tests(self):
+        # A rename is delete+add: moving code into docs/ must not look docs-only.
+        os.makedirs(os.path.join(self.repo, "db", "migrations"), exist_ok=True)
+        open(os.path.join(self.repo, "db", "migrations", "001.sql"), "w").write("x\n")
+        git(self.repo, "add", "db/migrations/001.sql")
+        git(self.repo, "commit", "--quiet", "-m", "feat: migration")
+        self.base = git(self.repo, "rev-parse", "HEAD")
+        os.makedirs(os.path.join(self.repo, "docs"), exist_ok=True)
+        git(self.repo, "mv", "db/migrations/001.sql", "docs/001.md")
+        git(self.repo, "commit", "--quiet", "-m", "docs: move")
+        head = git(self.repo, "rev-parse", "HEAD")
+        r = self.run_step("changes", "Detect changed paths", head)
+        self.assertEqual(r.returncode, 0, r.stderr)
+        out = dict(l.split("=", 1) for l in open(os.path.join(self.tmp, "output")).read().split())
+        self.assertEqual((out["code"], out["run_tests"]), ("true", "true"))
+
+    def test_accented_path_is_code(self):
+        rel = "infra/production/configuração.yml"
+        out = self.detect({rel: "x\n"})
+        self.assertEqual((out["code"], out["run_tests"]), ("true", "true"))
+
+    def test_policy_sees_renamed_and_accented_sensitive_paths(self):
+        os.makedirs(os.path.join(self.repo, "db", "migrations"), exist_ok=True)
+        open(os.path.join(self.repo, "db", "migrations", "001.sql"), "w").write("x\n")
+        git(self.repo, "add", "db/migrations/001.sql")
+        git(self.repo, "commit", "--quiet", "-m", "feat: migration")
+        self.base = git(self.repo, "rev-parse", "HEAD")
+        os.makedirs(os.path.join(self.repo, "docs"), exist_ok=True)
+        git(self.repo, "mv", "db/migrations/001.sql", "docs/001.md")
+        git(self.repo, "commit", "--quiet", "-m", "docs: move")
+        head = git(self.repo, "rev-parse", "HEAD")
+        self.base_checkout()
+        env, log = self.fake_gh()
+        r = self.run_step("policy", "Label sensitive paths with needs-owner-ok", head, env)
+        self.assertEqual(r.returncode, 0, r.stderr)
+        self.assertIn("db/migrations/001.sql", r.stdout)
+
+        self.setUp()
+        rel = "infra/production/configuração.yml"
+        head = self.commit({rel: "x\n"})
+        self.base_checkout()
+        env, log = self.fake_gh()
+        r = self.run_step("policy", "Label sensitive paths with needs-owner-ok", head, env)
+        self.assertEqual(r.returncode, 0, r.stderr)
+        self.assertIn(rel, r.stdout)
 
     def test_filter_page(self):
         self.assertEqual(self.detect({"app/README.md": "x\n"})["app"], "true")

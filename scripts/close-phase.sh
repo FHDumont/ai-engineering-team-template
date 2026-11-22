@@ -545,7 +545,7 @@ merge() {
   git show "origin/$base:.github/sensitive-paths" >"$globs" 2>/dev/null ||
     { rm -f "$globs"; die "cannot read .github/sensitive-paths of origin/$base: merge blocked"; }
   [ ! -f "$ROOT/.github/sensitive-paths" ] || { echo; cat "$ROOT/.github/sensitive-paths"; } >>"$globs"
-  touched="$(git diff --name-only "origin/$base...$sha" 2>/dev/null | python3 "$HERE/lib/sensitive_paths.py" "$globs" || true)"
+  touched="$(git diff --name-only --no-renames -z "origin/$base...$sha" 2>/dev/null | python3 "$HERE/lib/sensitive_paths.py" "$globs" || true)"
   rm -f "$globs"
   [ -z "$touched" ] || reasons="$reasons sensitive-paths($(echo "$touched" | paste -sd, -))"
   if [ -n "$reasons" ]; then

@@ -86,7 +86,13 @@ def main(argv):
     if len(argv) != 2 or argv[1] in ("-h", "--help"):
         print(__doc__.strip())
         return 0 if len(argv) == 2 else 2
-    paths = [l.strip() for l in sys.stdin if l.strip()]
+    raw = sys.stdin.buffer.read()
+    chunks = raw.split(b"\0") if b"\0" in raw else raw.splitlines()
+    paths = []
+    for chunk in chunks:
+        line = chunk.decode("utf-8", "surrogateescape").strip()
+        if line:
+            paths.append(line)
     root = os.getcwd()
     for p in sensitive(paths, load_globs(argv[1]), root=root):
         print(p)
