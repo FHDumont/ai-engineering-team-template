@@ -219,6 +219,15 @@ orphan_sweep() {
   return "$found"
 }
 
+# Identity of the worktree this run would validate: HEAD plus the dirty and
+# untracked files. A waiter inherits a result only when this is unchanged.
+tree_key() {
+  {
+    git -C "$ROOT" rev-parse HEAD 2>/dev/null || echo none
+    git -C "$ROOT" status --porcelain=v1 --untracked-files=all
+  } | cksum | awk '{print $1}'
+}
+
 slots_load_limits
 home="$(slots_home)"
 lockbase="$home/locks"
@@ -228,8 +237,10 @@ resultf="$lockbase/$key.result"
 mkdir -p "$lockbase"
 
 # One run per worktree. The holder writes its result before it frees the lock; a
-# second call waits for the holder and prints that result, if it ran the same options.
+# second call waits for the holder and prints that result, if it ran the same options
+# on the same tree.
 wait_start="$(now_epoch)"
+wait_tree="$(tree_key)"
 announced=0
 while ! mkdir "$lockdir" 2>/dev/null; do
   holder="$(cat "$lockdir/pid" 2>/dev/null || true)"
@@ -246,21 +257,28 @@ while ! mkdir "$lockdir" 2>/dev/null; do
   fi
   sleep "$AI_METHOD_POLL_SECONDS"
   if [ ! -d "$lockdir" ] && [ -f "$resultf" ]; then
-    IFS="$(printf '\t')" read -r r_ts r_rc r_args <"$resultf" || true
-    if [ "${r_ts:-0}" -ge "$wait_start" ] && [ "${r_args:-}" = "$args" ]; then
+    IFS="$(printf '\t')" read -r r_ts r_rc r_args r_tree <"$resultf" || true
+    now_tree="$(tree_key)"
+    if [ "${r_ts:-0}" -ge "$wait_start" ] && [ "${r_args:-}" = "$args" ] &&
+       [ "${r_tree:-}" = "$wait_tree" ] && [ "$now_tree" = "$wait_tree" ] &&
+       [ "${r_tree:-}" != stale ]; then
       sed 1d "$resultf"
       exit "${r_rc:-1}"
     fi
   fi
 done
 echo $$ >"$lockdir/pid"
+run_tree="$(tree_key)"
+printf '%s\n' "$run_tree" >"$lockdir/tree"
 RDIR="$(cd "$(mktemp -d "${TMPDIR:-/tmp}/validate-tests.XXXXXX")" && pwd -P)"
 log="$(mktemp "${TMPDIR:-/tmp}/validate.XXXXXX")"
 started=0
 finish_run() {
-  local rc=$?
+  local rc=$? cache_tree="${run_tree:-stale}" now_tree
+  now_tree="$(tree_key)"
+  [ "$now_tree" = "$cache_tree" ] || cache_tree=stale
   if [ "$started" = 1 ]; then
-    { printf '%s\t%s\t%s\n' "$(now_epoch)" "$rc" "$args"; cat "$log"; } >"$resultf.tmp" 2>/dev/null && mv "$resultf.tmp" "$resultf"
+    { printf '%s\t%s\t%s\t%s\n' "$(now_epoch)" "$rc" "$args" "$cache_tree"; cat "$log"; } >"$resultf.tmp" 2>/dev/null && mv "$resultf.tmp" "$resultf"
   fi
   # Interrupted or failed run: the tests still running and what they left go too.
   # shellcheck disable=SC2046
