@@ -9,6 +9,8 @@ source "$(dirname "$0")/lib.sh"
 source "$SCRIPTS/lib/procs.sh"
 
 export AI_METHOD_ORPHAN_ROOT="$TMP"
+# This test checks the sweep of lib.sh by cwd itself, so it keeps it on (validate.sh turns it off).
+unset AI_METHOD_SWEEP_AT_END
 PIDF="$TMP/pids"
 : >"$PIDF"
 trap 'xargs kill -KILL <"$PIDF" 2>/dev/null || true; test_sweep; rm -rf "$TMP"' EXIT

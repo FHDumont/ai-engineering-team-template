@@ -11,13 +11,17 @@ TMP="$(cd "$(mktemp -d "${TMPDIR:-/tmp}/tmp.XXXXXXXX")" && pwd -P)"
 # No test leaves a process alive (issue #66): whatever the test started in the
 # background, or left with its folder as the cwd or in its command line, is stopped at
 # the end, also when an assertion failed or the test got INT/TERM. A test that sets its
-# own trap calls test_sweep in it.
+# own trap calls test_sweep in it. Under validate.sh (AI_METHOD_SWEEP_AT_END=1) the
+# search by cwd (lsof, the dearest step, paid by every test) is left to the sweep that
+# validate.sh runs once at the end over the folder of the whole run: what a test leaves
+# there is still stopped, listed, and fails the run.
 # shellcheck source=scripts/lib/procs.sh
 source "$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/lib/procs.sh"
 test_sweep() {
   local p own="" left
+  left="$( { proc_descendants "$$"; [ -n "${AI_METHOD_SWEEP_AT_END:-}" ] || procs_in_dir "$TMP"; pgrep -f "$TMP" 2>/dev/null || true; } | sort -un)"
+  [ -n "$left" ] || return 0
   own="$(proc_chain "$$" | tr '\n' ' ')"
-  left="$( { proc_descendants "$$"; procs_in_dir "$TMP"; pgrep -f "$TMP" 2>/dev/null || true; } | sort -un)"
   for p in $left; do
     case " $own " in *" $p "*) continue ;; esac
     proc_alive "$p" || continue

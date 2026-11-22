@@ -168,7 +168,7 @@ for f in sys.argv[1:]:
       case "$2" in *.py) python3 "$2" >"$1/$n.out" 2>&1 ;; *) bash "$2" >"$1/$n.out" 2>&1 ;; esac
       echo $? >"$1/$n.rc"; basename "$2" >>"$1/done.log"'
     # Each test gets its own TMPDIR inside the folder of the run: orphan_sweep finds what it leaves.
-    runner="mkdir -p \"\$1/tmp\"; export TMPDIR=\"\$1/tmp\"; $runner"
+    runner="mkdir -p \"\$1/tmp\"; export TMPDIR=\"\$1/tmp\" AI_METHOD_SWEEP_AT_END=1; $runner"
     printf '%s\0' "${list[@]}" | xargs -0 -n1 -P "$AI_METHOD_TEST_JOBS" bash -c "$runner" _ "$rdir" &
     pid=$!
     while :; do
