@@ -36,7 +36,7 @@ assert_contains "$(cat "$TMP/o")" "missing: answer to offer:project" "check name
 # A plan without branch protection: pending until the mode is recorded, then configured.
 fake_setup freeplan
 assert_status 7 "check exits 7 on a plan without branch protection and no recorded mode" "$SETUP" --check
-assert_contains "$(last_output)" "missing: protection of main" "plan: names the missing mode"
+assert_contains "$(last_output)" "missing: owner ok to enter unprotected" "plan: names the missing owner ok"
 assert_contains "$(last_output)" 'say "configurar o repo"' "plan: tells to run the setup"
 assert_eq "" "$(gh_calls | grep -E '\-X (PUT|PATCH)|variable set' || true)" "plan: check writes nothing"
 fake_setup unprotected

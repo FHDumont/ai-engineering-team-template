@@ -1,0 +1,3 @@
+# Extra required status checks, one GitHub context per line.
+# CI and review/independent are always required by the method.
+# This file is of the repository: a template update does not overwrite it.

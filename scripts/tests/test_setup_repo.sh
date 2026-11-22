@@ -76,16 +76,22 @@ assert_contains "$out" "(read back)" "protection is declared after reading back"
 
 # Protection: a plan without branch protection has its own message; a PUT that does not
 # show up on read-back is not declared done.
-# A plan without branch protection: the "unprotected" mode is recorded (never a PUT), exit 0.
+# An Upgrade to GitHub response does not record unprotected mode by itself.
 : >"$FAKE_GH_LOG"; rm -f "$TMP/mode"
 assert_status 0 "plan without protection: dry-run exits 0" env FAKE_PLAN=free "$SETUP" --only protection --dry-run
-assert_contains "$(last_output)" "would: record the unprotected branch mode" "plan: dry-run says it would record"
+assert_contains "$(last_output)" "would: enter unprotected branch mode" "plan: dry-run lists entering unprotected mode"
+assert_contains "$(last_output)" "missing: owner ok to enter unprotected" "plan: dry-run asks for owner ok"
+assert_contains "$(last_output)" "does not record unprotected mode by itself" "plan: Upgrade to GitHub is not a decision"
 assert_not_contains "$(gh_calls)" "variable set" "plan: dry-run writes nothing"
-assert_status 0 "plan without protection: exits 0" env FAKE_PLAN=free "$SETUP" --only protection
-assert_contains "$(last_output)" "done: record the unprotected branch mode" "plan: records the mode, read back"
-assert_contains "$(last_output)" "warning:" "plan: warns"
-assert_contains "$(gh_calls)" "variable set PROCESS_BRANCH_MODE --repo owner/repo --body unprotected" "plan: sets the variable"
+assert_status 7 "plan without protection: without owner ok does not record" env FAKE_PLAN=free "$SETUP" --only protection
+assert_contains "$(last_output)" "missing: owner ok to enter unprotected" "plan: apply without ok stays dirty"
+assert_not_contains "$(gh_calls)" "variable set" "plan: Upgrade to GitHub does not set PROCESS_BRANCH_MODE"
 assert_not_contains "$(gh_calls)" "-X PUT" "plan: never tries the write"
+: >"$FAKE_GH_LOG"; rm -f "$TMP/mode"
+assert_status 0 "plan without protection: owner ok records the mode" env FAKE_PLAN=free "$SETUP" --only protection --owner-ok
+assert_contains "$(last_output)" "done: enter unprotected branch mode" "plan: records the mode after owner ok"
+assert_contains "$(last_output)" "warning:" "plan: warns"
+assert_contains "$(gh_calls)" "variable set PROCESS_BRANCH_MODE --repo owner/repo --body unprotected" "plan: sets the variable with owner ok"
 : >"$FAKE_GH_LOG"
 assert_status 0 "plan without protection: second run exits 0" env FAKE_PLAN=free "$SETUP" --only protection
 assert_not_contains "$(gh_calls)" "variable set" "plan: second run is idempotent"
@@ -95,6 +101,73 @@ assert_status 1 "protection not confirmed on read back fails" env FAKE_PUT_LOST=
 assert_contains "$(last_output)" "not confirmed on read back" "unconfirmed protection: says so"
 assert_not_contains "$(last_output)" "done: protect" "unconfirmed protection is not declared done"
 rm -f "$TMP/protected"
+
+# Extra required checks live in .github/required-checks; dropping a check or
+# loosening strict lists each change and applies only with --owner-ok.
+cat >"$TMP/extra-prot.sh" <<'H'
+case "$*" in
+  "api repos/owner/repo/branches/main/protection")
+    if [ -f "$TMP/protected" ]; then
+      extra=""
+      [ -f "$TMP/keep-security" ] && extra='{"context":"Security","app_id":null},'
+      cat <<J
+{"required_status_checks":{"strict":$([ -f "$TMP/strict" ] && echo true || echo false),"checks":[$extra{"context":"review/independent","app_id":null},{"context":"CI","app_id":15368}]},
+ "enforce_admins":{"enabled":true},"required_pull_request_reviews":{"required_approving_review_count":0},
+ "required_linear_history":{"enabled":true},"allow_force_pushes":{"enabled":false},"allow_deletions":{"enabled":false}}
+J
+    else
+      echo '{"message":"Branch not protected"}'; exit 1
+    fi ;;
+  "api -X PUT"*) cat >"$FAKE_GH_LOG.body.$RANDOM"; touch "$TMP/protected"; rm -f "$TMP/strict" "$TMP/keep-security" ;;
+esac
+H
+export TMP
+use_fake_gh "$TMP/extra-prot.sh"
+touch "$TMP/protected" "$TMP/keep-security"
+: >"$FAKE_GH_LOG"
+assert_status 7 "dropping an extra required check needs owner ok" "$SETUP" --only protection
+assert_contains "$(last_output)" "missing: owner ok to drop required check Security" "lists the check it would drop"
+assert_not_contains "$(gh_calls)" "-X PUT" "does not drop the check without owner ok"
+: >"$FAKE_GH_LOG"
+assert_status 0 "owner ok may drop the extra check" "$SETUP" --only protection --owner-ok
+assert_contains "$(gh_calls)" "-X PUT" "applies protection after owner ok"
+printf 'Security\n' >"$REPO/.github/required-checks"
+touch "$TMP/protected" "$TMP/keep-security"
+: >"$FAKE_GH_LOG"
+use_fake_gh "$TMP/extra-prot.sh"
+out="$("$SETUP" --only protection --dry-run 2>&1)"
+assert_contains "$out" "no changes" "an extra check in the repo file is kept"
+assert_not_contains "$out" "drop required check Security" "the repo file check is not listed as a drop"
+printf '# Extra required status checks, one GitHub context per line.\n# CI and review/independent are always required by the method.\n# This file is of the repository: a template update does not overwrite it.\n' >"$REPO/.github/required-checks"
+touch "$TMP/protected" "$TMP/strict"
+rm -f "$TMP/keep-security"
+: >"$FAKE_GH_LOG"
+use_fake_gh "$TMP/extra-prot.sh"
+assert_status 7 "loosening strict needs owner ok" "$SETUP" --only protection
+assert_contains "$(last_output)" "missing: owner ok to loosen strict" "lists the strict it would loosen"
+assert_not_contains "$(gh_calls)" "-X PUT" "does not loosen strict without owner ok"
+
+# A label in use is listed and not renamed without owner ok.
+cat >"$TMP/inuse.sh" <<'H'
+case "$*" in
+  "label list"*) echo '[{"name":"bug","color":"d73a4a","description":"x"}]' ;;
+  "issue list"*--label\ bug*|*"--label bug"*) echo '[{"number":9}]' ;;
+  "issue list"*) echo '[]' ;;
+  "api repos/owner/repo") echo '{"allow_auto_merge":true,"allow_merge_commit":false,"allow_squash_merge":false,"allow_rebase_merge":true,"delete_branch_on_merge":true}' ;;
+  "api repos/owner/repo/branches/main/protection") cat <<'J'
+{"required_status_checks":{"strict":false,"checks":[{"context":"review/independent","app_id":null},{"context":"CI","app_id":15368}]},
+ "enforce_admins":{"enabled":true},"required_pull_request_reviews":{"required_approving_review_count":0},
+ "required_linear_history":{"enabled":true},"allow_force_pushes":{"enabled":false},"allow_deletions":{"enabled":false}}
+J
+  ;;
+esac
+H
+use_fake_gh "$TMP/inuse.sh"
+: >"$FAKE_GH_LOG"
+out="$("$SETUP" --only labels --dry-run 2>&1)"
+assert_contains "$out" "would: rename label bug -> type:bug (in use)" "lists a rename of a label in use"
+assert_contains "$out" "missing: owner ok to rename label bug -> type:bug (in use)" "asks for owner ok before renaming a label in use"
+assert_not_contains "$(gh_calls)" "label edit" "does not rename a label in use without owner ok"
 
 # Offers: pending until the "no"; the "no" is stored as a repository variable.
 cat >"$TMP/offers.sh" <<'H'

@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 #: setup-repo.sh: apply the method's standard to the GitHub repository (idempotent).
 #:
-#: Usage: setup-repo.sh [--dry-run | --check] [--only labels|settings|protection]
+#: Usage: setup-repo.sh [--dry-run | --check] [--owner-ok] [--only labels|settings|protection]
 #:
 #: 1. Labels: syncs with .github/labels.tsv (creates, updates color and
 #:    description, renames from old names with `gh label edit --name`) and
@@ -10,10 +10,12 @@
 #: 3. Protection of main (§10.1): requires the `CI` check (from GitHub Actions)
 #:    and the `review/independent` status, no "up to date" requirement;
 #:    0 approvals; linear history; enforced for admins; no force-push, no deletion.
-#:    It is read back after being applied. When the plan has no branch protection
-#:    (a private repository on a free account) it records the "unprotected" mode in
-#:    the repository variable PROCESS_BRANCH_MODE, warns and exits 0 (§10.5 of the
-#:    design); --check then accepts it and the gate is kept by scripts.
+#:    It is read back after being applied. Extra required checks live in
+#:    .github/required-checks (the update does not wipe that file). Dropping a
+#:    required check, loosening strict, renaming or deleting a label in use, and
+#:    entering unprotected mode are listed and applied only with --owner-ok;
+#:    without it --check stays dirty and none of that is applied. An "Upgrade to
+#:    GitHub" response does not record PROCESS_BRANCH_MODE by itself.
 #:
 #: Usage: setup-repo.sh --offers | [--dry-run] --project | --decline project|runner|runner-trigger
 #: Offers (asked once; the agent shows one choice board per offer):
@@ -43,13 +45,14 @@ HERE="$(cd "$(dirname "$0")" && pwd)"
 source "$HERE/lib/common.sh"
 ROOT="$(cd "$HERE/.." && pwd)"
 
-dry=0 only="" mode=""
+dry=0 only="" mode="" owner_ok=0 need_owner_pending=0
 decline=""
 while [ $# -gt 0 ]; do
   case "$1" in
     -h|--help) print_help "$0"; exit 0 ;;
     --dry-run) dry=1; shift ;;
     --check) mode=check; dry=1; shift ;;
+    --owner-ok) owner_ok=1; shift ;;
     --only) only="$2"; shift 2 ;;
     --offers) mode=offers; shift ;;
     --project) mode=project; shift ;;
@@ -167,6 +170,40 @@ apply() { # apply <description> <command...>
   fi
 }
 
+# Weakening that needs the owner's ok. Lists it, counts as a pending change,
+# and never applies without --owner-ok.
+need_owner() { # need_owner <description>
+  changes=$((changes + 1))
+  need_owner_pending=$((need_owner_pending + 1))
+  echo "would: $1"
+  echo "missing: owner ok to $1" >&2
+}
+
+extra_required_checks() {
+  local f="$ROOT/.github/required-checks" line
+  [ -f "$f" ] || return 0
+  while IFS= read -r line || [ -n "$line" ]; do
+    case "$line" in ''|'#'*) continue ;; esac
+    printf '%s\n' "$line"
+  done <"$f"
+}
+
+label_in_use() { # label_in_use <name>
+  local name="$1" n
+  n="$(gh issue list --repo "$repo" --state open --label "$name" --limit 1 --json number 2>/dev/null | jq -r 'length // 0' 2>/dev/null || echo 0)"
+  case "$n" in ''|0|null) ;; *) return 0 ;; esac
+  grep -R -F -- "$name" "$ROOT/.github/workflows" >/dev/null 2>&1
+}
+
+maybe_apply() { # maybe_apply <in-use 0|1> <description> <command...>
+  local inuse="$1" what="$2"; shift 2
+  if [ "$inuse" = 1 ] && [ "$owner_ok" = 0 ]; then
+    need_owner "$what"
+    return 0
+  fi
+  apply "$what" "$@"
+}
+
 # Default labels GitHub creates in every new repository.
 DEFAULT_LABELS="bug
 documentation
@@ -200,7 +237,12 @@ sync_labels() {
       done
     fi
     if [ -n "$old" ]; then
-      apply "rename label $old -> $name" gh label edit "$old" --repo "$repo" --name "$name" --color "$color" --description "$desc"
+      if label_in_use "$old"; then
+        maybe_apply 1 "rename label $old -> $name (in use)" \
+          gh label edit "$old" --repo "$repo" --name "$name" --color "$color" --description "$desc"
+      else
+        apply "rename label $old -> $name" gh label edit "$old" --repo "$repo" --name "$name" --color "$color" --description "$desc"
+      fi
       current="$(echo "$current" | jq -c --arg o "$old" 'map(select(.name != $o))')"
     else
       apply "create label $name" gh label create "$name" --repo "$repo" --color "$color" --description "$desc"
@@ -213,7 +255,12 @@ sync_labels() {
     [ -n "$name" ] || continue
     echo "$wanted" | grep -qxF "$name" && continue
     if echo "$current" | jq -e --arg n "$name" 'any(.[]; .name == $n)' >/dev/null; then
-      apply "delete default label $name" gh label delete "$name" --repo "$repo" --yes
+      if label_in_use "$name"; then
+        maybe_apply 1 "delete default label $name (in use)" \
+          gh label delete "$name" --repo "$repo" --yes
+      else
+        apply "delete default label $name" gh label delete "$name" --repo "$repo" --yes
+      fi
     fi
   done <<<"$DEFAULT_LABELS"
 }
@@ -254,8 +301,14 @@ unprotected_mode() { # unprotected_mode <gh output>
     echo "mode: unprotected ($repo has no branch protection on this plan; the gate is kept by scripts)" >&2
     return 0
   fi
+  # An "Upgrade to GitHub" response is not a decision: it does not record the mode.
+  local what="enter unprotected branch mode (PROCESS_BRANCH_MODE=unprotected)"
+  if [ "$owner_ok" = 0 ]; then
+    need_owner "$what"
+    echo "note: an Upgrade to GitHub response does not record unprotected mode by itself" >&2
+    return 0
+  fi
   changes=$((changes + 1))
-  local what="record the unprotected branch mode (PROCESS_BRANCH_MODE=unprotected)"
   if [ "$dry" = 1 ]; then echo "would: $what"; return 0; fi
   gh variable set PROCESS_BRANCH_MODE --repo "$repo" --body unprotected >/dev/null
   var_names_read=0
@@ -266,17 +319,21 @@ unprotected_mode() { # unprotected_mode <gh output>
 }
 
 sync_protection() {
-  local body want have raw
-  body='{
-    "required_status_checks": {"strict": false, "checks": [{"context": "CI", "app_id": 15368}, {"context": "review/independent"}]},
-    "enforce_admins": true,
-    "required_pull_request_reviews": {"required_approving_review_count": 0, "dismiss_stale_reviews": false, "require_code_owner_reviews": false},
-    "restrictions": null,
-    "required_linear_history": true,
-    "allow_force_pushes": false,
-    "allow_deletions": false
-  }'
-  want='{"strict":false,"checks":["CI@15368","review/independent@any"],"enforce_admins":true,"reviews":0,"linear":true,"force_pushes":false,"deletions":false}'
+  local body want have raw extra extras_json checks_json want_checks
+  extras_json="$(extra_required_checks | jq -R -s -c 'split("\n") | map(select(length > 0 and . != "CI" and . != "review/independent"))')"
+  [ -n "$extras_json" ] || extras_json='[]'
+  checks_json="$(jq -nc --argjson extra "$extras_json" '[{"context":"CI","app_id":15368},{"context":"review/independent"}] + [ $extra[] | {context: .} ]')"
+  want_checks="$(echo "$checks_json" | jq -c '[.[] | .context + "@" + ((.app_id // "any") | tostring)] | sort')"
+  body="$(jq -nc --argjson checks "$checks_json" '{
+    required_status_checks: {strict: false, checks: $checks},
+    enforce_admins: true,
+    required_pull_request_reviews: {required_approving_review_count: 0, dismiss_stale_reviews: false, require_code_owner_reviews: false},
+    restrictions: null,
+    required_linear_history: true,
+    allow_force_pushes: false,
+    allow_deletions: false
+  }')"
+  want="$(jq -nc --argjson checks "$want_checks" '{strict:false, checks:$checks, enforce_admins:true, reviews:0, linear:true, force_pushes:false, deletions:false}')"
   # With no protection the API answers 404: compares with "none".
   if raw="$(gh api "repos/$repo/branches/$branch/protection" 2>&1)"; then
     have="$(echo "$raw" | jq -S -c "$NORMALIZE")"
@@ -287,6 +344,23 @@ sync_protection() {
   want="$(echo "$want" | jq -S -c .)"
   [ "$have" != "$want" ] || return 0
   echo "protection: have $have"
+  local blocked=0 ctx have_strict have_ctx want_ctx
+  if [ "$have" != none ] && [ "$owner_ok" = 0 ]; then
+    have_strict="$(echo "$have" | jq -r .strict)"
+    if [ "$have_strict" = true ]; then
+      need_owner "loosen strict on $branch"
+      blocked=1
+    fi
+    have_ctx="$(echo "$have" | jq -r '.checks[]? | split("@")[0]')"
+    want_ctx="$(echo "$want_checks" | jq -r '.[] | split("@")[0]')"
+    while IFS= read -r ctx; do
+      [ -n "$ctx" ] || continue
+      printf '%s\n' "$want_ctx" | grep -qxF "$ctx" && continue
+      need_owner "drop required check $ctx"
+      blocked=1
+    done <<<"$have_ctx"
+    [ "$blocked" = 0 ] || return 0
+  fi
   local what="protect $branch (CI + review/independent, 0 approvals, linear, admins included)"
   changes=$((changes + 1))
   if [ "$dry" = 1 ]; then echo "would: $what"; return 0; fi
@@ -346,6 +420,11 @@ case "$only" in
   ""|protection) sync_protection ;;
 esac
 
+if [ "$need_owner_pending" -gt 0 ] && [ "$dry" = 0 ]; then
+  echo "error: $repo has $need_owner_pending change(s) that need the owner's ok; nothing of that was applied" >&2
+  echo "fix: say \"configurar o repo\" to the agent (setup skill, which runs scripts/setup-repo.sh --owner-ok after the choice board)" >&2
+  exit 7
+fi
 if [ "$changes" = 0 ]; then
   echo "ok: $repo already matches the method (no changes)"
 elif [ "$dry" = 1 ]; then

@@ -57,7 +57,7 @@ assert_eq "" "$problems" "every path and command cited by the chapters exists"
 # The folders listed in "O que entra" are all there.
 for p in AGENTS.md CLAUDE.md CONTEXT.md .claude/agents .claude/commands .claude/hooks .claude/skills \
   .claude/settings.json .cursor/rules .githooks .github/ISSUE_TEMPLATE .github/workflows/ci.yml \
-  docs/process-design.md docs/adr docs/diagrams scripts/lib scripts/tests; do
+  .github/required-checks docs/process-design.md docs/adr docs/diagrams scripts/lib scripts/tests; do
   [ -e "$REPO/$p" ] && ok || bad "template path missing: $p"
 done
 
