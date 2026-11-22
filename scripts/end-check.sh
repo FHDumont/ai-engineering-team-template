@@ -99,7 +99,7 @@ else
       fail "local main is not at origin/main"
     left="$(printf '%s\n' "$remote" | while read -r b; do
       if [ -z "$b" ] || is_main_branch "$b"; then continue; fi
-      printf '%s\n' "$open_prs" | grep -q "^$b$TAB" || echo "$b"
+      printf '%s\n' "$open_prs" | stdin_grep -q "^$b$TAB" || echo "$b"
     done | list)"
     [ -z "$left" ] || fail "remote branch with no open PR ($left)"
     open="$(gh issue list --repo "$repo" --state open --limit 1000 --json number --jq '.[].number')" ||
@@ -125,7 +125,7 @@ note=""
 [ "$offline" = 0 ] || note=" (offline: GitHub not read)"
 # The unprotected mode (no branch protection on the plan) is not an error: the gate is
 # kept by scripts, so it is only named here.
-if [ "$offline" = 0 ] && gh variable list --repo "$repo" --json name --jq '.[].name' 2>/dev/null | grep -qxF PROCESS_BRANCH_MODE; then
+if [ "$offline" = 0 ] && gh variable list --repo "$repo" --json name --jq '.[].name' 2>/dev/null | stdin_grep -qxF PROCESS_BRANCH_MODE; then
   note="$note (mode: unprotected, the gate is kept by scripts)"
 fi
 echo "ok: end-check${issue:+ of phase #$issue}: nothing left$note"

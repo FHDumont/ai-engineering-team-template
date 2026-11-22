@@ -73,7 +73,7 @@ var_exists() { # var_exists <name>
     var_names="$(gh variable list --repo "$repo" --json name --jq '.[].name' 2>/dev/null || true)"
     var_names_read=1
   fi
-  printf '%s\n' "$var_names" | grep -qxF "$1"
+  printf '%s\n' "$var_names" | stdin_grep -qxF "$1"
 }
 repo_info=""
 read_repo_info() {
@@ -110,10 +110,10 @@ case "$mode" in
         exit 0
       fi
       echo "ok: board #$num already exists (reused)"
-      project_linked_numbers "$repo" | grep -qxF "$num" || echo "would: link board #$num to $repo"
+      project_linked_numbers "$repo" | stdin_grep -qxF "$num" || echo "would: link board #$num to $repo"
       existing="$(project_list_views "$owner" "$num")"
       while IFS='|' read -r name _; do
-        printf '%s\n' "$existing" | cut -f1 | grep -qxF "$name" || echo "would: create view: $name"
+        printf '%s\n' "$existing" | cut -f1 | stdin_grep -qxF "$name" || echo "would: create view: $name"
       done < <(project_default_views)
       exit 0
     fi
@@ -253,7 +253,7 @@ sync_labels() {
   wanted="$(label_rows "$ROOT/.github/labels.tsv" | cut -f1)"
   while IFS= read -r name; do
     [ -n "$name" ] || continue
-    echo "$wanted" | grep -qxF "$name" && continue
+    echo "$wanted" | stdin_grep -qxF "$name" && continue
     if echo "$current" | jq -e --arg n "$name" 'any(.[]; .name == $n)' >/dev/null; then
       if label_in_use "$name"; then
         maybe_apply 1 "delete default label $name (in use)" \
@@ -296,7 +296,7 @@ NORMALIZE='{
 # PROCESS_BRANCH_MODE. Returns 0 when it handled the case (the caller leaves the
 # protection alone), 1 when the output is not that answer.
 unprotected_mode() { # unprotected_mode <gh output>
-  printf '%s' "$1" | grep -qiE 'Upgrade to GitHub|make this repository public' || return 1
+  printf '%s' "$1" | stdin_grep -qiE 'Upgrade to GitHub|make this repository public' || return 1
   if var_exists PROCESS_BRANCH_MODE; then
     echo "mode: unprotected ($repo has no branch protection on this plan; the gate is kept by scripts)" >&2
     return 0
@@ -355,7 +355,7 @@ sync_protection() {
     want_ctx="$(echo "$want_checks" | jq -r '.[] | split("@")[0]')"
     while IFS= read -r ctx; do
       [ -n "$ctx" ] || continue
-      printf '%s\n' "$want_ctx" | grep -qxF "$ctx" && continue
+      printf '%s\n' "$want_ctx" | stdin_grep -qxF "$ctx" && continue
       need_owner "drop required check $ctx"
       blocked=1
     done <<<"$have_ctx"

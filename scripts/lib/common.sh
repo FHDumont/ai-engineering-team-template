@@ -3,6 +3,15 @@
 #   source "$(dirname "$0")/lib/common.sh"
 # Compatible with bash 3.2 (macOS) and bash 5 (CI).
 
+# Consume all of stdin while testing a match. Under pipefail, `cmd | grep -q`
+# closes the pipe on the first hit (SIGPIPE / 141), so a match looks like a miss.
+stdin_grep() {
+  local r=0
+  grep "$@" >/dev/null || r=$?
+  cat >/dev/null || true
+  return "$r"
+}
+
 # Root of the repository (of the current worktree).
 repo_root() {
   git rev-parse --show-toplevel 2>/dev/null
@@ -53,7 +62,7 @@ valid_ask_id() {
   case "$1" in
     *[!0-9-]*|-*|*-|*-*-*|"") return 1 ;;
   esac
-  printf '%s' "$1" | grep -qE '^[0-9]{14}-[0-9]+$'
+  printf '%s' "$1" | stdin_grep -qE '^[0-9]{14}-[0-9]+$'
 }
 
 # Issue number from the branch name (e.g. feat/issue-12-login -> 12).

@@ -68,7 +68,7 @@ if [ -f "$index" ]; then
     count="$(grep -cE "^\| *\[?$num\b" "$index" || true)"
     [ "$count" = 1 ] || problem "$index must have exactly one line for $num (has $count)"
     case "$f" in
-      docs/adr/archive/*) grep -E "^\| *\[?$num\b" "$index" | grep -qi 'substitu' || problem "$num is archived but not marked substituída in $index" ;;
+      docs/adr/archive/*) grep -E "^\| *\[?$num\b" "$index" | stdin_grep -qi 'substitu' || problem "$num is archived but not marked substituída in $index" ;;
     esac
   done
   while read -r num; do
@@ -102,11 +102,11 @@ same_files() {
   local p
   while read -r p; do
     [ -n "$p" ] || continue
-    echo "$3" | grep -qxF "$p" || problem "$design: the $1 table cites $p, which does not exist"
+    echo "$3" | stdin_grep -qxF "$p" || problem "$design: the $1 table cites $p, which does not exist"
   done <<<"$2"
   while read -r p; do
     [ -n "$p" ] || continue
-    echo "$2" | grep -qxF "$p" || problem "$design: the $1 table omits $p"
+    echo "$2" | stdin_grep -qxF "$p" || problem "$design: the $1 table omits $p"
   done <<<"$3"
 }
 if [ -f "$design" ]; then
@@ -117,7 +117,7 @@ if [ -f "$design" ]; then
     [ -n "$row" ] || continue
     num="$(echo "$row" | sed -E 's/^\| *([0-9]+)\..*/\1/')"
     [ "$(echo "$row" | awk -F '|' '{ print NF }')" = 6 ] || problem "$design: base rule $num must have 4 columns"
-    echo "$row" | awk -F '|' '{ print $4 }' | grep -q '[0-9]' || problem "$design: base rule $num has no exit code"
+    echo "$row" | awk -F '|' '{ print $4 }' | stdin_grep -q '[0-9]' || problem "$design: base rule $num has no exit code"
     locks="$(echo "$row" | awk -F '|' '{ print $3 }' | grep -oE '`[^`]+`' | tr -d '`' | awk '{ print $1 }' || true)"
     [ -n "$locks" ] || problem "$design: base rule $num names no script or hook"
     while read -r p; do

@@ -160,7 +160,7 @@ fi
 echo "deleted remote branch $old"
 
 registry="$main_root/.worktrees/parallel-active.tsv"
-if [ -f "$registry" ] && cut -f1 "$registry" | grep -qxF "$issue"; then
+if [ -f "$registry" ] && cut -f1 "$registry" | stdin_grep -qxF "$issue"; then
   awk -F '\t' -v OFS='\t' -v n="$issue" -v b="$new" '$1 == n { $2 = b } { print }' "$registry" >"$registry.redo"
   mv "$registry.redo" "$registry"
   [ "$(awk -F '\t' -v n="$issue" '$1 == n { print $2 }' "$registry")" = "$new" ] || die "registry line of #$issue not read back with $new"

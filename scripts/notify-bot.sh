@@ -35,7 +35,7 @@ while [ $# -gt 0 ]; do
   esac
 done
 
-bot_slugs | grep -qxF -- "$bot" || die "unknown bot: $bot (see .github/bots.tsv)"
+bot_slugs | stdin_grep -qxF -- "$bot" || die "unknown bot: $bot (see .github/bots.tsv)"
 ref="$(awk -F'\t' -v b="$bot" '$1 == b {print $3}' "$(bots_file)")"
 repo="$(repo_slug)"
 marker="<!-- bot:$bot reply-to:$ask_id -->"
@@ -74,7 +74,7 @@ done
 
 # The label is what the routine of the bot sweeps: it only counts when read back.
 gh issue edit "$issue" --repo "$repo" --add-label "ask:$bot" >/dev/null 2>&1 || true
-if gh issue view "$issue" --repo "$repo" --json labels --jq '.labels[].name' 2>/dev/null | grep -qxF "ask:$bot"; then
+if gh issue view "$issue" --repo "$repo" --json labels --jq '.labels[].name' 2>/dev/null | stdin_grep -qxF "ask:$bot"; then
   echo "failed to notify $bot after 3 attempts; labeled ask:$bot on #$issue (read back)"
   exit 4
 fi

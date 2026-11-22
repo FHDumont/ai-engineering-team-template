@@ -29,6 +29,8 @@ deny() {
 }
 
 here="$(cd "$(dirname "$0")" && pwd)"
+# shellcheck source=scripts/lib/common.sh
+source "$here/../../scripts/lib/common.sh"
 input="$(cat)"
 cmd="$(printf '%s' "$input" | jq -r '.tool_input.command // empty')" || deny "invalid hook input"
 sid="$(printf '%s' "$input" | jq -r '.session_id // empty')"
@@ -39,14 +41,12 @@ findings="$(printf '%s' "$input" | "$here/block-dangerous-git.sh" --git-writes)"
 
 forged="$(printf '%s\n' "$findings" | sed -n 's/^forge	//p' | head -1)"
 [ -z "$forged" ] || deny "never set or unset $forged in a command: the phase locks read it"
-if printf '%s' "$cmd" | grep -qE "(>|tee[^|;&]*[[:space:]])[[:space:]]*[\"']?[^[:space:];|&\"']*\.process/events\.jsonl[\"']?([[:space:];|&)]|\$)"; then
+if printf '%s' "$cmd" | stdin_grep -qE "(>|tee[^|;&]*[[:space:]])[[:space:]]*[\"']?[^[:space:];|&\"']*\.process/events\.jsonl[\"']?([[:space:];|&)]|\$)"; then
   deny "never write .process/events.jsonl by hand: only the hooks and scripts record the trace"
 fi
 
-# shellcheck source=scripts/lib/common.sh
-source "$here/../../scripts/lib/common.sh"
 unreadable=0
-printf '%s\n' "$findings" | grep -qx unreadable && unreadable=1
+printf '%s\n' "$findings" | stdin_grep -qx unreadable && unreadable=1
 while IFS= read -r dir; do
   [ -n "$dir" ] || continue
   phase="$(phase_of_path "$dir")"

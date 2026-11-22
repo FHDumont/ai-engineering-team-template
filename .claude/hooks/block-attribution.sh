@@ -9,6 +9,9 @@
 # the rule in the middle of a sentence passes.
 # Blocks with exit 2 and the reason on stderr.
 set -euo pipefail
+here="$(cd "$(dirname "$0")" && pwd)"
+# shellcheck source=scripts/lib/common.sh
+source "$here/../../scripts/lib/common.sh"
 
 input="$(cat)"
 cmd="$(printf '%s' "$input" | jq -r '.tool_input.command // empty')"
@@ -16,12 +19,11 @@ cwd="$(printf '%s' "$input" | jq -r '.cwd // empty')"
 [ -n "$cmd" ] || exit 0
 [ -n "$cwd" ] || cwd="$PWD"
 
-if ! printf '%s' "$cmd" | grep -qE '(^|[;&| ])(git( +-C +[^ ]+)? +commit|gh( +(-R|--repo)[ =]+[^ ]+)? +(pr +(create|edit|comment|review|close)|issue +(create|comment|edit|close)))( |$)'; then
+if ! printf '%s' "$cmd" | stdin_grep -qE '(^|[;&| ])(git( +-C +[^ ]+)? +commit|gh( +(-R|--repo)[ =]+[^ ]+)? +(pr +(create|edit|comment|review|close)|issue +(create|comment|edit|close)))( |$)'; then
   exit 0
 fi
 
 # The checker lives in the repository of the command (worktree), else next to the hook.
-here="$(cd "$(dirname "$0")" && pwd)"
 checker="$(git -C "$cwd" rev-parse --show-toplevel 2>/dev/null || true)/scripts/check-attribution.sh"
 [ -x "$checker" ] || checker="$here/../../scripts/check-attribution.sh"
 

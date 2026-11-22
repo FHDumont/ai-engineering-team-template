@@ -76,7 +76,7 @@ export PROCESS_VALIDATE_RUNNING=1
 # Files with a bash shebang among the candidates on stdin, including hooks without an extension.
 bash_files() {
   while read -r f; do
-    [ -f "$f" ] && head -1 "$f" | grep -qE '^#!.*\bbash' && echo "$f"; true
+    [ -f "$f" ] && head -1 "$f" | stdin_grep -qE '^#!.*\bbash' && echo "$f"; true
   done
 }
 

@@ -84,7 +84,7 @@ known="$(grep -v '^#' "$ROOT/.github/labels.tsv" | cut -f1)"
 for l in $labels; do
   case "$l" in
     group:*)
-      echo "$known" | grep -qxF "$l" && continue
+      echo "$known" | stdin_grep -qxF "$l" && continue
       gh label create "$l" --repo "$repo" --color d4c5f9 --description "Grupo de afinidade" >/dev/null 2>&1 || true ;;
   esac
 done
@@ -101,7 +101,7 @@ num="$(printf '%s\n' "$url" | sed -n -E 's#^https://.*/issues/([0-9]+)$#\1#p' | 
 have="$(gh issue view "$num" --repo "$repo" --json labels --jq '.labels[].name')" ||
   die "issue #$num not confirmed on read back (gh issue view failed)"
 for l in $labels; do
-  printf '%s\n' "$have" | grep -qxF "$l" || die "issue #$num was created without the label $l (read back); fix: scripts/label-issue.sh $num --add $l"
+  printf '%s\n' "$have" | stdin_grep -qxF "$l" || die "issue #$num was created without the label $l (read back); fix: scripts/label-issue.sh $num --add $l"
 done
 echo "$url"
 # shellcheck source=scripts/lib/project.sh

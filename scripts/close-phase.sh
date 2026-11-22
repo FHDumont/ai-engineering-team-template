@@ -531,9 +531,9 @@ merge() {
 
   # Never merges on its own: owner label, sensitive area or sensitive path.
   local reasons=""
-  echo "$labels" | grep -qxF needs-owner-ok && reasons="$reasons needs-owner-ok"
+  echo "$labels" | stdin_grep -qxF needs-owner-ok && reasons="$reasons needs-owner-ok"
   for a in $SENSITIVE_AREAS; do
-    echo "$labels" | grep -qxF "$a" && reasons="$reasons $a"
+    echo "$labels" | stdin_grep -qxF "$a" && reasons="$reasons $a"
   done
   local base touched globs
   base="$(echo "$info" | jq -r .baseRefName)"
@@ -553,7 +553,7 @@ merge() {
     # public record that the PR waited for the owner. A PR without it gets the label
     # now (read back by label-issue.sh) and this run is refused, with or without the flag.
     local labeled=1
-    if ! echo "$labels" | grep -qxF needs-owner-ok; then
+    if ! echo "$labels" | stdin_grep -qxF needs-owner-ok; then
       labeled=0
       "$HERE/label-issue.sh" "$n" --add needs-owner-ok >/dev/null ||
         die "PR #$n needs the owner's ok ($reasons ), but needs-owner-ok could not be put on it"
@@ -584,11 +584,11 @@ Ok do dono do repo registrado (quadro de escolha) para:$reasons." >/dev/null
   local required c
   if required="$(gh api "repos/$repo/branches/$base/protection" --jq '.required_status_checks | ([.checks[]?.context] + (.contexts // [])) | unique | .[]' 2>/dev/null)"; then
     for c in CI review/independent; do
-      printf '%s\n' "$required" | grep -qxF "$c" ||
+      printf '%s\n' "$required" | stdin_grep -qxF "$c" ||
         die "the protection of $base does not require $c: no merge without the gate; fix: scripts/setup-repo.sh --only protection"
     done
   else
-    gh variable list --repo "$repo" --json name --jq '.[].name' 2>/dev/null | grep -qxF PROCESS_BRANCH_MODE ||
+    gh variable list --repo "$repo" --json name --jq '.[].name' 2>/dev/null | stdin_grep -qxF PROCESS_BRANCH_MODE ||
       die "$base is not protected, or its protection cannot be read: no merge without the gate; fix: scripts/setup-repo.sh --only protection"
     unprotected_gate "$sha"
   fi

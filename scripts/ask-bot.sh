@@ -81,7 +81,7 @@ if [ "$1" = "--append" ]; then
   body="$(printf '%s\n\n%s\n\n<!-- ask-append:%s:%s -->' "$(author_header "$bot" "$id" "$qurl")" "$text" "$bot" "$id")"
   url="$(post_comment "$issue" "$body")"
   cid="${url##*#issuecomment-}"
-  gh api "repos/$repo/issues/comments/$cid" --jq .body 2>/dev/null | grep -qF "<!-- ask-append:$bot:$id -->" ||
+  gh api "repos/$repo/issues/comments/$cid" --jq .body 2>/dev/null | stdin_grep -qF "<!-- ask-append:$bot:$id -->" ||
     die "follow-up not confirmed on read back (comment $cid of #$issue has no marker); the bot was not notified"
   echo "appended to $bot question on #$issue (id $id): $url"
   trace_event bot_append "bot=$bot" "ask_id=$id" "issue=$issue" "comment=$url"
@@ -117,7 +117,7 @@ else
       *) die "unknown option: $1 (see --help)" 2 ;;
     esac
   done
-  bot_slugs | grep -qxF -- "$bot" || die "unknown bot: $bot (see .github/bots.tsv)"
+  bot_slugs | stdin_grep -qxF -- "$bot" || die "unknown bot: $bot (see .github/bots.tsv)"
   require_secret "$bot"
 
   id="$(date +%Y%m%d%H%M%S)-$$"
@@ -128,7 +128,7 @@ else
   # Exit 0 does not prove the comment exists: read it back by its id, with the marker.
   cid="$(printf '%s\n' "$url" | sed -n -E 's/.*#issuecomment-([0-9]+)$/\1/p')"
   [ -n "$cid" ] || die "question not posted on #$issue: gh issue comment returned no comment URL (the bot was not notified)"
-  gh api "repos/$repo/issues/comments/$cid" --jq .body 2>/dev/null | grep -qF "<!-- ask:$bot:$id -->" ||
+  gh api "repos/$repo/issues/comments/$cid" --jq .body 2>/dev/null | stdin_grep -qF "<!-- ask:$bot:$id -->" ||
     die "question not confirmed on read back (comment $cid of #$issue has no marker); the bot was not notified"
   echo "asked $bot on #$issue (id $id): $url"
   trace_event bot_ask "bot=$bot" "ask_id=$id" "issue=$issue" "comment=$url"

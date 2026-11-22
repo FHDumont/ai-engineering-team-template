@@ -101,7 +101,7 @@ PROJECT_NEUTRAL_FILTER="is:open"
 # scope already includes reading, and `gh auth status` does not list `read:project` next
 # to it; so `project` is enough. `read:project` alone is not enough to write.
 project_has_scopes() {
-  gh auth status 2>&1 | grep "Token scopes:" | grep -qF "'project'"
+  gh auth status 2>&1 | grep "Token scopes:" | stdin_grep -qF "'project'"
 }
 
 # `id<TAB>filter` of the view by name (empty when it does not exist or the read fails).
@@ -210,11 +210,11 @@ project_linked_numbers() { # project_linked_numbers <owner/repo>
 # Links the repo to the board if not yet linked and reads it back.
 project_ensure_link() { # project_ensure_link <owner/repo> <num>
   local repo="$1" num="$2"
-  if project_linked_numbers "$repo" | grep -qxF "$num"; then
+  if project_linked_numbers "$repo" | stdin_grep -qxF "$num"; then
     echo "ok: board #$num already linked to $repo"; return 0
   fi
   gh project link "$num" --owner "${repo%%/*}" --repo "$repo" >/dev/null 2>&1 || true
-  if project_linked_numbers "$repo" | grep -qxF "$num"; then
+  if project_linked_numbers "$repo" | stdin_grep -qxF "$num"; then
     echo "ok: board #$num linked to $repo (read back)"; return 0
   fi
   echo "error: board #$num is not linked to $repo (link not confirmed on read back)"
@@ -268,7 +268,7 @@ project_ensure_views() { # project_ensure_views <owner> <num>
   local name layout filter group vgroup group_ids vgroup_ids body want
   while IFS='|' read -r name layout filter group vgroup; do
     [ -n "$name" ] || continue
-    if printf '%s\n' "$existing" | cut -f1 | grep -qxF "$name"; then
+    if printf '%s\n' "$existing" | cut -f1 | stdin_grep -qxF "$name"; then
       echo "ok: view exists: $name"; continue
     fi
     if ! group_ids="$(project_field_ids "$fields" "$group")" || ! vgroup_ids="$(project_field_ids "$fields" "$vgroup")"; then
@@ -283,7 +283,7 @@ project_ensure_views() { # project_ensure_views <owner> <num>
     fi
     # Counts as created only if the read back returns the expected name and layout.
     want="$(printf '%s' "$layout" | tr '[:lower:]' '[:upper:]')_LAYOUT"
-    if project_list_views "$owner" "$num" | grep -qxF "$(printf '%s\t%s' "$name" "$want")"; then
+    if project_list_views "$owner" "$num" | stdin_grep -qxF "$(printf '%s\t%s' "$name" "$want")"; then
       echo "ok: view created: $name ($layout, read back)"
     else
       echo "pending: view '$name' not confirmed on read back; check it in the browser"

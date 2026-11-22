@@ -64,10 +64,10 @@ claude_rows() {
   local pid et cpu rss cmd kind
   ps -axo pid=,etime=,pcpu=,rss=,command= | while read -r pid et cpu rss cmd; do
     [ "$pid" != "$$" ] || continue
-    printf '%s\n' "$cmd" | grep -Eq '(^|[ /])claude( |$)' || continue
+    printf '%s\n' "$cmd" | stdin_grep -Eq '(^|[ /])claude( |$)' || continue
     case "$cmd" in *"mcp "*|*"--mcp"*) continue ;; esac
     if proc_in_app "$pid"; then kind=app
-    elif printf '%s\n' "$cmd" | grep -Eq ' (-p|--print)( |$)'; then kind=headless
+    elif printf '%s\n' "$cmd" | stdin_grep -Eq ' (-p|--print)( |$)'; then kind=headless
     else kind=cli; fi
     printf '%s\t%s\t%s\t%s\t%s\n' "$pid" "$et" "$cpu" "$rss" "$kind"
   done

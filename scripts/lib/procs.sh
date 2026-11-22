@@ -59,7 +59,7 @@ proc_in_app() { # proc_in_app <pid>
 
 # True when the command of the pid is a claude CLI.
 proc_is_claude() { # proc_is_claude <pid>
-  proc_cmd "$1" | grep -Eq '(^|[ /])claude( |$)'
+  proc_cmd "$1" | stdin_grep -Eq '(^|[ /])claude( |$)'
 }
 
 # Prints the descendants of the pid (not the pid), one per line.
@@ -195,7 +195,7 @@ procs_cleanup_worktree() { # procs_cleanup_worktree <worktree> <issue> [trace fi
     line="$(jq -rs --arg i "$issue" '[.[] | select(type == "object" and .event == "phase_headless" and (.issue | tostring) == $i)] | last // empty | "\(.pid)\t\(.child_session)"' "$trace" 2>/dev/null || true)"
     hp="${line%%$'\t'*}" hs="${line#*$'\t'}"
     # The session id in the command line guards against a reused pid.
-    if [ -n "$hp" ] && [ -n "$hs" ] && proc_alive "$hp" && proc_cmd "$hp" | grep -q -- "$hs"; then
+    if [ -n "$hp" ] && [ -n "$hs" ] && proc_alive "$hp" && proc_cmd "$hp" | stdin_grep -q -- "$hs"; then
       cand="$cand"$'\n'"$hp"
     fi
   fi
