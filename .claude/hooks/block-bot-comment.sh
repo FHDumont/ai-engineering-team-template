@@ -13,6 +13,9 @@
 # The text is the command, its arguments and the files named by --body-file/-F; a
 # heredoc stays in the command, so it is seen too.
 set -euo pipefail
+here="$(cd "$(dirname "$0")" && pwd)"
+# shellcheck source=scripts/lib/common.sh
+source "$here/../../scripts/lib/common.sh"
 
 input="$(cat)"
 cmd="$(printf '%s' "$input" | jq -r '.tool_input.command // empty')"
@@ -20,13 +23,12 @@ cwd="$(printf '%s' "$input" | jq -r '.cwd // empty')"
 [ -n "$cmd" ] || exit 0
 [ -n "$cwd" ] || cwd="$PWD"
 
-printf '%s' "$cmd" | grep -qE '(^|[;&| ])gh( +(-R|--repo)[ =]+[^ ]+)? +((issue|pr) +comment|(issue|pr) +close)( |$)' || exit 0
+printf '%s' "$cmd" | stdin_grep -qE '(^|[;&| ])gh( +(-R|--repo)[ =]+[^ ]+)? +((issue|pr) +comment|(issue|pr) +close)( |$)' || exit 0
 # close without --comment posts no comment.
-if printf '%s' "$cmd" | grep -qE 'gh( +(-R|--repo)[ =]+[^ ]+)? +(issue|pr) +close'; then
-  printf '%s' "$cmd" | grep -qE '(--comment|-c)([ =]|$)' || exit 0
+if printf '%s' "$cmd" | stdin_grep -qE 'gh( +(-R|--repo)[ =]+[^ ]+)? +(issue|pr) +close'; then
+  printf '%s' "$cmd" | stdin_grep -qE '(--comment|-c)([ =]|$)' || exit 0
 fi
 
-here="$(cd "$(dirname "$0")" && pwd)"
 text="$cmd
 $(printf '%s' "$cmd" | python3 -c 'import shlex, sys
 try:
@@ -59,14 +61,14 @@ if [ -f "$bots" ]; then
     case "$slug" in ''|'#'*) continue ;; esac
     for term in "$slug" "$name"; do
       [ -n "$term" ] || continue
-      if printf '%s' "$text" | grep -qiF -- "$term"; then
+      if printf '%s' "$text" | stdin_grep -qiF -- "$term"; then
         echo "blocked by block-bot-comment: the comment cites the bot \"$term\"; a request to a bot goes through scripts/ask-bot.sh <bot> <issue> \"text\" (--append for new information on an open question); a loose comment never notifies the bot" >&2
         exit 2
       fi
     done
   done <"$bots"
 fi
-if printf '%s' "$text" | grep -qF '<!-- ask:'; then
+if printf '%s' "$text" | stdin_grep -qF '<!-- ask:'; then
   echo "blocked by block-bot-comment: <!-- ask: markers come only from scripts/ask-bot.sh" >&2
   exit 2
 fi

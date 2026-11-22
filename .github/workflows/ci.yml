@@ -58,10 +58,11 @@ jobs:
           HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
           GH_TOKEN: ${{ github.token }}
         run: |
+          stdin_grep() { local r=0; grep "$@" >/dev/null || r=$?; cat >/dev/null || true; return $r; }
           # Files of the PR (since the merge-base), one per line.
           files="$(git diff --name-only "$BASE_SHA...$HEAD_SHA")"
           echo "$files"
-          has() { echo "$files" | grep -qE "$1" && echo true || echo false; }
+          has() { echo "$files" | stdin_grep -qE "$1" && echo true || echo false; }
           # By exclusion: a doc is a file in docs/ or a .md, except the issue
           # templates (read by the scripts). Everything else is code and runs
           # lint, whatever its folder. The tests job runs on every PR: tests
@@ -74,8 +75,8 @@ jobs:
           # (except AGENTS.md, CLAUDE.md, CHANGELOG.md and ROADMAP.md, which tests
           # read: the generated files carry issue titles, #54). Skills, hooks, scripts, workflows and app are never inert.
           needs_tests() { # needs_tests <files>: true when any file is not inert
-            if echo "$1" | grep -vE '^$' | grep -vE '^(docs/|[^/]+\.md$)' | grep -q .; then echo true
-            elif echo "$1" | grep -E '^(docs/process-design\.md|AGENTS\.md|CLAUDE\.md|CHANGELOG\.md|ROADMAP\.md)$' | grep -q .; then echo true
+            if echo "$1" | grep -vE '^$' | grep -vE '^(docs/|[^/]+\.md$)' | stdin_grep -q .; then echo true
+            elif echo "$1" | grep -E '^(docs/process-design\.md|AGENTS\.md|CLAUDE\.md|CHANGELOG\.md|ROADMAP\.md)$' | stdin_grep -q .; then echo true
             else echo false; fi
           }
           run_tests="$(needs_tests "$files")"

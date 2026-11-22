@@ -41,7 +41,7 @@ known="$(label_rows "$ROOT/.github/labels.tsv" | cut -f1)"
 if [ ${#add[@]} -gt 0 ]; then
   for l in "${add[@]}"; do
     case "$l" in group:*) continue ;; esac
-    echo "$known" | grep -qxF "$l" || die "unknown label: $l (add it to .github/labels.tsv)"
+    echo "$known" | stdin_grep -qxF "$l" || die "unknown label: $l (add it to .github/labels.tsv)"
   done
 fi
 
@@ -53,7 +53,7 @@ if [ ${#single[@]} -gt 0 ] && [ "$dry" = 0 ]; then
   current="$(gh issue view "$num" --repo "$repo" --json labels --jq '.labels[].name')"
   for prefix in "${single[@]}"; do
     for l in $(echo "$current" | grep "^$prefix:" || true); do
-      printf '%s\n' "${add[@]}" | grep -qxF "$l" || remove+=("$l")
+      printf '%s\n' "${add[@]}" | stdin_grep -qxF "$l" || remove+=("$l")
     done
   done
 fi
@@ -70,7 +70,7 @@ fi
 if [ ${#add[@]} -gt 0 ]; then
   for l in "${add[@]}"; do
     case "$l" in
-      group:*) echo "$known" | grep -qxF "$l" || gh label create "$l" --repo "$repo" --color d4c5f9 --description "Grupo de afinidade" >/dev/null 2>&1 || true ;;
+      group:*) echo "$known" | stdin_grep -qxF "$l" || gh label create "$l" --repo "$repo" --color d4c5f9 --description "Grupo de afinidade" >/dev/null 2>&1 || true ;;
     esac
   done
 fi
@@ -80,12 +80,12 @@ have="$(gh issue view "$num" --repo "$repo" --json labels --jq '.labels[].name')
   die "labels of #$num not confirmed on read back (gh issue view failed)"
 if [ ${#add[@]} -gt 0 ]; then
   for l in "${add[@]}"; do
-    printf '%s\n' "$have" | grep -qxF "$l" || die "label $l is not on #$num after the edit (read back)"
+    printf '%s\n' "$have" | stdin_grep -qxF "$l" || die "label $l is not on #$num after the edit (read back)"
   done
 fi
 if [ ${#remove[@]} -gt 0 ]; then
   for l in "${remove[@]}"; do
-    ! printf '%s\n' "$have" | grep -qxF "$l" || die "label $l is still on #$num after the edit (read back)"
+    ! printf '%s\n' "$have" | stdin_grep -qxF "$l" || die "label $l is still on #$num after the edit (read back)"
   done
 fi
 echo "labeled #$num: +${add[*]:-} -${remove[*]:-} (read back)"

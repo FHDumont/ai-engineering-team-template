@@ -65,6 +65,6 @@ open(path, "w", encoding="utf-8").write("\n".join(out) + "\n")
 PY
 # Read back: the file is in archive/, gone from docs/adr/, and the index says so.
 [ -f "docs/adr/archive/$name" ] && [ ! -e "$file" ] || die "ADR-$old was not moved to docs/adr/archive/$name"
-grep -F "(archive/$name)" docs/adr/INDEX.md | grep -qF "substituída por ADR-$by" ||
+grep -F "(archive/$name)" docs/adr/INDEX.md | stdin_grep -qF "substituída por ADR-$by" ||
   die "docs/adr/INDEX.md does not show ADR-$old as archived and replaced by ADR-$by (the file was moved; fix the index line by hand)"
 echo "archived ADR-$old (replaced by ADR-$by, read back)"

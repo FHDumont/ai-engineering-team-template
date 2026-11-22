@@ -169,7 +169,7 @@ spec_cites_bots() {
     text="$(awk -v n="$issue" '
       /^## Fase #[0-9]+/ { sec = ($0 ~ "^## Fase #" n "([^0-9]|$)"); seen = 1; next }
       !seen || sec { print }' "$spec")"
-    if printf '%s\n' "$text" | grep -q -E "ask-bot([^/]|$)|^#+ .*Bots|\*\*Bots|\`($slugs)\`"; then return 0; fi
+    if printf '%s\n' "$text" | stdin_grep -q -E "ask-bot([^/]|$)|^#+ .*Bots|\*\*Bots|\`($slugs)\`"; then return 0; fi
   done
   return 1
 }

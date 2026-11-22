@@ -34,11 +34,11 @@ source "$HERE/lib/runner_offer.sh"
 if [ "$runner_offer" = 1 ]; then
   repo="$(repo_slug)"
   vars="$(gh variable list --repo "$repo" --json name --jq '.[].name' 2>/dev/null || true)"
-  if echo "$vars" | grep -qxF PROCESS_OFFER_RUNNER_TRIGGER; then
+  if echo "$vars" | stdin_grep -qxF PROCESS_OFFER_RUNNER_TRIGGER; then
     echo "skip trigger offer already declined"; exit 0
   fi
   has_runs_on=0
-  echo "$vars" | grep -qxF CI_RUNS_ON && has_runs_on=1
+  echo "$vars" | stdin_grep -qxF CI_RUNS_ON && has_runs_on=1
   private="$(gh api "repos/$repo" --jq .private 2>/dev/null || true)"
   # Average (s) of the last completed CI runs; empty if the API fails.
   avg="$(gh api "repos/$repo/actions/runs?per_page=20&status=completed" --jq \

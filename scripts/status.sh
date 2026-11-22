@@ -151,7 +151,7 @@ fi
 # A single write: `| head -1` does not kill the script with SIGPIPE.
 warn=""
 if is_main_branch "$branch" &&
-   git status --porcelain --untracked-files=all 2>/dev/null | cut -c4- | grep -qvE '^(docs/specs/|\.process/)'; then
+   git status --porcelain --untracked-files=all 2>/dev/null | cut -c4- | stdin_grep -qvE '^(docs/specs/|\.process/)'; then
   warn=$'\n\nAviso: há edição de código pendente na main; não se trabalha na main (use phase-start.sh).'
 fi
 [ -z "$phases" ] || phases="Fases abertas:"$'\n'"$phases"$'\n'
