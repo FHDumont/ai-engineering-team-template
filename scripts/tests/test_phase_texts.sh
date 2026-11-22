@@ -249,3 +249,14 @@ assert_contains "$setup" "over-target" "setup says the owner is called again onl
 assert_contains "$(cat "$REPO/README.md")" "meta de tempo" "the quick start mentions the time target"
 
 finish
+
+# Notes to the headless child (#74) and the cheap pre-review (#75).
+execute="$(cat "$REPO/.claude/skills/execute/SKILL.md")"
+reviewer="$(cat "$REPO/.claude/agents/close-reviewer.md")"
+assert_contains "$execute" "Para: fase #<n>" "execute makes the headless child read the notes addressed to the phase"
+assert_contains "$execute" "antes de cada etapa e antes do \`close-phase.sh --merge\`" "execute reads them before each step and before --merge"
+assert_contains "$close" "close-phase.sh --pre-review" "close-phase records the pre-review before --prepare"
+assert_contains "$close" "no máximo 2 vezes" "close-phase limits the pre-review fixes to 2"
+assert_contains "$reviewer" "Pré-revisão" "close-reviewer knows the pre-review mode"
+assert_contains "$design" "Pré-revisão" "the design describes the pre-review"
+assert_contains "$design" "Recado à filha headless" "the design describes the note to the headless child"

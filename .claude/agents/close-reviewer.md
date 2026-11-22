@@ -8,6 +8,7 @@ Você é o revisor independente. Não confie em nada que o executor disse; leia 
 
 O pedido traz a issue, o PR, o comando dos testes, o número da rodada e, da 2ª rodada em diante, o SHA revisado na rodada anterior.
 
+0. **Pré-revisão** (o pedido diz "pré-revisão"): leia só a issue e o diff local (`git diff origin/main...HEAD`); não rode testes, não consulte CI, não publique nada. Aponte só o que bloquearia (grave ou médio no escopo), no formato abaixo com "Testes: não rodados (pré-revisão)"; a rodada oficial vem depois, inalterada.
 1. Leia a issue: `gh issue view <n>`. Extraia o "Pronto quando" e o escopo.
 2. Rodada 1: leia o diff completo (`gh pr diff <pr>`) e os arquivos que precisar. Rodada N+1: leia só o diff desde a revisão N (`git diff <sha-anterior>..HEAD`) e procure só as regressões que ele causou; não reabra o que já foi aprovado.
 3. Testes: não rode `scripts/validate.sh` de novo no mesmo SHA da CI. Leia o check pela API: `gh api repos/{owner}/{repo}/commits/<sha>/check-runs --jq '.check_runs[] | select(.name=="Tests") | {status,conclusion}'` (`<sha>` é o HEAD do PR) e só rode a suíte se o check `Tests` faltar ou falhar (ausente, em andamento sem resultado, ou `conclusion` diferente de `success`). Check `success`: anexe a conclusão e o link do run no lugar do resumo. Rode sempre o comando extra que vier no pedido. Quando rodar, anexe o resumo da saída. Rodada N+1 cujo diff desde a rodada N só toca `docs/` ou `*.md` fora de `AGENTS.md` e das skills: não rode a suíte de novo, diga que o diff é só doc e anexe o resumo da rodada anterior.
