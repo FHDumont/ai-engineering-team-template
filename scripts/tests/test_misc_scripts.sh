@@ -16,8 +16,19 @@ EOF
 chmod +x "$sentinel"
 trap 'rm -f "$sentinel"; test_sweep; rm -rf "$TMP"' EXIT
 
-# Every script has --help, exits 0 and prints something.
-for s in "$SCRIPTS"/*.sh "$SCRIPTS"/*.py; do
+# Closed list of the method's scripts. Never a glob of scripts/: an adopted
+# repository keeps the application's scripts in that directory (issue #92).
+for name in \
+  archive-adr.sh ask-bot.sh auto-label.py check-attribution.sh check-docs.sh \
+  check-env.sh check-workflows.py ci-gate.sh close-phase.sh deploy.sh \
+  end-check.sh gen-changelog.py gen-docs.sh gen-roadmap.py init-env.sh \
+  integrate-parallel.sh label-issue.sh machine-slots.sh measure-session.py \
+  new-phase.sh notify-bot.sh open-issue.sh open-parallel.sh phase-start.sh \
+  progress.sh redo-phase.sh search-history.sh sessions.sh setup-repo.sh \
+  setup-runner.sh start-headless.sh status.sh summarize-thread.sh \
+  trace-view.py triage.sh validate.sh wait-reply.sh weights.sh
+do
+  s="$SCRIPTS/$name"
   out="$("$s" --help 2>&1)" && rc=0 || rc=$?
   assert_eq 0 "$rc" "$(basename "$s") --help exits 0"
   [ -n "$out" ] && ok || bad "$(basename "$s") --help prints usage"
@@ -47,4 +58,21 @@ cat >"$TMP/session.jsonl" <<'J'
 J
 out="$("$SCRIPTS/measure-session.py" "$TMP/session.jsonl" --json)"
 assert_eq '1 2 1 3 100' "$(echo "$out" | jq -r '.[0] | [.user_messages, .tool_calls, .choice_questions, .words_read, .input_tokens] | map(tostring) | join(" ")')" "counts touches, tools, choices, words, tokens"
+
+# A script dropped into scripts/ is not part of the method (issue #92). The walk below
+# is the same glob the loop at the top uses, so this fails until that walk is a closed list.
+# case-92-start
+sentinel92="$SCRIPTS/zz-not-a-method-script.sh"
+marker92="$TMP/sentinel92.ran"
+rm -f "$marker92"
+printf '#!/bin/sh\nprintf ran >"%s"\nexit 0\n' "$marker92" >"$sentinel92"
+chmod +x "$sentinel92"
+for s92 in "$SCRIPTS"/*.sh "$SCRIPTS"/*.py; do
+  [ -f "$s92" ] || continue
+  "$s92" --help >/dev/null 2>&1 || true
+done
+got92="$(cat "$marker92" 2>/dev/null || true)"
+rm -f "$sentinel92" "$marker92"
+assert_eq "" "$got92" "a sentinel script in scripts/ is not executed"
+# case-92-end
 finish
