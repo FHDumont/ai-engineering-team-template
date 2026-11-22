@@ -158,7 +158,7 @@ class SensitivePathsTests(unittest.TestCase):
                  "web/package-lock.json", "package-lock.json", "app/billing/api.ts",
                  "README.md", "scripts/setup-repo.sh", "docs/auth.md", "authors.txt"]
         hits = sp.sensitive(paths, globs)
-        self.assertEqual(hits, paths[:8])
+        self.assertEqual(hits, paths[:8] + ["scripts/setup-repo.sh"])
 
     def test_gate_files_sensitive(self):
         globs = sp.load_globs(os.path.join(ROOT, ".github", "sensitive-paths"))
@@ -180,6 +180,35 @@ class SensitivePathsTests(unittest.TestCase):
         r = sp.glob_to_regex("**/auth/**")
         self.assertTrue(r.match("a/b/auth/c/d"))
         self.assertFalse(r.match("a/authx/c"))
+
+    def test_method_paths_in_code(self):
+        paths = [".claude/hooks/block-dangerous-git.sh", ".claude/settings.json",
+                 ".githooks/pre-push", ".github/actions/x/action.yml",
+                 "scripts/lib/procs.sh", "scripts/sessions.sh",
+                 "scripts/start-headless.sh", "scripts/setup-repo.sh", "README.md"]
+        hits = sp.sensitive(paths, [])
+        self.assertEqual(hits, paths[:-1])
+
+    def test_repo_file_only_adds(self):
+        hits = sp.sensitive(["app/custom/secret.txt", "README.md"], ["app/custom/**"])
+        self.assertEqual(hits, ["app/custom/secret.txt"])
+        hits = sp.sensitive(["scripts/setup-repo.sh", "app/custom/secret.txt"], ["app/custom/**"])
+        self.assertEqual(hits, ["scripts/setup-repo.sh", "app/custom/secret.txt"])
+
+    def test_write_token_workflow_is_sensitive(self):
+        d = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, d, True)
+        os.makedirs(os.path.join(d, ".github", "workflows"))
+        open(os.path.join(d, ".github", "workflows", "write.yml"), "w").write(
+            "on: push\njobs:\n  x:\n    permissions:\n      issues: write\n")
+        open(os.path.join(d, ".github", "workflows", "read.yml"), "w").write(
+            "on: push\njobs:\n  x:\n    permissions:\n      contents: read\n")
+        paths = [".github/workflows/write.yml", ".github/workflows/read.yml"]
+        self.assertEqual(sp.sensitive(paths, [], root=d), [".github/workflows/write.yml"])
+        self.assertIn(".github/workflows/ci.yml",
+                      sp.sensitive([".github/workflows/ci.yml"], [], root=ROOT))
+        self.assertIn(".github/workflows/issues-label.yml",
+                      sp.sensitive([".github/workflows/issues-label.yml"], [], root=ROOT))
 
 
 
