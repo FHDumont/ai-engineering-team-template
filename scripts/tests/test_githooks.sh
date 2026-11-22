@@ -89,6 +89,19 @@ refused "blocks the redo worktree issue-7-r2" git -C "$repo/.worktrees/issue-7-r
 tidy "$repo/.worktrees/issue-7-r2"
 assert_eq "$before" "$(head_of)" "the phase branch did not move"
 assert_eq "$before" "$(git -C "$repo" rev-parse feat/issue-7-x-r2)" "the redo branch did not move"
+# A child commit without phase_session is refused (#113).
+echo z >"$wt/z.txt"
+git -C "$wt" add z.txt
+assert_status 1 "the child session cannot commit without phase_session" as child git -C "$wt" commit -m "feat: z"
+assert_contains "$(last_output)" "no phase_session" "says check-env.sh must run first"
+git -C "$wt" reset --quiet HEAD
+rm -f "$wt/z.txt"
+jq -cn '{event: "phase_session", session_id: "child", issue: "7"}' >>"$repo/.process/events.jsonl"
+# Updating check-env.sh mid-phase does not drop the recorded phase_session.
+mkdir -p "$wt/scripts"
+printf '#!/bin/sh\necho new\n' >"$wt/scripts/check-env.sh"
+git -C "$wt" add scripts/check-env.sh
+assert_status 0 "a commit that updates check-env.sh keeps the recorded phase_session" as child git -C "$wt" commit -m "chore: check-env"
 # The child session and a plain terminal write normally; the opener still creates and deletes branches.
 assert_status 0 "the child session cherry-picks" as child git -C "$wt" cherry-pick "$side"
 echo d >"$wt/d.txt"
