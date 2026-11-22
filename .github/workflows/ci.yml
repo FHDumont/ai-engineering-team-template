@@ -86,8 +86,30 @@ jobs:
             for c in $(git rev-list --max-count=15 "$BASE_SHA..$HEAD_SHA" | tail -n +2); do
               delta="$(git diff --name-only --no-renames -z "$c" "$HEAD_SHA" 2>/dev/null | tr '\0' '\n' || echo "?")"
               [ "$(needs_tests "$delta")" = false ] || break
-              done_ok="$(gh api "repos/$GITHUB_REPOSITORY/commits/$c/check-runs" --jq '[.check_runs[] | select(.name == "Tests" and .conclusion == "success")] | length' 2>/dev/null || echo 0)"
-              if [ "${done_ok:-0}" -gt 0 ]; then run_tests=false; echo "tests already passed on $c, code unchanged since"; break; fi
+              raw="$(gh api "repos/$GITHUB_REPOSITORY/commits/$c/check-runs?per_page=100" 2>/dev/null)" || {
+                echo "Tests check unread on $c: running"
+                break
+              }
+              conc="$(printf '%s' "$raw" | jq -r '[.check_runs[]? | select(.name == "Tests")] | sort_by(.started_at // "") | last
+                | if . == null then "missing"
+                  elif (.status // "completed") != "completed" then (.status // "pending")
+                  else (.conclusion // "missing") end' 2>/dev/null || echo apierr)"
+              case "$conc" in
+                skipped) continue ;;
+                success)
+                  if git merge-base --is-ancestor "$BASE_SHA" "$c" 2>/dev/null; then
+                    run_tests=false
+                    echo "tests already passed on $c, code unchanged since, commit contains the base"
+                    break
+                  fi
+                  echo "Tests success on $c does not contain the current base: running"
+                  break
+                  ;;
+                *)
+                  echo "Tests on $c is $conc: running"
+                  break
+                  ;;
+              esac
             done
           fi
           workflows="$(has '^\.github/workflows/')"

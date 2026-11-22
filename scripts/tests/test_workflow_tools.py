@@ -254,9 +254,11 @@ class CiStepsTests(unittest.TestCase):
         return git(self.repo, "rev-parse", "HEAD")
 
     def run_step(self, job, name, head, extra_env=None):
-        env = dict(os.environ, BASE_SHA=self.base, HEAD_SHA=head, RUNNER_TEMP=self.tmp,
+        env = dict(os.environ)
+        env.update(BASE_SHA=self.base, HEAD_SHA=head, RUNNER_TEMP=self.tmp,
                    GITHUB_OUTPUT=os.path.join(self.tmp, "output"), GITHUB_REPOSITORY="owner/repo",
-                   PR_NUMBER="7", **(extra_env or {}))
+                   PR_NUMBER="7")
+        env.update(extra_env or {})
         open(env["GITHUB_OUTPUT"], "w").close()
         return subprocess.run(["bash", "-eo", "pipefail", "-c", ci_step(job, name)["run"]], cwd=self.repo,
                               env=env, text=True, capture_output=True)
@@ -303,7 +305,17 @@ class CiStepsTests(unittest.TestCase):
         fake = os.path.join(self.tmp, "bin")
         os.makedirs(fake)
         gh = os.path.join(fake, "gh")
-        open(gh, "w").write('#!/bin/sh\ncase "$*" in *"commits/%s/check-runs"*) echo "$GH_TESTS" ;; *) echo 0 ;; esac\n' % first)
+        open(gh, "w").write('''#!/bin/sh
+if echo "$*" | grep -q "commits/%s/check-runs"; then
+  if [ "$GH_TESTS" = 1 ]; then
+    printf '{"check_runs":[{"name":"Tests","status":"completed","conclusion":"success","started_at":"2020-01-01T00:00:00Z"}]}\\n'
+  else
+    printf '{"check_runs":[]}\\n'
+  fi
+else
+  printf '{"check_runs":[]}\\n'
+fi
+''' % first)
         os.chmod(gh, 0o755)
         env = {"PATH": fake + os.pathsep + os.environ["PATH"]}
         for passed, want in (("1", "false"), ("0", "true")):
@@ -314,6 +326,78 @@ class CiStepsTests(unittest.TestCase):
         # Code changed after the tested commit: the suite runs, whatever the check says.
         head2 = self.commit({"scripts/y.sh": "y\n"})
         r = self.run_step("changes", "Detect changed paths", head2, dict(env, GH_TESTS="1"))
+        out = dict(l.split("=", 1) for l in open(os.path.join(self.tmp, "output")).read().split())
+        self.assertEqual(out["run_tests"], "true")
+
+    def write_gh_conclusions(self, mapping, extra=""):
+        """Fake gh: mapping of commit SHA to Tests conclusion (or 'apierr')."""
+        fake = os.path.join(self.tmp, "binconc")
+        os.makedirs(fake, exist_ok=True)
+        gh = os.path.join(fake, "gh")
+        clauses = []
+        for sha, conc in mapping.items():
+            if conc == "apierr":
+                clauses.append('  *"commits/%s/check-runs"*) echo "api failed" >&2; exit 1 ;;' % sha)
+            elif conc == "pending":
+                body = '{"check_runs":[{"name":"Tests","status":"in_progress","conclusion":null,"started_at":"2020-01-01T00:00:00Z"}]}'
+                clauses.append('  *"commits/%s/check-runs"*) body=\'%s\' ;;' % (sha, body))
+            else:
+                body = '{"check_runs":[{"name":"Tests","status":"completed","conclusion":"%s","started_at":"2020-01-01T00:00:00Z"}]}' % conc
+                clauses.append('  *"commits/%s/check-runs"*) body=\'%s\' ;;' % (sha, body))
+        open(gh, "w").write("""#!/bin/sh
+body='{"check_runs":[]}'
+case "$*" in
+%s
+  *) body='{"check_runs":[]}' ;;
+esac
+jq_expr=""
+prev=""
+for a in "$@"; do
+  [ "$prev" = --jq ] && jq_expr="$a"
+  prev="$a"
+done
+if [ -n "$jq_expr" ]; then printf '%%s\\n' "$body" | jq -r "$jq_expr"; else printf '%%s\\n' "$body"; fi
+%s
+""" % ("\n".join(clauses), extra))
+        os.chmod(gh, 0o755)
+        return {"PATH": fake + os.pathsep + os.environ["PATH"]}
+
+    def test_tests_run_when_newer_tests_failed(self):
+        # A green, B red, C docs-only: the newest Tests result is a failure, so run.
+        a = self.commit({"scripts/x.sh": "x\n"})
+        b = self.commit({"docs/a.md": "a\n"})
+        c = self.commit({"docs/b.md": "b\n"})
+        env = self.write_gh_conclusions({a: "success", b: "failure"})
+        r = self.run_step("changes", "Detect changed paths", c, env)
+        self.assertEqual(r.returncode, 0, r.stderr)
+        out = dict(l.split("=", 1) for l in open(os.path.join(self.tmp, "output")).read().split())
+        self.assertEqual(out["run_tests"], "true")
+
+    def test_tests_run_on_cancelled_pending_or_api_error(self):
+        a = self.commit({"scripts/x.sh": "x\n"})
+        b = self.commit({"docs/a.md": "a\n"})
+        c = self.commit({"docs/b.md": "b\n"})
+        for conc in ("cancelled", "timed_out", "pending", "apierr"):
+            env = self.write_gh_conclusions({a: "success", b: conc})
+            r = self.run_step("changes", "Detect changed paths", c, env)
+            self.assertEqual(r.returncode, 0, r.stderr + conc)
+            out = dict(l.split("=", 1) for l in open(os.path.join(self.tmp, "output")).read().split())
+            self.assertEqual(out["run_tests"], "true", conc)
+
+    def test_tests_skip_only_when_success_contains_base(self):
+        a = self.commit({"scripts/x.sh": "x\n"})
+        b = self.commit({"docs/a.md": "a\n"})
+        env = self.write_gh_conclusions({a: "success"})
+        r = self.run_step("changes", "Detect changed paths", b, env)
+        self.assertEqual(r.returncode, 0, r.stderr)
+        out = dict(l.split("=", 1) for l in open(os.path.join(self.tmp, "output")).read().split())
+        self.assertEqual(out["run_tests"], "false")
+        git(self.repo, "switch", "--quiet", "main")
+        new_base = self.commit({"unrelated.txt": "u\n"})
+        git(self.repo, "switch", "--quiet", "feat/x")
+        env = self.write_gh_conclusions({a: "success"})
+        r = self.run_step("changes", "Detect changed paths", b, dict(env, BASE_SHA=new_base))
+        self.assertEqual(r.returncode, 0, r.stderr)
         out = dict(l.split("=", 1) for l in open(os.path.join(self.tmp, "output")).read().split())
         self.assertEqual(out["run_tests"], "true")
 
