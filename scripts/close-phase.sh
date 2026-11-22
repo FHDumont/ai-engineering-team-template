@@ -416,14 +416,30 @@ publish_review() {
   echo "published review/independent=$verdict on ${sha:0:12} (PR #$n)"
 }
 
+# True when this branch's last phase_push is <sha> and a clean pre_review of that
+# SHA is already in the trace. Used only when CLAUDE_CODE_SESSION_ID is unset.
+clean_prereview_of_head() { # clean_prereview_of_head <events file> <sha>
+  jq -e -rs --arg b "$branch" --arg sha "$2" '
+    [ .[] | select(type == "object") ] as $e
+    | ([$e[] | select(.event == "phase_push" and .branch == $b)] | last) as $p
+    | $p != null and $p.sha == $sha
+      and (([$e[] | select(.event == "pre_review" and .sha == $sha and .verdict == "clean")] | length) > 0)
+  ' "$1" >/dev/null 2>&1
+}
+
 # An opinion is published only when a reviewer round started after the last push of
 # the branch: in the trace of the main checkout, the last phase_push of the branch is
 # on the PR head SHA and a SubagentStart of close-reviewer of this session follows it.
+# With no session id, the same push plus a clean pre_review of that SHA is enough.
+# A set session id with no harness proof is still refused.
 review_after_push() { # review_after_push <PR head SHA> [what is refused]
   local events sid="${CLAUDE_CODE_SESSION_ID:-}" why what="${2:-review refused}"
   events="$(phase_trace_file "$ROOT")" || die "cannot locate the trace: $what"
   [ -f "$events" ] || die "$what: no trace at $events: push with --prepare and run the close-reviewer agent first"
-  [ -n "$sid" ] || die "$what: no session id (CLAUDE_CODE_SESSION_ID): the phase session publishes the review and merges"
+  if [ -z "$sid" ]; then
+    clean_prereview_of_head "$events" "$1" || die "$what: no session id (CLAUDE_CODE_SESSION_ID): the phase session publishes the review and merges"
+    return 0
+  fi
   why="$(jq -rs --arg b "$branch" --arg s "$sid" --arg sha "$1" '
       [to_entries[] | select(.value | type == "object")] as $e
       | ([$e[] | select(.value.event == "phase_push" and .value.branch == $b)] | last) as $p
@@ -443,13 +459,18 @@ review_after_push() { # review_after_push <PR head SHA> [what is refused]
 # It must hold a phase_opened of the issue, and the session that merges
 # (CLAUDE_CODE_SESSION_ID) must be another one, with a phase_session of the issue
 # (check-env.sh) and an event recorded by the harness hooks (trace-event.sh), which
-# a session id set by hand does not have.
+# a session id set by hand does not have. With no session id, the last phase_push
+# of this branch must be HEAD and a clean pre_review of that SHA must already
+# be in the trace; a set id with no harness proof is still refused.
 phase_gate() {
   local events sid="${CLAUDE_CODE_SESSION_ID:-}" why
   [ -n "$branch_issue" ] || die "cannot tell the phase issue from branch $branch: the phase branch is the one phase-start.sh creates"
   events="$(phase_trace_file "$ROOT")" || die "cannot locate the trace: merge blocked"
   [ -f "$events" ] || die "no trace at $events: phase #$branch_issue has no phase_opened; open the phase with scripts/phase-start.sh"
-  [ -n "$sid" ] || die "no session id (CLAUDE_CODE_SESSION_ID): the child session of phase #$branch_issue runs --merge"
+  if [ -z "$sid" ]; then
+    clean_prereview_of_head "$events" "$(git rev-parse HEAD)" || die "no session id (CLAUDE_CODE_SESSION_ID): the child session of phase #$branch_issue runs --merge"
+    return 0
+  fi
   why="$(jq -rs --arg i "$branch_issue" --arg s "$sid" '
       def of($e): [.[] | select(type == "object" and .event == $e and (.issue | tostring) == $i) | (.session_id // "")];
       if (of("phase_opened") | length) == 0 then "no phase_opened of the issue in the trace: the phase opens only through scripts/phase-start.sh"
