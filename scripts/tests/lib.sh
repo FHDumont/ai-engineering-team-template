@@ -11,15 +11,15 @@ TMP="$(cd "$(mktemp -d "${TMPDIR:-/tmp}/tmp.XXXXXXXX")" && pwd -P)"
 # No test leaves a process alive (issue #66): whatever the test started in the
 # background, or left with its folder as the cwd or in its command line, is stopped at
 # the end, also when an assertion failed or the test got INT/TERM. A test that sets its
-# own trap calls test_sweep in it. Under validate.sh (AI_METHOD_SWEEP_AT_END=1) the
-# search by cwd (lsof, the dearest step, paid by every test) is left to the sweep that
-# validate.sh runs once at the end over the folder of the whole run: what a test leaves
-# there is still stopped, listed, and fails the run.
+# own trap calls test_sweep in it. The search by cwd (issue #83) looks only at the detached
+# processes (parent 1, a few of them): lsof over every process of the machine was the
+# dearest step, paid by each test. In the CI (CI set) the machine is the runner's and the
+# search stays the full one, since a detached process may have another parent there.
 # shellcheck source=scripts/lib/procs.sh
 source "$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/lib/procs.sh"
 test_sweep() {
   local p own="" left
-  left="$( { proc_descendants "$$"; [ -n "${AI_METHOD_SWEEP_AT_END:-}" ] || procs_in_dir "$TMP"; pgrep -f "$TMP" 2>/dev/null || true; } | sort -un)"
+  left="$( { proc_descendants "$$"; if [ -n "${CI:-}" ]; then procs_in_dir "$TMP"; else procs_orphans "$TMP"; fi; pgrep -f "$TMP" 2>/dev/null || true; } | sort -un)"
   [ -n "$left" ] || return 0
   own="$(proc_chain "$$" | tr '\n' ' ')"
   for p in $left; do
