@@ -123,6 +123,8 @@ Baseados nas observações de Andrej Karpathy ([andrej-karpathy-skills](https://
    | igual ao da sessão que abriu a fase | sai 0 e grava o mesmo `phase_session` | segue nesse par; a tabela do PR mostra a diferença |
    | outro par, ou par que não dá para ler | sai 1 e grava `phase_pair_mismatch`; sem `phase_session` o portão do merge fica fechado | não começa nenhuma etapa; avisa a sessão principal, que ajusta o par com `set_session_model` e `set_session_effort`; depois roda o `check-env.sh` de novo |
 
+   Sem `phase_session` da sessão, o `.githooks/pre-commit` recusa o commit de etapa no worktree (ou avisa a falta quando não há id de sessão). Fase que atualiza o próprio método: o `phase_session` gravado no início continua válido se o `check-env.sh` mudar no meio; o commit que altera esse script não precisa rodá-lo de novo antes de entrar.
+
 6. **Etapa com par diferente do da sessão.** O `check-env.sh` imprime, para cada etapa da spec, onde ela roda: par igual ao da sessão, na própria sessão; par diferente, num subagente aberto com o par da etapa.
 7. **A tabela do PR é do script.** O `close-phase.sh --prepare` escreve a seção "Modelo e esforço" do PR com a saída de `scripts/trace-view.py --pairs <issue>` (pedido × usado, com `(diverge)` onde difere). Ninguém a preenche à mão.
 
@@ -343,7 +345,7 @@ Os hooks do agente saem 2 quando barram; os do git saem 1. Todo hook tem teste. 
 | `.claude/hooks/prompt-phase-entry.sh` | UserPromptSubmit | Nada: põe no contexto de "executar #<n>" o caminho único (skill `plan`, depois `phase-start.sh`) |
 | `.claude/hooks/session-setup-check.sh` | SessionStart | Nada: com o setup pendente (`setup-repo.sh --check` sai 7 ou 6), põe no contexto, uma vez por sessão, que o primeiro passo é a skill `setup`. Sem `gh`, sem remoto, sem rede ou passados 5 segundos, não diz nada. Conferência limpa fica em `.process/setup-ok` e as sessões seguintes não leem o GitHub de novo (a trava do `phase-start.sh` confere sempre) |
 | `.claude/hooks/trace-event.sh` | SessionStart, SubagentStart, SubagentStop, Stop, SessionEnd, Pre e PostToolUse do Agent | Nada: grava o trace (§6.3) |
-| `.githooks/pre-commit` | git | Commit na `main`; commit da sessão que abriu a fase |
+| `.githooks/pre-commit` | git | Commit na `main`; commit da sessão que abriu a fase; commit de etapa sem `phase_session` da sessão |
 | `.githooks/pre-merge-commit` | git | Merge feito pela sessão que abriu a fase |
 | `.githooks/pre-rebase` | git | Rebase feito pela sessão que abriu a fase |
 | `.githooks/pre-push` | git | Push para a `main` no modo sem proteção (§10.5) |
