@@ -268,11 +268,17 @@ assert_status 0 "label-issue accepts the ask label of a bot" env BOTS_FILE="$TMP
 assert_status 1 "label-issue refuses the ask label of an unknown bot" env BOTS_FILE="$TMP/bots.tsv" "$SCRIPTS/label-issue.sh" 3 --add ask:bot-a --dry-run
 [ ! -e "$SCRIPTS/lib/bots.tsv" ] && ok || bad "scripts/lib/ holds no bot list"
 
+# An untracked file with a bot name is found before it is committed (#117).
+printf 'solo-bot-untracked\n' >"$REPO/scripts/untracked-bot-name.txt"
+bot_hits="$(cd "$REPO" && git ls-files -co --exclude-standard scripts | tr '\n' '\0' | xargs -0 grep -nF -- 'solo-bot-untracked' 2>/dev/null || true)"
+assert_contains "$bot_hits" "untracked-bot-name.txt" "an untracked file with a forbidden token is found"
+rm -f "$REPO/scripts/untracked-bot-name.txt"
+
 # Names of one repository (the list of docs/repo-notes.md, when the file exists) stay out of
 # the method's code; the bots file is the repository's own data.
 if [ -f "$REPO/docs/repo-notes.md" ]; then
   names="$(awk '$0 == "## Nomes só deste repositório" { p = 1; next } p && /^## / { exit } p && /^- / { print }' "$REPO/docs/repo-notes.md" | grep -oE '`[^`]+`' | tr -d '`')"
-  hits="$(cd "$REPO" && git ls-files scripts .claude/hooks .githooks .github | grep -vxF .github/bots.tsv | tr '\n' '\0' | xargs -0 grep -nF -- "$names" 2>/dev/null | cut -c1-120 || true)"
+  hits="$(cd "$REPO" && git ls-files -co --exclude-standard scripts .claude/hooks .githooks .github | grep -vxF .github/bots.tsv | tr '\n' '\0' | xargs -0 grep -nF -- "$names" 2>/dev/null | cut -c1-120 || true)"
   assert_eq "" "$hits" "the method's code cites no repository-only name"
 fi
 

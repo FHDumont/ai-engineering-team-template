@@ -153,8 +153,12 @@ assert_contains "$hb" "a cada 4 minutos" "the design gives the interval of the h
 was=8
 # ROADMAP.md and CHANGELOG.md are generated from issue titles, not heartbeat text: a title
 # with the old number and minutes (#44 had one) must not fail the suite.
-old_interval_in() { (cd "$1" && git grep -n -I -E "$was min|$was minutes|[*]/$was|every $was" -- . ':!ROADMAP.md' ':!CHANGELOG.md' || true); }
+old_interval_in() { (cd "$1" && git grep -n -I --untracked -E "$was min|$was minutes|[*]/$was|every $was" -- . ':!ROADMAP.md' ':!CHANGELOG.md' || true); }
 assert_eq "" "$(old_interval_in "$REPO")" "no file keeps the old interval of the heartbeat"
+# An untracked file with the old interval is visible before it is committed (#117).
+printf 'a cada %s minutos\n' "$was" >"$REPO/untracked-interval.md"
+assert_contains "$(old_interval_in "$REPO")" "untracked-interval.md" "an untracked file with the old interval is found"
+rm -f "$REPO/untracked-interval.md"
 gen_repo="$(mktemp -d)"
 git -C "$gen_repo" init -q
 printf -- '- #44 Heartbeat every %s min\n' "$was" >"$gen_repo/ROADMAP.md"
