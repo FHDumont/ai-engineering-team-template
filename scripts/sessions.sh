@@ -50,7 +50,8 @@ case "$hours" in ''|*[!0-9.]*) die "hours must be a number" 2 ;; esac
 [ -n "$mode" ] || { print_help "$0"; exit 2; }
 
 # Directory of a pid, repository root of it (the part before /.worktrees/).
-proc_cwd() { lsof -a -d cwd -Fn -p "$1" 2>/dev/null | sed -n 's/^n//p' | head -1; }
+# A pid that exits between ps and lsof makes lsof exit 1. Skip it; do not fail the script.
+proc_cwd() { lsof -a -d cwd -Fn -p "$1" 2>/dev/null | sed -n 's/^n//p' | head -1 || true; }
 repo_of() {
   local d="$1"
   case "$d" in */.worktrees/*) d="${d%%/.worktrees/*}" ;; esac
@@ -81,6 +82,7 @@ case "$mode" in
         n=$((n + 1)); kr=$((kr + $(ps -o rss= -p "$k" 2>/dev/null | tr -d ' ' || echo 0)))
       done
       cwd="$(proc_cwd "$pid")"
+      [ -n "$cwd" ] || continue
       mark=""
       if [ "$(proc_ppid "$pid")" = 1 ] && orphan_cwd_match "$cwd"; then mark=" orphan"; fi
       printf '%-44s %-9s %7s %9s %5s %7s %s\n' "$(repo_of "$cwd")" "$kind" "$pid" "$et" "$cpu" \
