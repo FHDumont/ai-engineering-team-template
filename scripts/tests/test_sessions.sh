@@ -27,7 +27,10 @@ export PROCS_APP_MARK="$TMP/Claude.app"
 # A zombie of this shell counts as dead.
 alive() { case "$(ps -o stat= -p "$1" 2>/dev/null)" in ""|Z*) echo dead ;; *) echo alive ;; esac; }
 
-spawn "$TMP/fake/server" "$TMP/wt/sub"; srv=$!         # test server inside the worktree
+# Own process group, same session, so cleanup still stops it (issue #120).
+python3 -c 'import os,sys; os.setpgid(0,0); os.execvp(sys.argv[1], sys.argv[1:])' \
+  "$TMP/fake/server" "$TMP/wt/sub" >/dev/null 2>&1 &
+srv=$!; PIDS="$PIDS $srv"
 spawn "$TMP/fake/server" "$TMP/other"; elsewhere=$!    # a process of another directory
 spawn "$TMP/Claude.app/Contents/app.sh" "$TMP/wt" "$TMP/fake/claude"; appchild=$! # claude of the app, cwd in the worktree
 (cd "$TMP/other" || exit; exec "$TMP/fake/claude" -p task --session-id sid-123 >/dev/null 2>&1) &

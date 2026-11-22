@@ -7,6 +7,10 @@
 #:   close-phase.sh --pre-review --verdict clean|findings [--round N]
 #:   close-phase.sh --check
 #:   close-phase.sh --merge [--owner-ok] [--wait]
+#:
+#: Do not pipe --check or --merge (the pipe hides the exit code and the cleanup
+#: can stop the reader). Write the output to a file and read its last line:
+#:   scripts/close-phase.sh --merge --wait >file 2>&1
 #:   close-phase.sh --cleanup
 #:   close-phase.sh --abort [--discard]
 #:
@@ -98,6 +102,20 @@ source "$HERE/lib/common.sh"
 # shellcheck source=scripts/lib/progress.sh
 source "$HERE/lib/progress.sh"
 ROOT="$(cd "$HERE/.." && pwd)"
+
+# gh prints "hint:" lines (for example "gh event listen") that drown the result
+# and, once captured, corrupt a value read from the command. Drop them. The last
+# line of this script is the result.
+gh() {
+  local out err rc=0
+  out="$(mktemp)"
+  err="$(mktemp)"
+  command gh "$@" >"$out" 2>"$err" || rc=$?
+  grep -vE '^[[:space:]]*hint:' "$out" || true
+  grep -vE '^[[:space:]]*hint:' "$err" >&2 || true
+  rm -f "$out" "$err"
+  return "$rc"
+}
 
 mode="" title="" body_file="" issue="" review_file="" verdict="" round="" owner_ok=0 wait=0 discard=0
 while [ $# -gt 0 ]; do

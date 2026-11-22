@@ -17,6 +17,25 @@ etime_seconds() { # etime_seconds <etime>
 
 proc_ppid() { ps -o ppid= -p "$1" 2>/dev/null | tr -d ' '; }
 proc_cmd() { ps -o command= -p "$1" 2>/dev/null; }
+proc_pgid() { ps -o pgid= -p "$1" 2>/dev/null | tr -d ' '; }
+# Session id. ps -o sess prints 0 on this macOS, so ask the kernel. A pid that is
+# not a real process (the tests' table) falls back to ps, which the test fakes.
+proc_sid() { # proc_sid <pid>
+  local s
+  s="$(python3 -c 'import os,sys
+try:
+    print(os.getsid(int(sys.argv[1])))
+except Exception:
+    pass' "$1" 2>/dev/null || true)"
+  if [ -n "$s" ] && [ "$s" != 0 ]; then
+    printf '%s\n' "$s"
+    return 0
+  fi
+  ps -o sess= -p "$1" 2>/dev/null | tr -d ' '
+}
+proc_cwd_of() { # proc_cwd_of <pid>
+  lsof -a -d cwd -Fn -p "$1" 2>/dev/null | sed -n 's/^n//p' | head -1 || true
+}
 proc_alive() { kill -0 "$1" 2>/dev/null; }
 
 # Prints the pid and its ancestors, one per line.
@@ -159,12 +178,19 @@ procs_orphans() { # procs_orphans [dir...]
 
 # Stops the processes of a phase worktree and the headless child of the trace.
 # An orphan outside that worktree is not stopped (sessions.sh --list only marks it).
+# Spares the caller's process group (a pipe reader started beside the script) and a
+# process of another session whose only link is the worktree as its cwd. Records
+# pid, command and directory in the trace before the signal.
 # Prints one line per stopped process.
 procs_cleanup_worktree() { # procs_cleanup_worktree <worktree> <issue> [trace file]
   local wt="$1" issue="$2" trace="${3:-}" prot cand="" p hp hs all="" stop="" line
+  local caller_pgid caller_sid in_dir g s cmd dir
   prot="$(proc_chain "$$" | tr '\n' ' ')$(app_claude_chains)"
+  caller_pgid="$(proc_pgid $$)"
+  caller_sid="$(proc_sid $$)"
   # shellcheck disable=SC2086
   cand="$(procs_in_dir "$wt")"
+  in_dir="$(printf '%s\n' "$cand" | tr '\n' ' ')"
   if [ -n "$trace" ] && [ -f "$trace" ]; then
     line="$(jq -rs --arg i "$issue" '[.[] | select(type == "object" and .event == "phase_headless" and (.issue | tostring) == $i)] | last // empty | "\(.pid)\t\(.child_session)"' "$trace" 2>/dev/null || true)"
     hp="${line%%$'\t'*}" hs="${line#*$'\t'}"
@@ -177,13 +203,28 @@ procs_cleanup_worktree() { # procs_cleanup_worktree <worktree> <issue> [trace fi
     # A protected process keeps its children too.
     # shellcheck disable=SC2086
     proc_stoppable "$p" $prot || continue
+    # The traced headless child is stopped even when it shares the caller's group.
+    if [ "$p" != "${hp:-}" ]; then
+      g="$(proc_pgid "$p")"
+      [ -n "$caller_pgid" ] && [ "$g" = "$caller_pgid" ] && continue
+      s="$(proc_sid "$p")"
+      # Another session, and the worktree is only its cwd: an observer.
+      if [ -n "$caller_sid" ] && [ -n "$s" ] && [ "$s" != "$caller_sid" ]; then
+        case " $in_dir " in *" $p "*) continue ;; esac
+      fi
+    fi
     all="$all $p $(proc_descendants "$p" | tr '\n' ' ')"
   done
   for p in $(printf '%s\n' "$all" | tr ' ' '\n' | grep . | sort -un); do
     # shellcheck disable=SC2086
     proc_stoppable "$p" $prot || continue
+    cmd="$(proc_cmd "$p" | tr '\n' ' ' | cut -c1-100)"
+    dir="$(proc_cwd_of "$p")"
+    if command -v trace_event >/dev/null 2>&1; then
+      trace_event process_stopped pid="$p" command="$cmd" dir="$dir" || true
+    fi
     stop="$stop $p"
-    echo "stopped process $p: $(proc_cmd "$p" | cut -c1-100)"
+    echo "stopped process $p: $cmd"
   done
   # shellcheck disable=SC2086
   [ -z "$stop" ] || proc_stop $stop
