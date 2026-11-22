@@ -85,4 +85,140 @@ assert_not_contains "$out" "Archived" "--stale skips an archived session"
 assert_not_contains "$out" "Fresh" "--stale skips a recent session"
 assert_not_contains "$out" "Other repo" "--stale skips another repository"
 assert_status 2 "unknown option" "$S" --bogus
+
+#  close-idle (issue #91): the default, with no --under, is this checkout. A directory
+# outside it is refused before any signal. ps, lsof and kill are fakes; BASH_ENV
+# turns off the kill builtin so the script uses the fake on PATH.
+# case-91-start
+repo91="$(make_repo)"
+mkdir -p "$repo91/sub" "${repo91}2"
+ln -s / "$repo91/link-out"
+bin91="$TMP/bin91"
+mkdir -p "$bin91"
+: >"$TMP/dead91"
+: >"$TMP/kill91"
+printf 'enable -n kill\n' >"$bin91/disable-kill"
+printf '%s\t%s\t%s\t%s\t%s\t%s\n' \
+  "8101" "1" "10-00:00:00" "0.0" "1024" "/opt/fake/claude -p outside" \
+  "8102" "1" "10-00:00:00" "0.0" "1024" "/opt/fake/claude -p inside" >"$TMP/ps91.tab"
+printf '%s\t%s\n' "8101" "${repo91}2" "8102" "$repo91/sub" >"$TMP/lsof91.tab"
+export FAKE_PS_TAB="$TMP/ps91.tab" FAKE_PS_DEAD="$TMP/dead91"
+export FAKE_LSOF_TAB="$TMP/lsof91.tab" FAKE_KILL_LOG="$TMP/kill91"
+cat >"$bin91/ps" <<'PS'
+#!/bin/sh
+tab="${FAKE_PS_TAB:?}"
+dead="${FAKE_PS_DEAD:?}"
+spec="" pid=""
+while [ $# -gt 0 ]; do
+  case "$1" in
+    -p) pid="$2"; shift 2 ;;
+    -o|-axo) spec="$2"; shift 2 ;;
+    *) shift ;;
+  esac
+done
+emit() {
+  fpid=$(printf '%s' "$1" | awk -F '\t' '{ print $1 }')
+  fppid=$(printf '%s' "$1" | awk -F '\t' '{ print $2 }')
+  fet=$(printf '%s' "$1" | awk -F '\t' '{ print $3 }')
+  fcpu=$(printf '%s' "$1" | awk -F '\t' '{ print $4 }')
+  frss=$(printf '%s' "$1" | awk -F '\t' '{ print $5 }')
+  fcmd=$(printf '%s' "$1" | awk -F '\t' '{ print $6 }')
+  case "$spec" in
+    ppid=) printf '%s\n' "$fppid" ;;
+    command=) printf '%s\n' "$fcmd" ;;
+    stat=) printf 'S\n' ;;
+    rss=) printf '%s\n' "$frss" ;;
+    "pid=,command=") printf '%s %s\n' "$fpid" "$fcmd" ;;
+    "pid=,ppid=") printf '%s %s\n' "$fpid" "$fppid" ;;
+    "pid=,etime=,pcpu=,rss=,command=") printf '%s %s %s %s %s\n' "$fpid" "$fet" "$fcpu" "$frss" "$fcmd" ;;
+    *) printf '%s\n' "$fpid $fppid $fet $fcpu $frss $fcmd" ;;
+  esac
+}
+if [ -n "$pid" ]; then
+  if [ -f "$dead" ] && grep -qx "$pid" "$dead"; then exit 0; fi
+  row=$(awk -F '\t' -v p="$pid" '$1 == p { print; exit }' "$tab")
+  [ -n "$row" ] || exit 0
+  emit "$row"
+  exit 0
+fi
+while IFS= read -r row; do
+  [ -n "$row" ] || continue
+  fpid=$(printf '%s' "$row" | awk -F '\t' '{ print $1 }')
+  if [ -f "$dead" ] && grep -qx "$fpid" "$dead"; then continue; fi
+  emit "$row"
+done <"$tab"
+exit 0
+PS
+cat >"$bin91/lsof" <<'LSOF'
+#!/bin/sh
+tab="${FAKE_LSOF_TAB:?}"
+dead="${FAKE_PS_DEAD:-}"
+pids=""
+while [ $# -gt 0 ]; do
+  case "$1" in
+    -p) pids="$2"; shift 2 ;;
+    *) shift ;;
+  esac
+done
+awk -F '\t' -v pids="$pids" -v deadfile="$dead" '
+  FILENAME == deadfile { if ($0 != "") dead[$0] = 1; next }
+  {
+    if ($1 in dead) next
+    if (pids != "") {
+      hit = 0
+      n = split(pids, a, ",")
+      for (i = 1; i <= n; i++) if (a[i] == $1) hit = 1
+      if (!hit) next
+    }
+    printf "p%s\nn%s\n", $1, $2
+  }
+' "$dead" "$tab"
+exit 0
+LSOF
+cat >"$bin91/kill" <<'KILL'
+#!/bin/sh
+log="${FAKE_KILL_LOG:?}"
+dead="${FAKE_PS_DEAD:?}"
+sig=""
+for arg in "$@"; do
+  case "$arg" in
+    -*) sig="${arg#-}" ;;
+    *)
+      if [ "$sig" = "0" ]; then
+        if [ -f "$dead" ] && grep -qx "$arg" "$dead"; then exit 1; fi
+        exit 0
+      fi
+      printf '%s\n' "$arg" >>"$dead"
+      printf '%s %s\n' "${sig:-TERM}" "$arg" >>"$log"
+      ;;
+  esac
+done
+exit 0
+KILL
+chmod +x "$bin91/ps" "$bin91/lsof" "$bin91/kill"
+run91() { # run91 <expected> <description> <sessions args...>
+  : >"$TMP/dead91"
+  : >"$TMP/kill91"
+  local want="$1" what="$2"
+  shift 2
+  assert_status "$want" "$what" env PATH="$bin91:$PATH" BASH_ENV="$bin91/disable-kill" \
+    bash -c 'cd "$1" && shift && exec "$@"' _ "$repo91" "$SCRIPTS/sessions.sh" "$@"
+}
+state91() {
+  case "$(PATH="$bin91:$PATH" ps -o stat= -p "$1" 2>/dev/null)" in
+    ""|Z*) echo dead ;; *) echo alive ;;
+  esac
+}
+run91 2 "--close-idle --under / is outside the repository" --close-idle --under /
+assert_eq "" "$(cat "$TMP/kill91")" "--under / signals nobody"
+run91 2 "--close-idle --under .. is outside the repository" --close-idle --under "$repo91/.."
+assert_eq "" "$(cat "$TMP/kill91")" "--under .. signals nobody"
+run91 2 "--close-idle --under a symlink to / is outside" --close-idle --under "$repo91/link-out"
+assert_eq "" "$(cat "$TMP/kill91")" "a symlink under --under signals nobody"
+run91 2 "--close-idle --under a sibling prefix is outside" --close-idle --under "${repo91}2"
+assert_eq "" "$(cat "$TMP/kill91")" "a sibling directory with the same prefix signals nobody"
+run91 0 "--close-idle with no --under" --close-idle
+assert_eq alive "$(state91 8101)" "a headless session outside this repository stays"
+assert_eq dead "$(state91 8102)" "an idle headless session of this repository is stopped"
+# case-91-end
 finish
