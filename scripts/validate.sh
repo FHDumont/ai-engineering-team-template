@@ -27,6 +27,11 @@
 #: Progress (for the owner and the dashboard, never printed): each step goes to
 #: ~/.cache/ai-method/progress/<repo>-<issue>.jsonl (scripts/progress.sh reads it).
 #:
+#: Orphans: every test runs with TMPDIR inside a folder of this run. At the end, and on
+#: INT/TERM, a process still alive there (cwd or command line in that folder) is stopped
+#: and listed ("orphan process <pid>") and the run exits 1: a process left by the suite
+#: is a defect (issue #66).
+#:
 #: Never runs from inside its own tests: it sets PROCESS_VALIDATE_RUNNING=1 in the
 #: environment and, called again with the mark, exits 3 at once.
 set -euo pipefail
@@ -37,6 +42,8 @@ source "$HERE/lib/common.sh"
 source "$HERE/lib/slots.sh"
 # shellcheck source=scripts/lib/progress.sh
 source "$HERE/lib/progress.sh"
+# shellcheck source=scripts/lib/procs.sh
+source "$HERE/lib/procs.sh"
 ROOT="$(cd "$HERE/.." && pwd)"
 cd "$ROOT"
 
@@ -154,12 +161,14 @@ for f in sys.argv[1:]:
     # temporary folder (tests/lib.sh makes one per run); output and exit code go to
     # files and are reported afterwards, in the fixed order of the list. Each finished
     # test appends its name to done.log, which feeds the progress.
-    rdir="$(mktemp -d "${TMPDIR:-/tmp}/validate-tests.XXXXXX")"
+    rdir="$RDIR"
     : >"$rdir/done.log"
     # shellcheck disable=SC2016  # the runner is a script for the child shell
     runner='n="$(printf %s "$2" | tr / _)"
       case "$2" in *.py) python3 "$2" >"$1/$n.out" 2>&1 ;; *) bash "$2" >"$1/$n.out" 2>&1 ;; esac
       echo $? >"$1/$n.rc"; basename "$2" >>"$1/done.log"'
+    # Each test gets its own TMPDIR inside the folder of the run: orphan_sweep finds what it leaves.
+    runner="mkdir -p \"\$1/tmp\"; export TMPDIR=\"\$1/tmp\"; $runner"
     printf '%s\0' "${list[@]}" | xargs -0 -n1 -P "$AI_METHOD_TEST_JOBS" bash -c "$runner" _ "$rdir" &
     pid=$!
     while :; do
@@ -181,10 +190,33 @@ for f in sys.argv[1:]:
         echo "$out" | missing_dep_hint
       fi
     done
-    rm -rf "$rdir"
     echo "tests: $passed passed, $failed failed"
   fi
   exit "$fail"
+}
+
+# Stops what is alive in the folder of this run (its tests' processes and whatever they
+# left detached), listing it; returns 0 when there was something.
+orphan_sweep() {
+  local pids p all="" stop="" found=1
+  [ -n "${RDIR:-}" ] && [ -d "$RDIR" ] || return 1
+  pids="$(procs_orphans "$RDIR"; procs_in_dir "$RDIR"; pgrep -f "$RDIR/" 2>/dev/null || true)"
+  for p in $pids; do
+    [ "$p" != "$$" ] || continue
+    case " $(proc_chain "$$" | tr '\n' ' ') " in *" $p "*) continue ;; esac
+    proc_alive "$p" || continue
+    all="$all $p $(proc_descendants "$p" | tr '\n' ' ')"
+  done
+  for p in $(printf '%s\n' "$all" | tr ' ' '\n' | grep . | sort -un); do
+    proc_alive "$p" || continue
+    case " $(proc_chain "$$" | tr '\n' ' ') " in *" $p "*) continue ;; esac
+    stop="$stop $p"
+    echo "orphan process $p: $(proc_cmd "$p" | cut -c1-100)"
+    found=0
+  done
+  # shellcheck disable=SC2086
+  [ -z "$stop" ] || proc_stop $stop
+  return "$found"
 }
 
 slots_load_limits
@@ -222,6 +254,7 @@ while ! mkdir "$lockdir" 2>/dev/null; do
   fi
 done
 echo $$ >"$lockdir/pid"
+RDIR="$(cd "$(mktemp -d "${TMPDIR:-/tmp}/validate-tests.XXXXXX")" && pwd -P)"
 log="$(mktemp "${TMPDIR:-/tmp}/validate.XXXXXX")"
 started=0
 finish_run() {
@@ -229,12 +262,19 @@ finish_run() {
   if [ "$started" = 1 ]; then
     { printf '%s\t%s\t%s\n' "$(now_epoch)" "$rc" "$args"; cat "$log"; } >"$resultf.tmp" 2>/dev/null && mv "$resultf.tmp" "$resultf"
   fi
+  # Interrupted or failed run: the tests still running and what they left go too.
+  # shellcheck disable=SC2046
+  proc_stop $(proc_descendants "$$" | tr '\n' ' ') 2>/dev/null || true
+  orphan_sweep >/dev/null 2>&1 || true
   progress_end "$rc"
   rm -f "$log"
+  [ -z "${RDIR:-}" ] || rm -rf "$RDIR"
   slots_release
   rm -rf "$lockdir"
 }
 trap finish_run EXIT
+trap 'exit 130' INT
+trap 'exit 143' TERM
 
 slots_wait validate "$(issue_from_branch "$(current_branch)")" "$ROOT" || exit $?
 slots_load_report | grep '^warn:' || true
@@ -244,6 +284,13 @@ started=1
 set +e
 run_validate 2>&1 | tee "$log"
 rc=${PIPESTATUS[0]}
+if [ "$tests" = 1 ]; then
+  sleep 1   # a test that exited just now may still be detaching its children
+  if orphan="$(orphan_sweep)"; then
+    { printf '%s\n' "$orphan"; echo "FAIL: the suite left orphan processes (listed and stopped above); the test that starts a process stops it"; } 2>&1 | tee -a "$log"
+    rc=1
+  fi
+fi
 set -e
 history_add validate "$(slots_repo_name)" "$(issue_from_branch "$(current_branch)")" "$SLOT_WAIT" "$(( $(now_epoch) - t0 ))"
 exit "$rc"

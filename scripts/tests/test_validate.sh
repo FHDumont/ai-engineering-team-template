@@ -8,7 +8,7 @@ source "$(dirname "$0")/lib.sh"
 repo="$(make_repo)"
 mkdir -p "$repo/scripts/lib" "$repo/scripts/tests"
 cp "$SCRIPTS/validate.sh" "$repo/scripts/validate.sh"
-cp "$SCRIPTS/lib/common.sh" "$SCRIPTS/lib/slots.sh" "$SCRIPTS/lib/progress.sh" "$SCRIPTS/lib/machine-limits.env.example" "$repo/scripts/lib/"
+cp "$SCRIPTS/lib/common.sh" "$SCRIPTS/lib/slots.sh" "$SCRIPTS/lib/progress.sh" "$SCRIPTS/lib/procs.sh" "$SCRIPTS/lib/machine-limits.env.example" "$repo/scripts/lib/"
 PROBE="$TMP/probe.out"
 cat >"$repo/scripts/tests/test_probe.sh" <<P
 #!/usr/bin/env bash
@@ -61,7 +61,7 @@ assert_eq "" "$(pgrep -f "$broken/scripts" || true)" "no process of the broken c
 dep="$(make_repo)"
 mkdir -p "$dep/scripts/lib" "$dep/scripts/tests" "$dep/dashboard" "$dep/web"
 cp "$SCRIPTS/validate.sh" "$dep/scripts/validate.sh"
-cp "$SCRIPTS/lib/common.sh" "$SCRIPTS/lib/slots.sh" "$SCRIPTS/lib/progress.sh" "$SCRIPTS/lib/machine-limits.env.example" "$dep/scripts/lib/"
+cp "$SCRIPTS/lib/common.sh" "$SCRIPTS/lib/slots.sh" "$SCRIPTS/lib/progress.sh" "$SCRIPTS/lib/procs.sh" "$SCRIPTS/lib/machine-limits.env.example" "$dep/scripts/lib/"
 printf 'fastapi==0.110\nuvicorn\n' >"$dep/dashboard/requirements.txt"
 printf '{}\n' >"$dep/web/package.json"
 cat >"$dep/scripts/tests/test_dep.sh" <<'P'
@@ -81,7 +81,7 @@ case "$(last_output)" in *"missing dependency"*) bad "the CI output has no depen
 par="$(make_repo)"
 mkdir -p "$par/scripts/lib" "$par/scripts/tests"
 cp "$SCRIPTS/validate.sh" "$par/scripts/validate.sh"
-cp "$SCRIPTS/lib/common.sh" "$SCRIPTS/lib/slots.sh" "$SCRIPTS/lib/progress.sh" "$SCRIPTS/lib/machine-limits.env.example" "$par/scripts/lib/"
+cp "$SCRIPTS/lib/common.sh" "$SCRIPTS/lib/slots.sh" "$SCRIPTS/lib/progress.sh" "$SCRIPTS/lib/procs.sh" "$SCRIPTS/lib/machine-limits.env.example" "$par/scripts/lib/"
 for n in a b; do
   cat >"$par/scripts/tests/test_$n.sh" <<P
 #!/usr/bin/env bash

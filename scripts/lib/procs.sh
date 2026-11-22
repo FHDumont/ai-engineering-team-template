@@ -117,6 +117,7 @@ orphan_cwd_match() { # orphan_cwd_match <cwd>
 # dir, the ones whose cwd is a temporary folder (orphan_cwd_match) and that are at least
 # AI_METHOD_ORPHAN_MIN_AGE seconds old (default 60: a process another run is still
 # starting is not an orphan yet). Never this process.
+# shellcheck disable=SC2120  # callers pass dirs, or none for the temporary-folder sweep
 procs_orphans() { # procs_orphans [dir...]
   local rows pid et cmd cwd d min="${AI_METHOD_ORPHAN_MIN_AGE:-60}" ok
   rows="$(ps -axo pid=,ppid=,etime=,command= | awk '$2 == 1 && $1 != 1 { print }')"
