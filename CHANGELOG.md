@@ -14,6 +14,7 @@
 
 ## Correções
 
+- fix(tests): the series case of test_validate.sh waits a short explicit limit ([#79](https://github.com/FHDumont/ai-engineering-team-template/pull/79)) · 2026-11-22
 - feat(ci): run CI on push to main and let phase-start wait for it ([#61](https://github.com/FHDumont/ai-engineering-team-template/pull/61)) · 2026-11-21
 - fix: accept a main base without CI when its merged PR had green CI and the same tree ([#37](https://github.com/FHDumont/ai-engineering-team-template/pull/37)) · 2026-11-21
 
@@ -26,6 +27,15 @@
 
 ## Outros
 
+- perf(tests): cut the fixed cost per test and split the largest tests ([#86](https://github.com/FHDumont/ai-engineering-team-template/pull/86)) · 2026-11-22
+- perf(tests): split phase-start and hook tests, make the headless test load-proof ([#84](https://github.com/FHDumont/ai-engineering-team-template/pull/84)) · 2026-11-22
+- perf(tests): split test_close_phase.sh into parallel files ([#82](https://github.com/FHDumont/ai-engineering-team-template/pull/82)) · 2026-11-22
+- feat(close-phase): notes to the headless child and cheap pre-review ([#80](https://github.com/FHDumont/ai-engineering-team-template/pull/80)) · 2026-11-22
+- fix: tests never fail by time under load and the orphan scan is cheap ([#77](https://github.com/FHDumont/ai-engineering-team-template/pull/77)) · 2026-11-22
+- fix(tests): no process of the method outlives its creator ([#73](https://github.com/FHDumont/ai-engineering-team-template/pull/73)) · 2026-11-21
+- fix: detach the headless child from the caller pipes and process group ([#72](https://github.com/FHDumont/ai-engineering-team-template/pull/72)) · 2026-11-21
+- fix(phase-start): wait for the workflow run of main before the CI job exists ([#70](https://github.com/FHDumont/ai-engineering-team-template/pull/70)) · 2026-11-21
+- fix(ci): run the tests on PRs of generated ROADMAP and CHANGELOG ([#69](https://github.com/FHDumont/ai-engineering-team-template/pull/69)) · 2026-11-21
 - docs(process): ask the owner only on sensitive actions ([#60](https://github.com/FHDumont/ai-engineering-team-template/pull/60)) · 2026-11-21
 - feat: run the validate.sh test suite in parallel ([#58](https://github.com/FHDumont/ai-engineering-team-template/pull/58)) · 2026-11-21
 - perf: faster phase opening and loose spec only for pending phases ([#57](https://github.com/FHDumont/ai-engineering-team-template/pull/57)) · 2026-11-21
