@@ -11,6 +11,9 @@
 #:   ~/Library/Application Support/Claude/claude-code-sessions, read only; the
 #:   AI_METHOD_SESSIONS_DIR variable overrides the folder). Only the owner frees
 #:   those: app menu, Archive (not Delete: the history is lost).
+#:   A session whose parent is 1 (the creator is gone) and whose directory is a
+#:   temporary folder of a test or a worktree that no longer exists gets the mark
+#:   "orphan" at the end of its line; close-phase.sh --cleanup stops it.
 #: --close-idle: stops the headless sessions (never a child of the Claude.app,
 #:   never this process or its ancestors) idle for more than N hours (CPU under 1%)
 #:   with their MCPs. --under limits it to sessions whose directory is <dir> or
@@ -74,8 +77,11 @@ case "$mode" in
       for k in $(proc_descendants "$pid"); do
         n=$((n + 1)); kr=$((kr + $(ps -o rss= -p "$k" 2>/dev/null | tr -d ' ' || echo 0)))
       done
-      printf '%-44s %-9s %7s %9s %5s %7s %s\n' "$(repo_of "$(proc_cwd "$pid")")" "$kind" "$pid" "$et" "$cpu" \
-        "$(rss_mb "$rss")" "$n (+$(rss_mb "$kr") MB)"
+      cwd="$(proc_cwd "$pid")"
+      mark=""
+      if [ "$(proc_ppid "$pid")" = 1 ] && orphan_cwd_match "$cwd"; then mark=" orphan"; fi
+      printf '%-44s %-9s %7s %9s %5s %7s %s\n' "$(repo_of "$cwd")" "$kind" "$pid" "$et" "$cpu" \
+        "$(rss_mb "$rss")" "$n (+$(rss_mb "$kr") MB)$mark"
     done ;;
   --close-idle)
     stopped=0

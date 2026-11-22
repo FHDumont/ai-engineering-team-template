@@ -7,7 +7,7 @@ TESTS_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO="$(cd "$TESTS_DIR/../.." && pwd)"
 # shellcheck disable=SC2034  # used by the tests that load this file
 SCRIPTS="$REPO/scripts"
-TMP="$(cd "$(mktemp -d)" && pwd -P)"
+TMP="$(cd "$(mktemp -d "${TMPDIR:-/tmp}/tmp.XXXXXXXX")" && pwd -P)"
 # No test leaves a process alive (issue #66): whatever the test started in the
 # background, or left with its folder as the cwd or in its command line, is stopped at
 # the end, also when an assertion failed or the test got INT/TERM. A test that sets its

@@ -61,7 +61,7 @@ vrepo="$(make_repo)"
 vname="$(basename "$vrepo")"
 mkdir -p "$vrepo/scripts/lib" "$vrepo/scripts/tests"
 cp "$SCRIPTS/validate.sh" "$vrepo/scripts/validate.sh"
-cp "$SCRIPTS/lib/common.sh" "$SCRIPTS/lib/slots.sh" "$SCRIPTS/lib/progress.sh" "$SCRIPTS/lib/machine-limits.env.example" "$vrepo/scripts/lib/"
+cp "$SCRIPTS/lib/common.sh" "$SCRIPTS/lib/slots.sh" "$SCRIPTS/lib/progress.sh" "$SCRIPTS/lib/procs.sh" "$SCRIPTS/lib/machine-limits.env.example" "$vrepo/scripts/lib/"
 printf '#!/usr/bin/env bash\nexit 0\n' >"$vrepo/scripts/tests/test_a.sh"
 printf '#!/usr/bin/env bash\nexit 0\n' >"$vrepo/scripts/tests/test_b.sh"
 git -C "$vrepo" checkout --quiet -b feat/issue-55-x
