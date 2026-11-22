@@ -13,7 +13,8 @@
 #:   those: app menu, Archive (not Delete: the history is lost).
 #:   A session whose parent is 1 (the creator is gone) and whose directory is a
 #:   temporary folder of a test or a worktree that no longer exists gets the mark
-#:   "orphan" at the end of its line; close-phase.sh --cleanup stops it.
+#:   "orphan" at the end of its line. The mark only informs: close-phase.sh
+#:   --cleanup does not stop an orphan outside the phase worktree.
 #: --close-idle: stops the headless sessions (never a child of the Claude.app,
 #:   never this process or its ancestors) idle for more than N hours (CPU under 1%)
 #:   with their MCPs. --under limits it to sessions whose directory is <dir> or
