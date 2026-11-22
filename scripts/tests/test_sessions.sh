@@ -54,19 +54,25 @@ assert_eq dead "$(alive "$head")" "the headless child of the trace is stopped"
 assert_eq alive "$(alive "$appclaude")" "the app session still stays"
 
 # sessions.sh: --list, --close-idle (headless only), --stale.
+# --close-idle runs inside a temporary repository: --under only narrows there.
 export AI_METHOD_IDLE_HOURS=4
 S="$SCRIPTS/sessions.sh"
-(cd "$TMP/other" || exit; exec "$TMP/fake/claude" -p idle >/dev/null 2>&1) &
+repo_s="$(make_repo)"
+mkdir -p "$repo_s/other"
+(cd "$repo_s/other" || exit; exec "$TMP/fake/claude" -p idle >/dev/null 2>&1) &
 hl=$!; PIDS="$PIDS $hl"
 sleep 1
 assert_status 0 "sessions.sh --list" "$S" --list
 assert_contains "$(last_output)" "headless" "--list shows the headless session"
 assert_contains "$(last_output)" " app " "--list shows the app session"
-assert_status 0 "--close-idle with the default hours" "$S" --close-idle --under "$TMP"
+assert_status 0 "--close-idle with the default hours" \
+  bash -c 'cd "$1" && exec "$2" --close-idle --under "$1"' _ "$repo_s" "$S"
 assert_eq alive "$(alive "$hl")" "a young headless session stays"
-assert_status 0 "--close-idle --dry-run" "$S" --close-idle --older-than 0 --under "$TMP" --dry-run
+assert_status 0 "--close-idle --dry-run" \
+  bash -c 'cd "$1" && exec "$2" --close-idle --older-than 0 --under "$1" --dry-run' _ "$repo_s" "$S"
 assert_eq alive "$(alive "$hl")" "dry-run stops nothing"
-assert_status 0 "--close-idle --older-than 0 stops it" "$S" --close-idle --older-than 0 --under "$TMP"
+assert_status 0 "--close-idle --older-than 0 stops it" \
+  bash -c 'cd "$1" && exec "$2" --close-idle --older-than 0 --under "$1"' _ "$repo_s" "$S"
 sleep 1
 assert_eq dead "$(alive "$hl")" "an idle headless session is stopped"
 assert_eq alive "$(alive "$appclaude")" "--close-idle never stops a child of the Claude.app"
