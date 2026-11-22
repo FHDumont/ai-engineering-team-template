@@ -84,8 +84,8 @@ git -C "$repo" worktree add --quiet -b fix/issue-6-b "$repo/.worktrees/issue-6" 
 (cd "$repo/.worktrees/issue-6" && "$SCRIPTS/status.sh" --state trabalhando >/dev/null)
 out="$(cd "$repo" && "$SCRIPTS/status.sh" --state trabalhando --next "esperar as fases")"
 assert_eq "Fases abertas:
-- #5 — Fim coerente — trabalhando
-- #6 — Modelo e esforço — trabalhando
+- #5 — Fim coerente — aberta, sem sessão
+- #6 — Modelo e esforço — aberta, sem sessão
 
 **Estado:** trabalhando
 
@@ -98,8 +98,8 @@ mkdir -p "$repo/.worktrees/issue-5/docs/specs"
 printf '# Spec\n\n## Fase #5 — a\n\n1. Etapa. modelo: fable · esforço: high · motivo: x\n' >"$repo/.worktrees/issue-5/docs/specs/five.md"
 printf '{"event":"phase_session","issue":"6","model":"sonnet","effort":"medium"}\n' >>"$PROCESS_EVENTS_FILE"
 out="$(cd "$repo" && "$SCRIPTS/status.sh" --state trabalhando --next "esperar as fases")"
-assert_contains "$out" "- #5 — Fim coerente — trabalhando — modelo/esforço: fable/high (pedido)" "no phase_session yet: the pair of the spec, marked pedido"
-assert_contains "$out" "- #6 — Modelo e esforço — trabalhando — modelo/esforço: sonnet/medium" "the real pair of the session"
+assert_contains "$out" "- #5 — Fim coerente — aberta, sem sessão — modelo/esforço: fable/high (pedido)" "no phase_session yet: open without a session, never trabalhando"
+assert_contains "$out" "- #6 — Modelo e esforço — trabalhando — modelo/esforço: sonnet/medium" "a card that already became a session is trabalhando"
 assert_not_contains "$out" "sonnet/medium (pedido)" "the real pair is not marked pedido"
 (cd "$repo/.worktrees/issue-5" && "$SCRIPTS/status.sh" --state esperando --need "responder ao cartão do merge" >/dev/null)
 out="$(cd "$repo" && "$SCRIPTS/status.sh" --state trabalhando --next "esperar as fases")"
@@ -110,4 +110,9 @@ out="$(cd "$repo" && "$SCRIPTS/status.sh" --state esperando --need "aprovar a sp
 assert_contains "$out" "**Você precisa:** aprovar a spec; Fase #5 — Fim coerente: responder ao cartão do merge" "the pending decision joins the need of the main session"
 out="$(cd "$repo/.worktrees/issue-6" && "$SCRIPTS/status.sh" --state trabalhando)"
 assert_not_contains "$out" "Fases abertas" "a phase session lists no phase"
+printf '{"event":"phase_session","issue":"5","model":"sonnet","effort":"low"}\n' >>"$PROCESS_EVENTS_FILE"
+(cd "$repo/.worktrees/issue-5" && "$SCRIPTS/status.sh" --state esperando --need 'clique no cartão "Fase #5"' >/dev/null)
+out="$(cd "$repo" && "$SCRIPTS/status.sh" --state trabalhando --next "esperar as fases")"
+assert_contains "$out" "- #5 — Fim coerente — trabalhando" "a card that already became a session is trabalhando"
+assert_not_contains "$out" "clique no cartão" "does not wait for a card click after the session exists"
 finish

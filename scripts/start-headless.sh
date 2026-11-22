@@ -3,8 +3,12 @@
 #:
 #: Usage: start-headless.sh <issue> [--brief <text> | --brief-file <file>] [--dry-run]
 #:
-#: For the manager when the app refuses start_session (Remote Control): the phase
-#: must already be open (phase-start.sh). It reads the pair "modelo/esforço" of the
+#: Off by default. PROCESS_HEADLESS=on or a one-line "on" in .github/headless
+#: (a repo file; the template update does not overwrite it) turns it on. A
+#: refusal for lack of owner speech is a card or a wait, not this script.
+#: No --allowedTools Bash beyond the app child.
+#: For the manager when the owner turned headless on for that opening or the app
+#: does not exist: the phase must already be open (phase-start.sh). It reads the pair "modelo/esforço" of the
 #: spec in the worktree of the phase (the spec may exist only on its branch), then starts in the background, inside .worktrees/issue-<n>:
 #:   claude -p <execute prompt> --session-id <uuid> --model <m> --effort <e>
 #: with stdin from /dev/null, stdout and stderr only in the log
@@ -24,10 +28,11 @@
 #: execute prompt, under "Brief of the manager:"; phase_headless records brief=yes
 #: (or brief=no). The app child gets the brief through the background of
 #: start_session; without it here the headless child would only see the skill.
-#: Permission mode: HEADLESS_PERMISSION_MODE (default acceptEdits, plus Bash allowed).
-#: Exit 3: "claude" is not installed (fall back to the card of start_session);
-#: 4: the process died right after the start (see the log); 2: bad usage or no
-#: worktree/pair. --dry-run prints the command and starts nothing.
+#: Permission mode: HEADLESS_PERMISSION_MODE (default acceptEdits; same tools as the app child).
+#: Exit 5: headless is off (card or wait instead); 3: "claude" is not installed
+#: (fall back to the card of start_session); 4: the process died right after the
+#: start (see the log); 2: bad usage or no worktree/pair. --dry-run prints the
+#: command and starts nothing.
 set -euo pipefail
 HERE="$(cd "$(dirname "$0")" && pwd)"
 # shellcheck source=scripts/lib/common.sh
@@ -48,7 +53,16 @@ while [ $# -gt 0 ]; do
   esac
 done
 [ -n "$issue" ] || { print_help "$0"; exit 2; }
-require_cmd git jq python3
+require_cmd git
+headless_on() {
+  case "${PROCESS_HEADLESS:-}" in on|ON|1|true) return 0 ;; esac
+  local root
+  root="$(git worktree list --porcelain 2>/dev/null | sed -n '1s/^worktree //p')"
+  [ -n "$root" ] || root="$(git rev-parse --show-toplevel 2>/dev/null || true)"
+  [ -f "$root/.github/headless" ] && grep -qxF on "$root/.github/headless"
+}
+headless_on || die "headless is off: propose the session (initiation own_initiative) or wait for the owner to speak here; do not start a headless child" 5
+require_cmd jq python3
 command -v claude >/dev/null 2>&1 || die "claude is not installed: use the card of start_session" 3
 
 main_root="$(git worktree list --porcelain | sed -n '1s/^worktree //p')"
@@ -70,7 +84,7 @@ prompt="Execute the phase of issue #$issue with the execute skill; work in the w
 Brief of the manager:
 $brief"
 cmd=(claude -p "$prompt" --session-id "$sid" --model "$model" --effort "$effort"
-  --permission-mode "$mode" --allowedTools Bash)
+  --permission-mode "$mode")
 if [ "$dry" = 1 ]; then
   echo "cwd: $wt"
   echo "env: CLAUDE_CODE_PRINT_BG_WAIT_CEILING_MS=0"
