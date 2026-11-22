@@ -636,7 +636,7 @@ O agente `close-reviewer`, aberto com o par do peso `reviewer` (§3), lê a issu
 | 3ª rodada de "mudanças pedidas" | a filha para e avisa a sessão principal, que faz o quadro ao dono: corrigir, aceitar com achado, pausar |
 | Registro | toda rodada, aprovada e reprovada, vira comentário no PR |
 | Pré-revisão | antes do `--prepare`, o `close-reviewer` lê só a issue e o diff (sem testes, push ou CI); `close-phase.sh --pre-review` grava `pre_review` no trace; grave ou médio: corrige e repete, no máximo 2 vezes, sem `--prepare`; o `--prepare` só avisa sem `pre_review` do HEAD; a rodada oficial não muda |
-| Recado à filha headless | comentário na issue com `Para: fase #n`: a filha o relê antes de cada etapa e do `--merge`, que recusa (saída 12) até ela responder com `De: fase #n` |
+| Recado à filha | comentário na issue com `Para: fase #n` (filha do app e headless, além da mensagem de sessão): a filha o relê antes de cada etapa, da parada de lab-test e do `--merge`; o `--merge` relê imediatamente antes do `gh pr merge` e recusa (saída 12) até ela responder com `De: fase #n`; `status.sh --state esperando` no lab-test recusa do mesmo modo; o ok do quadro não vence um recado posterior à abertura dele |
 
 ### 10.3 Nunca fecha sozinho
 
@@ -644,7 +644,7 @@ Lista: cobrança, autenticação, migração de banco, credenciais, infraestrutu
 
 1. As labels `area:billing`, `area:auth`, `area:migration` e `area:credentials` são aplicadas pela triagem e pelo workflow.
 2. Os caminhos do método (hooks, `.claude/settings.json`, `.githooks/`, `.github/actions/`, workflows com token de escrita, `scripts/lib/procs.sh`, `scripts/sessions.sh`, `scripts/start-headless.sh`, `scripts/setup-repo.sh`) valem no código (`scripts/lib/sensitive_paths.py`). `.github/sensitive-paths` só acrescenta os globs do projeto e os arquivos do próprio portão (`close-phase.sh`, workflows de deploy, `ci.yml`, os verificadores lidos da base e a própria lista); a atualização soma caminho novo do método sem apagar o do repo. O job `policy` do CI põe `needs-owner-ok` quando o diff toca um deles. O `close-phase.sh --merge` decide pela união da lista da base (`origin/main`) com a do PR: tirar uma entrada no próprio PR não dispensa o ok, e base sem lista legível recusa o merge.
-3. O `close-phase.sh --merge` sai 5 com `needs-owner-ok` ou com label de área sensível. A filha pede o ok do dono num quadro `Fase #<n> — <título>:` e roda `--merge --owner-ok --wait`. O `--owner-ok` só vale com a label `needs-owner-ok` já posta no PR: sem ela, a recusa põe a label e sai 5.
+3. O `close-phase.sh --merge` sai 5 com `needs-owner-ok` ou com label de área sensível. A filha pede o ok do dono num quadro `Fase #<n> — <título>:` cujas opções dizem a ação inteira e o SHA do HEAD, e roda `--merge --owner-ok <sha> --wait`. O `--owner-ok` recebe o SHA e só vale se for o HEAD e se a label `needs-owner-ok` já estiver no PR: sem ela, a recusa põe a label e sai 5. Quadros de sessões diferentes sobre o mesmo merge não ficam abertos juntos.
 
 Para todo o resto, `end:auto-close` vale como ok prévio do dono para o merge.
 

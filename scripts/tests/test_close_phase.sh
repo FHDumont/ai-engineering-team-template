@@ -102,4 +102,17 @@ handler "type:feature" success
 assert_status 1 "an unreadable issue refuses the merge" env FAKE_GH_FAIL="issue view 5.*--json comments" sh -c "cd '$repo' && '$CLOSE' --merge"
 assert_not_contains "$(gh_calls)" "pr merge" "no merge when the comments cannot be read"
 
+# --merge rereads notes immediately before gh pr merge (#122): a note that
+# arrives after the first read still holds the merge.
+child_session 5
+handler "type:feature" success
+rm -f "$TMP/comments.json"
+comments "$(note)"
+mv "$TMP/comments.json" "$TMP/comments_later.json"
+assert_status 12 "rereads notes immediately before gh pr merge" \
+  env FAKE_NOTE_FROM_READ=2 sh -c "cd '$repo' && '$CLOSE' --merge"
+assert_contains "$(last_output)" "issues/5#c" "names the note found on the second read"
+assert_not_contains "$(gh_calls)" "pr merge" "no merge when a note arrives before gh pr merge"
+rm -f "$TMP/comments_later.json"
+
 finish

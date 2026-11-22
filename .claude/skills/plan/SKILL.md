@@ -13,14 +13,14 @@ description: Planejamento nível 2 — lê por inteiro só as issues escolhidas 
 4a. §2.1: critério verificável, escopo explícito, solução simples.
 5. Escreva `docs/specs/AAAA-MM-DD-<group>.md`, seção por fase:
    - issue, objetivo, pronto quando, arquivos;
-   - etapas (um commit cada) com `modelo: … · esforço: … · motivo: …`, o par que `scripts/weights.sh <peso>` imprime (`light`, `medium` ou `strong`, §3), nunca de memória;
+   - etapas (um commit cada) com `modelo: … · esforço: … · motivo: …`, o par que `scripts/weights.sh <peso>` imprime (`light`, `medium` ou `strong`, §3);
    - modo de fim, área sensível, solo ou paralela (`integration.md`).
 6. Ok da spec: quadro (ou label `approved`). Aplique `end:*` e `group:*`.
-7. **Antes de qualquer `start_session`:** linha com o par atual e o da spec; nunca execute aqui. Fecho liberado: passo 6. Abertura: só `scripts/phase-start.sh <n> [<n>…]`.
+7. **Antes de qualquer `start_session`:** linha com o par atual e o da spec; nunca execute aqui. Abertura: só `scripts/phase-start.sh <n> [<n>…]`.
    - **Filhas:** no mesmo turno do "executar", um `start_session` por fase, com: `initiation: "user_asked"`, `context: "fresh"`, `use_worktree: false`, `title`, `prompt`, `background`, `model`/`effort` da spec; o fecho vai no brief. O `check-env.sh` da filha confere o par (§3); divergência: `set_session_model`/`set_session_effort`.
    - **Par:** leia do app, cite.
    - **Batimento, depois das filhas:** só com `list_sessions` mostrando filha rodando. Tarefa do `phase-start.sh` (4 minutos): faz o próximo passo; só escreve, com o bloco, se o estado mudou. A `integrate` apaga.
    - **Recusado** (sem fala do dono): `initiation: "own_initiative"` (cartão) ou esperar; pare com o `--state esperando --need` do `phase-start.sh` (título exato e onde: "na barra lateral, dentro do agrupamento da sessão principal; se não aparecer, abra o agrupamento"). Headless só se o dono ligou (§4.3). Nunca subagente.
-8. Vira a **gerenciadora**: não edita nem executa; só ela pergunta ao dono e repassa, inclusive "fechar fase". Após o último merge: skill `integrate`.
+8. Vira a **gerenciadora**: não edita nem executa; só ela pergunta ao dono e repassa, inclusive "fechar fase". Segurar o merge é comentário `Para: fase #n` na issue, além da mensagem. Após o último merge: skill `integrate`.
 9. Feito: só lido de volta.
 10. Fim de turno: saída do `status.sh`, sem bloco de código.

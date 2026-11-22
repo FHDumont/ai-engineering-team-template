@@ -144,7 +144,7 @@ git -C "$repo" rm --quiet .github/sensitive-paths; git -C "$repo" commit --quiet
 git -C "$repo" push --quiet origin nolist
 git -C "$repo" switch --quiet feat/issue-5-x
 handler "type:feature" success
-assert_status 1 "refuses merge when the base has no readable list" env FAKE_BASE=nolist sh -c "cd '$repo' && '$CLOSE' --merge --owner-ok"
+assert_status 1 "refuses merge when the base has no readable list" env FAKE_BASE=nolist sh -c "cd '$repo' && '$CLOSE' --merge --owner-ok '$SHA'"
 assert_contains "$(last_output)" "cannot read .github/sensitive-paths of origin/nolist" "says the base list is unreadable"
 assert_not_contains "$(gh_calls)" "pr merge" "never merges without the base list"
 cp "$REPO/.github/sensitive-paths" "$repo/.github/sensitive-paths"

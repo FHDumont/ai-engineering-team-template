@@ -6,7 +6,7 @@
 #:   close-phase.sh --publish-review F --verdict success|failure [--round N]
 #:   close-phase.sh --pre-review --verdict clean|findings [--round N]
 #:   close-phase.sh --check
-#:   close-phase.sh --merge [--owner-ok] [--wait]
+#:   close-phase.sh --merge [--owner-ok SHA] [--wait]
 #:
 #: Do not pipe --check or --merge (the pipe hides the exit code and the cleanup
 #: can stop the reader). Write the output to a file and read its last line:
@@ -53,8 +53,8 @@
 #: --merge: first refuses (exit 12) while the issue holds a comment headed "Para: fase #n"
 #:   (scripts/lib/author.sh) after the last comment of the phase itself; then refuses with needs-owner-ok, a sensitive area label or a diff in
 #:   .github/sensitive-paths (union of the base's list and the PR's; no readable
-#:   list on the base: refused), unless --owner-ok (only after the owner's ok in a
-#:   choice question). --owner-ok only counts with needs-owner-ok already on the
+#:   list on the base: refused), unless --owner-ok SHA (only after the owner's ok in a
+#:   choice question, bound to that SHA of HEAD). --owner-ok only counts with needs-owner-ok already on the
 #:   PR: without it the refusal puts the label (read back) and exits 5, with or
 #:   without the flag. Requires review/independent = success on HEAD and, in the
 #:   trace, the close-reviewer round of this session after the push of that HEAD
@@ -101,6 +101,8 @@ HERE="$(cd "$(dirname "$0")" && pwd)"
 source "$HERE/lib/common.sh"
 # shellcheck source=scripts/lib/progress.sh
 source "$HERE/lib/progress.sh"
+# shellcheck source=scripts/lib/notes.sh
+source "$HERE/lib/notes.sh"
 ROOT="$(cd "$HERE/.." && pwd)"
 
 # gh prints "hint:" lines (for example "gh event listen") that drown the result
@@ -117,7 +119,7 @@ gh() {
   return "$rc"
 }
 
-mode="" title="" body_file="" issue="" review_file="" verdict="" round="" owner_ok=0 wait=0 discard=0
+mode="" title="" body_file="" issue="" review_file="" verdict="" round="" owner_ok=0 owner_ok_sha="" wait=0 discard=0
 while [ $# -gt 0 ]; do
   case "$1" in
     -h|--help) print_help "$0"; exit 0 ;;
@@ -131,7 +133,12 @@ while [ $# -gt 0 ]; do
     --cleanup) mode=cleanup; shift ;;
     --abort) mode=abort; shift ;;
     --discard) discard=1; shift ;;
-    --owner-ok) owner_ok=1; shift ;;
+    --owner-ok)
+      owner_ok=1
+      case "${2:-}" in
+        ''|--*) die "--owner-ok needs the SHA of the approved HEAD" 2 ;;
+        *) owner_ok_sha="$2"; shift 2 ;;
+      esac ;;
     --wait) wait=1; shift ;;
     --title) title="$2"; shift 2 ;;
     --body-file) body_file="$2"; shift 2 ;;
@@ -500,27 +507,17 @@ unprotected_gate() { # unprotected_gate <sha>
   echo "unprotected mode: CI and review/independent are success on ${sha:0:12} (read through the API)"
 }
 
-# Notes to the phase left unanswered on its issue: the comments whose header says
-# "Para: fase #n" (scripts/lib/author.sh) after the last comment the phase itself wrote
-# ("De: fase #n"). Prints the url of each; a read that fails is an error (fails closed).
+# Notes to the phase left unanswered on its issue (scripts/lib/notes.sh). A read
+# that fails is an error (fails closed).
 pending_notes() {
-  local json
-  [ -n "$issue" ] || return 0
-  json="$(gh issue view "$issue" --repo "$repo" --json comments)" ||
+  local notes
+  notes="$(phase_pending_notes "$issue" "$repo")" ||
     die "cannot read the comments of issue #$issue: merge blocked"
-  [ -n "$json" ] || return 0
-  printf '%s' "$json" | jq -r --arg n "$issue" '
-    (.comments // []) as $c
-    | ($c | map(.body | test("(^|\n)\\*\\*De:\\*\\* fase #" + $n + " ·")) | rindex(true) // -1) as $last
-    | $c | to_entries[]
-    | select(.key > $last and (.value.body | test("(^|\n)\\*\\*De:\\*\\* [^\n]+ · \\*\\*Para:\\*\\* fase #" + $n + " ·")))
-    | .value.url // "(comment without url)"' ||
-    die "cannot parse the comments of issue #$issue: merge blocked"
+  printf '%s' "$notes"
 }
 
-merge() {
-  local n info labels sha state notes
-  n="$(pr_number)"; [ -n "$n" ] || die "no open PR for $branch"
+refuse_pending_notes() {
+  local notes
   notes="$(pending_notes)"
   if [ -n "$notes" ]; then
     echo "refused: issue #$issue has a note to phase #$issue with no answer:"
@@ -528,6 +525,12 @@ merge() {
     echo "read it, follow it, and answer with a comment headed by scripts/lib/author.sh (De: fase #$issue); then run --merge again"
     exit 12
   fi
+}
+
+merge() {
+  local n info labels sha state
+  n="$(pr_number)"; [ -n "$n" ] || die "no open PR for $branch"
+  refuse_pending_notes
   info="$(gh pr view "$n" --repo "$repo" --json labels,headRefOid,baseRefName)"
   labels="$(echo "$info" | jq -r '.labels[].name')"
   sha="$(echo "$info" | jq -r .headRefOid)"
@@ -565,7 +568,12 @@ merge() {
     if [ "$owner_ok" = 0 ] || [ "$labeled" = 0 ]; then
       echo "refused: PR #$n needs the owner's ok:$reasons"
       [ "$owner_ok" = 0 ] || echo "--owner-ok does not count: needs-owner-ok was not on PR #$n before this run"
-      echo "ask the repo owner with a choice question, then rerun with --merge --owner-ok"
+      echo "ask the repo owner with a choice question that names this SHA, then rerun with --merge --owner-ok $sha"
+      exit 5
+    fi
+    if [ "$owner_ok_sha" != "$sha" ]; then
+      echo "refused: --owner-ok $owner_ok_sha does not match HEAD $sha"
+      echo "ask the repo owner with a choice question that names this SHA, then rerun with --merge --owner-ok $sha"
       exit 5
     fi
     gh pr comment "$n" --repo "$repo" --body "<!-- owner-ok sha:$sha -->
@@ -601,6 +609,9 @@ Ok do dono do repo registrado (quadro de escolha) para:$reasons." >/dev/null
 
   # CI does not run on a PR edit: check the final body and the commits here.
   "$HERE/check-attribution.sh" --pr "$n" || die "PR #$n has AI attribution: fix the body or commits first"
+
+  # A note posted while this run was waiting still holds the merge (#122).
+  refuse_pending_notes
 
   if ! gh pr merge "$n" --repo "$repo" --auto --rebase --delete-branch >/dev/null 2>&1; then
     # Already clean (green checks): auto-merge does not turn on, so merge directly.
