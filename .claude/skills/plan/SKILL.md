@@ -20,7 +20,7 @@ description: Planejamento nível 2 — lê por inteiro só as issues escolhidas 
    - **Filhas:** no mesmo turno do "executar", um `start_session` por fase, com: `initiation: "user_asked"`, `context: "fresh"`, `use_worktree: false`, `title`, `prompt`, `background`, `model`/`effort` da spec; o fecho vai no brief. O `check-env.sh` da filha confere o par (§3); divergência: `set_session_model`/`set_session_effort`.
    - **Par:** leia do app, cite.
    - **Batimento, depois das filhas:** só com `list_sessions` mostrando filha rodando. Tarefa do `phase-start.sh` (4 minutos): faz o próximo passo; só escreve, com o bloco, se o estado mudou. A `integrate` apaga.
-   - **Recusado** (Remote Control): rode `scripts/start-headless.sh <n> --brief-file <arquivo>` (mesmo background; §4.3). Saída 3 ou 4: repita com `initiation: "own_initiative"` (cartão) e pare com o `--state esperando --need` do `phase-start.sh`: cartão, título exato e onde ("na barra lateral, dentro do agrupamento da sessão principal; se não aparecer, abra o agrupamento"). Nunca subagente.
+   - **Recusado** (sem fala do dono): `initiation: "own_initiative"` (cartão) ou esperar; pare com o `--state esperando --need` do `phase-start.sh` (título exato e onde: "na barra lateral, dentro do agrupamento da sessão principal; se não aparecer, abra o agrupamento"). Headless só se o dono ligou (§4.3). Nunca subagente.
 8. Vira a **gerenciadora**: não edita nem executa; só ela pergunta ao dono e repassa, inclusive "fechar fase". Após o último merge: skill `integrate`.
 9. Feito: só lido de volta.
 10. Fim de turno: saída do `status.sh`, sem bloco de código.

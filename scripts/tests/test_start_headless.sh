@@ -11,6 +11,7 @@ printf '# Spec\n\n## Fase #7 — x\n\n1. Etapa. modelo: sonnet · esforço: medi
 git -C "$repo" add .gitignore scripts docs
 git -C "$repo" commit --quiet -m "chore: scripts and spec"
 export PROCESS_EVENTS_FILE="$repo/.process/events.jsonl"
+export PROCESS_HEADLESS=on
 events() { cat "$PROCESS_EVENTS_FILE" 2>/dev/null || true; }
 # The fake claude of every start is stopped at the end, also when an assertion fails
 # (the pid is in the trace); then the sweep of lib.sh catches what is left.
@@ -30,6 +31,8 @@ export FAKE_CLAUDE_ARGS="$TMP/claude.args"
 
 assert_status 0 "--help works" "$repo/scripts/start-headless.sh" --help
 assert_contains "$(last_output)" 'claude -p "<answer>" --resume' "the resume text puts the prompt right after -p"
+assert_status 5 "headless is off by default" env PROCESS_HEADLESS= sh -c "cd '$repo' && PATH='$bin:$PATH' scripts/start-headless.sh 7 --dry-run"
+assert_contains "$(last_output)" "headless is off" "says to use a card or wait"
 assert_status 2 "needs an issue number" sh -c "cd '$repo' && scripts/start-headless.sh"
 assert_status 2 "refuses a phase without worktree" sh -c "cd '$repo' && PATH='$bin:$PATH' scripts/start-headless.sh 7"
 assert_contains "$(last_output)" "phase-start.sh" "says to open the phase first"
@@ -45,6 +48,7 @@ assert_not_contains "$(events)" "phase_headless" "no event without claude"
 
 assert_status 0 "--dry-run starts nothing" sh -c "cd '$repo' && PATH='$bin:$PATH' scripts/start-headless.sh 7 --dry-run"
 assert_contains "$(last_output)" "--model sonnet" "dry-run shows the model of the spec"
+assert_not_contains "$(last_output)" "--allowedTools" "no extra Bash allow beyond the app child"
 assert_not_contains "$(events)" "phase_headless" "dry-run records nothing"
 
 assert_status 0 "starts the headless child" sh -c "cd '$repo' && PATH='$bin:$PATH' scripts/start-headless.sh 7"

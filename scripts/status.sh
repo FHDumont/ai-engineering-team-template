@@ -92,7 +92,7 @@ if [ -z "$issue" ] && is_main_branch "$branch"; then
   while read -r wt; do
     p="$(phase_of_path "$wt")"
     [ -n "$p" ] || continue
-    n="${p%%"$TAB"*}" title="" p_state=trabalhando p_need="" p_pair=""
+    n="${p%%"$TAB"*}" title="" p_state="aberta, sem sessão" p_need="" p_pair="" has_session=""
     if [ "$offline" = 0 ] && command -v gh >/dev/null 2>&1; then
       title="$(gh issue view "$n" --json title --jq .title 2>/dev/null || true)"
     fi
@@ -103,6 +103,14 @@ if [ -z "$issue" ] && is_main_branch "$branch"; then
       if [ -n "$last" ]; then p_state="${last%%"$TAB"*}"; p_need="${last#*"$TAB"}"; fi
       p_pair="$(jq -rs --arg i "$n" '[.[] | select(type == "object" and .event == "phase_session" and (.issue | tostring) == $i)]
         | last | select(. != null) | "\(.model)/\(.effort)"' "$trace" 2>/dev/null || true)"
+      [ -z "$p_pair" ] || has_session=1
+    fi
+    if [ -z "$has_session" ]; then
+      [ "$p_state" != trabalhando ] || p_state="aberta, sem sessão"
+      [ -n "$last" ] || p_state="aberta, sem sessão"
+    else
+      [ -n "$last" ] || p_state=trabalhando
+      case "$p_need" in clique*) p_state=trabalhando; p_need="" ;; esac
     fi
     if [ -n "$p_pair" ]; then
       p_pair="modelo/esforço: $p_pair"
