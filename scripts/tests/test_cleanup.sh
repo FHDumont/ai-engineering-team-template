@@ -144,7 +144,7 @@ export FAKE_GH_HINT=1
 printf 'enable -n kill\n' >"$TMP/bin/disable-kill"
 # 8301 is another session (an observer). 8302 shares this session and has its own
 # process group (a server of the phase). Neither pid is a real process.
-sid120="$(/bin/ps -o sess= -p $$ | tr -d ' ')"
+sid120="$(python3 -c 'import os; print(os.getsid(0))')"
 printf '%s\t%s\t%s\t%s\t%s\n' \
   "8301" "1" "830101" "830101" "cat" \
   "8302" "1" "830202" "$sid120" "sleep 300" >"$TMP/ps120.tab"
@@ -152,13 +152,12 @@ export FAKE_PS_TAB="$TMP/ps120.tab" FAKE_REAL_PS="/bin/ps"
 cat >"$TMP/bin/ps" <<'PS'
 #!/bin/sh
 tab="${FAKE_PS_TAB:?}"
-spec="" pid=""
-while [ $# -gt 0 ]; do
-  case "$1" in
-    -p) pid="$2"; shift 2 ;;
-    -o|-axo) spec="$2"; shift 2 ;;
-    *) shift ;;
-  esac
+real="${FAKE_REAL_PS:-/bin/ps}"
+spec="" pid="" prev=""
+for arg in "$@"; do
+  if [ "$prev" = "-p" ]; then pid="$arg"; fi
+  if [ "$prev" = "-o" ] || [ "$prev" = "-axo" ]; then spec="$arg"; fi
+  prev="$arg"
 done
 emit() {
   fpid=$(printf '%s' "$1" | awk -F '\t' '{ print $1 }')
@@ -180,9 +179,8 @@ emit() {
 if [ -n "$pid" ]; then
   row=$(awk -F '\t' -v p="$pid" '$1 == p { print; exit }' "$tab")
   if [ -n "$row" ]; then emit "$row"; exit 0; fi
-  exec "$FAKE_REAL_PS" "$@"
 fi
-exec "$FAKE_REAL_PS" "$@"
+exec "$real" "$@"
 PS
 cat >"$TMP/bin/lsof" <<'LSOF'
 #!/bin/sh
@@ -260,7 +258,7 @@ assert_not_contains "$(cat "$TMP/kill120")" "TERM $sib120" "the pipe reader is n
 assert_not_contains "$(cat "$TMP/kill120")" "TERM 8301" "a process of another session that only has this cwd is not signaled"
 assert_contains "$(cat "$TMP/kill120")" "TERM 8302" "a server of this session in its own process group is stopped"
 assert_eq "" "$(cat "$TMP/early120")" "every signaled process is in the trace before the signal"
-assert_contains "$(cat "$PROCESS_EVENTS_FILE")" "\"pid\":\"$srv120\"" "the trace names the stopped pid"
+assert_contains "$(cat "$PROCESS_EVENTS_FILE")" "\"pid\":\"8302\"" "the trace names the stopped pid"
 assert_contains "$(cat "$PROCESS_EVENTS_FILE")" "sleep" "the trace names the command"
 assert_contains "$(cat "$PROCESS_EVENTS_FILE")" "$wt120" "the trace names the directory"
 assert_not_contains "$(cat "$out120")" "hint:" "gh hint lines are not forwarded"
