@@ -8,7 +8,25 @@ REPO="$(cd "$TESTS_DIR/../.." && pwd)"
 # shellcheck disable=SC2034  # used by the tests that load this file
 SCRIPTS="$REPO/scripts"
 TMP="$(cd "$(mktemp -d)" && pwd -P)"
-trap 'rm -rf "$TMP"' EXIT
+# No test leaves a process alive (issue #66): whatever the test started in the
+# background, or left with its folder as the cwd or in its command line, is stopped at
+# the end, also when an assertion failed or the test got INT/TERM. A test that sets its
+# own trap calls test_sweep in it.
+# shellcheck source=scripts/lib/procs.sh
+source "$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/lib/procs.sh"
+test_sweep() {
+  local p own="" left
+  own="$(proc_chain "$$" | tr '\n' ' ')"
+  left="$( { proc_descendants "$$"; procs_in_dir "$TMP"; pgrep -f "$TMP" 2>/dev/null || true; } | sort -un)"
+  for p in $left; do
+    case " $own " in *" $p "*) continue ;; esac
+    proc_alive "$p" || continue
+    printf '%s\n' "$p"
+  done | xargs kill -KILL 2>/dev/null || true
+}
+trap 'test_sweep; rm -rf "$TMP"' EXIT
+trap 'exit 130' INT
+trap 'exit 143' TERM
 # No test writes to the real trace (.process/events.jsonl of the main checkout).
 export PROCESS_EVENTS_FILE="$TMP/events.jsonl"
 # No test depends on the bots of this repository: every one reads the fixture.
