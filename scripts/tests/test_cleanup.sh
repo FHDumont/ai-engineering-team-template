@@ -240,9 +240,15 @@ out120="$TMP/out120"
 : >"$out120"
 (
   cd "$wt120" || exit 1
+  # Own pid. BASHPID is the subshell on bash 4; on bash 3.2 the child shell's
+  # parent is this subshell. Do not write "$(...)" next to $$: bash 4 parses that
+  # as a command substitution and the reader dies before the cleanup finishes.
+  if [ -n "${BASHPID:-}" ]; then sibpid=$BASHPID; else sibpid=$(sh -c 'echo "$PPID"'); fi
   while IFS= read -r line; do
     printf '%s\n' "$line" >>"$out120"
-    if grep -E -q "(^| )$$( |$)" "$FAKE_KILL_LOG" 2>/dev/null; then exit 0; fi
+    if awk -v p="$sibpid" '$1 == "TERM" && $2 == p { found = 1 } END { exit !found }' "$FAKE_KILL_LOG" 2>/dev/null; then
+      exit 0
+    fi
   done <"$fifo120"
 ) &
 sib120=$!
