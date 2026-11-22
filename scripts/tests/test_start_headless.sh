@@ -94,6 +94,28 @@ assert_eq "no" "$([ -e "$repo/docs/specs/eight.md" ] && echo yes || echo no)" "t
 assert_status 0 "reads the pair from the spec that exists only on the branch" sh -c "cd '$repo' && PATH='$bin:$PATH' scripts/start-headless.sh 8 --dry-run"
 assert_contains "$(last_output)" "--model opus --effort high" "the pair comes from the worktree spec"
 
+# #68: the child does not inherit the pipes of the caller and has a session of its own.
+# A fake that reports stdin, its process group and session, then lives a while.
+cat >"$bin/claude" <<'F'
+#!/usr/bin/env bash
+if [ -t 0 ] || [ -p /dev/stdin ] || ! [ -c /dev/stdin ]; then echo "stdin: inherited" >"$FAKE_CLAUDE_ARGS.in"; else echo "stdin: null" >"$FAKE_CLAUDE_ARGS.in"; fi
+echo "$(python3 -c "import os,sys;print(os.getsid(int(sys.argv[1])))" $$) $(ps -o pgid= -p $$) $$" >"$FAKE_CLAUDE_ARGS.ps"
+echo "child running"
+sleep 8
+F
+start=$SECONDS
+out="$(cd "$repo" && PATH="$bin:$PATH" scripts/start-headless.sh 7 2>&1 | tail -2)"
+assert_eq "1" "$([ $((SECONDS - start)) -lt 6 ] && echo 1 || echo 0)" "a | tail -2 caller returns in seconds, not when the child ends"
+assert_contains "$out" "log:" "the caller still sees the start lines"
+sleep 1
+assert_contains "$(cat "$FAKE_CLAUDE_ARGS.in")" "stdin: null" "stdin of the child is /dev/null"
+read -r csess cpgid cpid <"$FAKE_CLAUDE_ARGS.ps"
+assert_eq "$cpid" "$cpgid" "the child leads its own process group"
+assert_eq "$cpid" "$csess" "the child leads its own session"
+assert_not_contains "$out" "child running" "the output of the child is not in the caller pipe"
+assert_contains "$(cat "$wt/.process/headless.log")" "child running" "the output of the child is in the log"
+kill "$(events | jq -r 'select(.event == "phase_headless") | .pid' | tail -1)" 2>/dev/null || true
+
 # A child that dies at once with an error: exit 4, no event.
 cat >"$bin/claude" <<'F'
 #!/usr/bin/env bash
