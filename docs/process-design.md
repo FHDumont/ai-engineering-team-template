@@ -649,7 +649,7 @@ Para todo o resto, `end:auto-close` vale como ok prévio do dono para o merge.
 O arquivo é a fonte. Ele precisa ter:
 
 - `attribution` com `commit` e `pr` vazios;
-- `allow` para os scripts, para a leitura e escrita de issues e PRs com `gh` e para os comandos de git do dia a dia;
+- `allow` para cada script do método pelo nome (nunca `scripts/*`), para a leitura e escrita de issues e PRs com `gh` e para os comandos de git do dia a dia, sem `git push` genérico;
 - `deny` para `gh pr merge`, push forçado, `git reset --hard`, apagar o repo, disparo de workflow e leitura direta de segredo; o deny vence o allow;
 - os hooks da §6.2, cada um no evento da tabela.
 
