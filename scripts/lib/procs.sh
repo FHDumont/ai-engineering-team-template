@@ -91,6 +91,79 @@ app_claude_chains() {
   return 0
 }
 
+# Orphan = parent 1 (the creator is gone). Temporary folder of a test or of validate.sh:
+# a path with a component tmp.*, validate-tests.* or validate.* under a temp root
+# (/tmp, /var/folders and TMPDIR; AI_METHOD_ORPHAN_ROOT replaces the roots, for tests).
+proc_tmp_roots() {
+  if [ -n "${AI_METHOD_ORPHAN_ROOT:-}" ]; then echo "${AI_METHOD_ORPHAN_ROOT%/}"; return; fi
+  printf '%s\n' /tmp /private/tmp /var/folders /private/var/folders
+  [ -z "${TMPDIR:-}" ] || echo "${TMPDIR%/}"
+}
+
+# True when <dir> is a temporary folder of the method's tests, or a folder that is gone
+# from a worktree (.worktrees/<x>).
+orphan_cwd_match() { # orphan_cwd_match <cwd>
+  local d="$1" r
+  [ -n "$d" ] || return 1
+  case "$d" in */.worktrees/*) [ -d "$d" ] || return 0 ;; esac
+  case "$d" in */tmp.*|*/validate-tests.*|*/validate.*) ;; *) return 1 ;; esac
+  for r in $(proc_tmp_roots); do
+    case "$d" in "$r"/*) return 0 ;; esac
+  done
+  return 1
+}
+
+# Pids whose parent is 1 and whose cwd or command line is inside one of the dirs; with no
+# dir, the ones whose cwd is a temporary folder (orphan_cwd_match) and that are at least
+# AI_METHOD_ORPHAN_MIN_AGE seconds old (default 60: a process another run is still
+# starting is not an orphan yet). Never this process.
+procs_orphans() { # procs_orphans [dir...]
+  local rows pid et cmd cwd d min="${AI_METHOD_ORPHAN_MIN_AGE:-60}" ok
+  rows="$(ps -axo pid=,ppid=,etime=,command= | awk '$2 == 1 && $1 != 1 { print }')"
+  [ -n "$rows" ] || return 0
+  local pids
+  pids="$(printf '%s\n' "$rows" | awk '{ printf "%s%s", (n++ ? "," : ""), $1 }')"
+  local cwds
+  cwds="$(lsof -a -d cwd -Fpn -p "$pids" 2>/dev/null | awk '/^p/ { pid = substr($0, 2) } /^n/ { print pid "\t" substr($0, 2) }')"
+  printf '%s\n' "$rows" | while read -r pid _ et cmd; do
+    [ "$pid" != "$$" ] || continue
+    cwd="$(printf '%s\n' "$cwds" | awk -F'\t' -v p="$pid" '$1 == p { print $2; exit }')"
+    ok=0
+    if [ $# -gt 0 ]; then
+      for d in "$@"; do
+        d="${d%/}"
+        case "$cwd" in "$d"|"$d"/*) ok=1 ;; esac
+        case "$cmd" in *"$d"/*|*"$d") ok=1 ;; esac
+      done
+    else
+      orphan_cwd_match "$cwd" || continue
+      awk -v s="$(etime_seconds "$et")" -v m="$min" 'BEGIN { exit !(s >= m) }' && ok=1
+    fi
+    [ "$ok" = 1 ] && echo "$pid"
+  done
+  return 0
+}
+
+# Stops the orphans left by another run (temporary folders, worktrees that are gone) with
+# their children. Prints one line per stopped process.
+procs_stop_orphans() {
+  local prot p all="" stop=""
+  prot="$(proc_chain "$$" | tr '\n' ' ')$(app_claude_chains)"
+  for p in $(procs_orphans); do
+    # shellcheck disable=SC2086
+    proc_stoppable "$p" $prot || continue
+    all="$all $p $(proc_descendants "$p" | tr '\n' ' ')"
+  done
+  for p in $(printf '%s\n' "$all" | tr ' ' '\n' | grep . | sort -un); do
+    # shellcheck disable=SC2086
+    proc_stoppable "$p" $prot || continue
+    stop="$stop $p"
+    echo "stopped orphan process $p: $(proc_cmd "$p" | cut -c1-100)"
+  done
+  # shellcheck disable=SC2086
+  [ -z "$stop" ] || proc_stop $stop
+}
+
 # Stops the processes of a phase worktree and the headless child of the trace.
 # Prints one line per stopped process.
 procs_cleanup_worktree() { # procs_cleanup_worktree <worktree> <issue> [trace file]
@@ -121,4 +194,5 @@ procs_cleanup_worktree() { # procs_cleanup_worktree <worktree> <issue> [trace fi
   # shellcheck disable=SC2086
   [ -z "$stop" ] || proc_stop $stop
   [ -n "$stop" ] || echo "no process left in the worktree"
+  procs_stop_orphans
 }

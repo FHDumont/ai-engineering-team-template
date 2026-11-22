@@ -21,7 +21,7 @@ printf '#!/usr/bin/env bash\ncd "$1"; exec sleep 300\n' >"$TMP/fake/server"
 printf '#!/usr/bin/env bash\ncd "$1"; "$2" -p task --session-id sid-app >/dev/null 2>&1\n' >"$TMP/Claude.app/Contents/app.sh"
 chmod +x "$TMP/fake/"* "$TMP/Claude.app/Contents/app.sh"
 PIDS=""
-trap 'kill $PIDS 2>/dev/null || true; rm -rf "$TMP"' EXIT
+trap 'kill $PIDS 2>/dev/null || true; test_sweep; rm -rf "$TMP"' EXIT
 spawn() { "$@" >/dev/null 2>&1 & PIDS="$PIDS $!"; }
 export PROCS_APP_MARK="$TMP/Claude.app"
 # A zombie of this shell counts as dead.
