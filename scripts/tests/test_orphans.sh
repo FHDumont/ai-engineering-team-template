@@ -107,17 +107,71 @@ assert_status 0 "validate.sh is green without orphans" \
 assert_not_contains "$(last_output)" "orphan process" "no orphan line on a clean run"
 
 # 4. sessions.sh --list marks an orphan claude; a claude with a live parent has no mark.
-mkdir -p "$TMP/fake" "$TMP/tmp.orph"
-printf '#!/usr/bin/env bash\nsleep 300\n' >"$TMP/fake/claude"
-chmod +x "$TMP/fake/claude"
-oc="$(orphan "$TMP/tmp.orph" "$TMP/fake/claude" -p task)"
-(cd "$TMP/d2" && exec "$TMP/fake/claude" -p live >/dev/null 2>&1) &
-lc=$!; echo "$lc" >>"$PIDF"
-sleep 1
-assert_status 0 "sessions.sh --list" "$SCRIPTS/sessions.sh" --list
+# Fake ps and lsof: the case does not read the machine's real sessions (issue #109).
+mkdir -p "$TMP/bin109" "$TMP/tmp.list"
+printf '%s\t%s\t%s\t%s\t%s\t%s\n' \
+  "9101" "1" "00:10" "0.0" "1024" "/opt/fake/claude -p orphan" \
+  "9102" "999" "00:10" "0.0" "1024" "/opt/fake/claude -p live" >"$TMP/ps109.tab"
+printf '%s\t%s\n' "9101" "$TMP/tmp.list" "9102" "$TMP/d2" >"$TMP/lsof109.tab"
+export FAKE_PS_TAB="$TMP/ps109.tab" FAKE_LSOF_TAB="$TMP/lsof109.tab" FAKE_PS_DEAD="$TMP/dead109"
+: >"$TMP/dead109"
+cat >"$TMP/bin109/ps" <<'PS'
+#!/bin/sh
+tab="${FAKE_PS_TAB:?}"
+spec="" pid="" prev=""
+for arg in "$@"; do
+  if [ "$prev" = "-p" ]; then pid="$arg"; fi
+  if [ "$prev" = "-o" ] || [ "$prev" = "-axo" ]; then spec="$arg"; fi
+  prev="$arg"
+done
+row_of() { awk -F '\t' -v p="$1" '$1 == p { print; exit }' "$tab"; }
+emit() {
+  fpid=$(printf '%s' "$1" | awk -F '\t' '{ print $1 }')
+  fppid=$(printf '%s' "$1" | awk -F '\t' '{ print $2 }')
+  fet=$(printf '%s' "$1" | awk -F '\t' '{ print $3 }')
+  fcpu=$(printf '%s' "$1" | awk -F '\t' '{ print $4 }')
+  frss=$(printf '%s' "$1" | awk -F '\t' '{ print $5 }')
+  fcmd=$(printf '%s' "$1" | awk -F '\t' '{ print $6 }')
+  case "$spec" in
+    ppid=) printf '%s\n' "$fppid" ;;
+    command=) printf '%s\n' "$fcmd" ;;
+    rss=) printf '%s\n' "$frss" ;;
+    "pid=,ppid=") printf '%s %s\n' "$fpid" "$fppid" ;;
+    "pid=,etime=,pcpu=,rss=,command=") printf '%s %s %s %s %s\n' "$fpid" "$fet" "$fcpu" "$frss" "$fcmd" ;;
+    *) printf '%s %s\n' "$fpid" "$fcmd" ;;
+  esac
+}
+if [ -n "$pid" ]; then
+  row=$(row_of "$pid")
+  [ -n "$row" ] || exit 0
+  emit "$row"
+  exit 0
+fi
+while IFS= read -r row; do
+  [ -n "$row" ] || continue
+  emit "$row"
+done <"$tab"
+exit 0
+PS
+cat >"$TMP/bin109/lsof" <<'LSOF'
+#!/bin/sh
+tab="${FAKE_LSOF_TAB:?}"
+[ "${FAKE_LSOF_EXIT:-0}" = 0 ] || exit 1
+awk -F '\t' '{ printf "p%s\nn%s\n", $1, $2 }' "$tab"
+exit 0
+LSOF
+chmod +x "$TMP/bin109/ps" "$TMP/bin109/lsof"
+assert_status 0 "sessions.sh --list" env PATH="$TMP/bin109:$PATH" "$SCRIPTS/sessions.sh" --list
 list="$(last_output)"
-assert_contains "$(printf '%s\n' "$list" | grep -E "[ ]$oc " || true)" "orphan" "--list marks the orphan claude"
-assert_not_contains "$(printf '%s\n' "$list" | grep -E "[ ]$lc " || true)" "orphan" "a claude with a live parent is not marked"
+assert_contains "$(printf '%s\n' "$list" | grep -E '[ ]9101 ' || true)" "orphan" "--list marks the orphan claude"
+assert_not_contains "$(printf '%s\n' "$list" | grep -E '[ ]9102 ' || true)" "orphan" "a claude with a live parent is not marked"
+# A process that disappears between ps and lsof (lsof exits 1) is skipped (issue #109).
+repo109="$(make_repo)"
+assert_status 0 "sessions.sh --list survives lsof exit 1" \
+  env PATH="$TMP/bin109:$PATH" FAKE_LSOF_EXIT=1 "$SCRIPTS/sessions.sh" --list
+assert_status 0 "sessions.sh --close-idle survives lsof exit 1" \
+  env PATH="$TMP/bin109:$PATH" FAKE_LSOF_EXIT=1 \
+  bash -c 'cd "$1" && exec "$2" --close-idle --older-than 0' _ "$repo109" "$SCRIPTS/sessions.sh"
 
 # 5. cleanup (issue #88): two orphans that are not of this phase stay alive. ps, lsof
 # and kill are fakes, so the case never signals a real process. One cwd is a tmp.*
