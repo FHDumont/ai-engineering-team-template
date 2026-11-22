@@ -151,8 +151,19 @@ assert_contains "$hb" "a cada 4 minutos" "the design gives the interval of the h
 # The interval is 4 minutes everywhere: no text, script or test keeps the old one.
 # The old number is built here so that this file does not match its own search.
 was=8
-old_interval="$(cd "$REPO" && git grep -n -I -E "$was min|$was minutes|[*]/$was|every $was" -- . || true)"
-assert_eq "" "$old_interval" "no file keeps the old interval of the heartbeat"
+# ROADMAP.md and CHANGELOG.md are generated from issue titles, not heartbeat text: a title
+# with the old number and minutes (#44 had one) must not fail the suite.
+old_interval_in() { (cd "$1" && git grep -n -I -E "$was min|$was minutes|[*]/$was|every $was" -- . ':!ROADMAP.md' ':!CHANGELOG.md' || true); }
+assert_eq "" "$(old_interval_in "$REPO")" "no file keeps the old interval of the heartbeat"
+gen_repo="$(mktemp -d)"
+git -C "$gen_repo" init -q
+printf -- '- #44 Heartbeat every %s min\n' "$was" >"$gen_repo/ROADMAP.md"
+printf -- '- fix: heartbeat of %s minutes\n' "$was" >"$gen_repo/CHANGELOG.md"
+printf 'a cada %s minutos\n' "$was" >"$gen_repo/plan.md"
+git -C "$gen_repo" add ROADMAP.md CHANGELOG.md plan.md
+assert_contains "$(old_interval_in "$gen_repo")" "plan.md" "the old interval is still found in a text"
+assert_eq "1" "$(old_interval_in "$gen_repo" | wc -l | tr -d ' ')" "an issue title with the old interval in the generated files does not count"
+rm -rf "$gen_repo"
 # End-step action denied by the app: one path, a choice card that authorizes and
 # the session itself runs the action again; the owner never runs a script.
 denied="$(printf '%s\n' "$integrate" | awk '/negada pelo app\. Caminho único/{p=1} /^[0-9]+\. /&&!/negada pelo app/{p=0} p')"

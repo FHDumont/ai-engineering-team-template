@@ -250,12 +250,21 @@ class CiStepsTests(unittest.TestCase):
     def test_tests_skip_only_for_inert_docs(self):
         # Generated docs, specs and the docs/ pages skip the tests job; what the tests
         # read (AGENTS.md, CLAUDE.md, the design, skills, scripts) never does.
-        out = self.detect({"docs/x.md": "x\n", "CHANGELOG.md": "x\n", "ROADMAP.md": "x\n",
-                           "docs/specs/s.md": "x\n", "README.md": "x\n"})
+        out = self.detect({"docs/x.md": "x\n", "docs/specs/s.md": "x\n", "README.md": "x\n"})
         self.assertEqual((out["code"], out["run_tests"]), ("false", "false"))
+        # ROADMAP.md and CHANGELOG.md are generated from issue titles and PRs and a test reads
+        # them (#54): a PR that only changes them still runs the tests.
         for rel in ("AGENTS.md", "CLAUDE.md", "docs/process-design.md", ".claude/skills/plan/SKILL.md",
                     "scripts/x.sh", "app/README.md"):
             self.assertEqual(self.detect({rel: "x\n"})["run_tests"], "true", rel)
+
+    def test_generated_docs_run_the_tests(self):
+        # The #44 case: the ROADMAP.md carried an issue title the text tests refuse, and the PR
+        # that only changed it skipped the tests. Each file alone, in a fresh PR.
+        for rel in ("ROADMAP.md", "CHANGELOG.md"):
+            self.setUp()
+            out = self.detect({rel: "x\n"})
+            self.assertEqual((out["code"], out["run_tests"]), ("false", "true"), rel)
 
     def test_tests_skip_when_code_already_tested(self):
         # A docs-only push on top of a commit whose Tests passed does not run the suite again.
