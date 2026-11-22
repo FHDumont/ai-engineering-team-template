@@ -104,19 +104,23 @@ cat >"$bin/claude" <<'F'
 if [ -t 0 ] || [ -p /dev/stdin ] || ! [ -c /dev/stdin ]; then echo "stdin: inherited" >"$FAKE_CLAUDE_ARGS.in"; else echo "stdin: null" >"$FAKE_CLAUDE_ARGS.in"; fi
 echo "$(python3 -c "import os,sys;print(os.getsid(int(sys.argv[1])))" $$) $(ps -o pgid= -p $$) $$" >"$FAKE_CLAUDE_ARGS.ps"
 echo "child running"
-sleep 25
+# Lives until the test releases it (capped at 2 minutes): no timing decides the assertion below.
+for _ in $(seq 600); do [ -e "$FAKE_CLAUDE_ARGS.release" ] && break; sleep 0.2; done
 F
-start=$SECONDS
+rm -f "$FAKE_CLAUDE_ARGS.release"
 out="$(cd "$repo" && PATH="$bin:$PATH" scripts/start-headless.sh 7 2>&1 | tail -2)"
-assert_eq "1" "$([ $((SECONDS - start)) -lt 18 ] && echo 1 || echo 0)" "a | tail -2 caller returns in seconds, not when the child ends"
+# The pipe closed while the child still waits for the release: the caller did not wait for it, however loaded the machine is.
+assert_eq "0" "$([ -e "$FAKE_CLAUDE_ARGS.release" ] && echo 1 || echo 0)" "a | tail -2 caller returns while the child is still running, not when it ends"
 assert_contains "$out" "log:" "the caller still sees the start lines"
-sleep 1
+# The fake writes its report after the caller returned: wait for it (not a fixed delay).
+for _ in $(seq 150); do [ -s "$FAKE_CLAUDE_ARGS.ps" ] && break; sleep 0.2; done
 assert_contains "$(cat "$FAKE_CLAUDE_ARGS.in")" "stdin: null" "stdin of the child is /dev/null"
 read -r csess cpgid cpid <"$FAKE_CLAUDE_ARGS.ps"
 assert_eq "$cpid" "$cpgid" "the child leads its own process group"
 assert_eq "$cpid" "$csess" "the child leads its own session"
 assert_not_contains "$out" "child running" "the output of the child is not in the caller pipe"
 assert_contains "$(cat "$wt/.process/headless.log")" "child running" "the output of the child is in the log"
+touch "$FAKE_CLAUDE_ARGS.release"
 kill "$(events | jq -r 'select(.event == "phase_headless") | .pid' | tail -1)" 2>/dev/null || true
 
 # A child that dies at once with an error: exit 4, no event.
