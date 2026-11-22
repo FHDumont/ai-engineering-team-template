@@ -107,4 +107,30 @@ assert_status 1 "with one job the same tests run in series and fail" env -u PROC
 [ $(( $(date +%s) - t0 )) -lt 30 ] && ok || bad "the series case does not wait for the parameter limit"
 assert_contains "$(last_output)" "FAIL scripts/tests/test_a.sh" "a failing test is reported by name"
 
+# A waiter does not inherit a green result of a tree that changed during the run (#150).
+inherit="$(make_repo)"
+mkdir -p "$inherit/scripts/lib" "$inherit/scripts/tests"
+cp "$SCRIPTS/validate.sh" "$inherit/scripts/validate.sh"
+cp "$SCRIPTS/lib/common.sh" "$SCRIPTS/lib/slots.sh" "$SCRIPTS/lib/progress.sh" "$SCRIPTS/lib/procs.sh" "$SCRIPTS/lib/machine-limits.env.example" "$inherit/scripts/lib/"
+printf 'good\n' >"$inherit/subject.txt"
+cat >"$inherit/scripts/tests/test_slow.sh" <<'P'
+#!/usr/bin/env bash
+grep -q good subject.txt
+rc=$?
+sleep 8
+exit $rc
+P
+chmod +x "$inherit/scripts/tests/test_slow.sh"
+git -C "$inherit" add subject.txt scripts >/dev/null 2>&1 || true
+: >"$TMP/inherit.out"
+env -u PROCESS_VALIDATE_RUNNING "$inherit/scripts/validate.sh" --tests >"$TMP/inherit.first" 2>&1 &
+first=$!
+sleep 4
+printf 'broken\n' >"$inherit/subject.txt"
+second=0
+env -u PROCESS_VALIDATE_RUNNING "$inherit/scripts/validate.sh" --tests >"$TMP/inherit.second" 2>&1 || second=$?
+wait "$first" || true
+assert_eq 1 "$second" "a waiter on a changed tree does not inherit the previous green"
+assert_contains "$(cat "$TMP/inherit.second")" "failed" "the second run reports the failure of the new tree"
+
 finish

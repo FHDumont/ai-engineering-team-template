@@ -45,6 +45,9 @@ assert_not_contains "$(cat "$TMP/last.out" 2>/dev/null; last_output)" "jsonl" "t
 # (the trace holds the green run).
 VAL_LOG="$TMP/validate-runs.log"; : >"$VAL_LOG"
 assert_eq "1" "$(jq -s '[.[] | select(.event == "phase_validate" and .sha == "'"$(git -C "$repo" rev-parse HEAD)"'")] | length' "$PROCESS_EVENTS_FILE")" "a green validate.sh is recorded with the HEAD sha"
+# The SHA is the one read before the suite, and only when HEAD is still that commit.
+assert_contains "$(awk '/^run_validate\(\)/,/^}/' "$SCRIPTS/close-phase.sh")" 'sha="$(git rev-parse HEAD)"' "run_validate photographs HEAD before validate.sh"
+assert_contains "$(awk '/^run_validate\(\)/,/^}/' "$SCRIPTS/close-phase.sh")" 'trace_event phase_validate sha="$sha"' "phase_validate records the photographed SHA"
 printf '#!/usr/bin/env bash\necho run >>"%s"\n' "$VAL_LOG" >"$TMP/validate-counter.sh"
 cp "$repo/scripts/validate.sh" "$TMP/validate-stub.sh"
 cp "$TMP/validate-counter.sh" "$repo/scripts/validate.sh"; chmod +x "$repo/scripts/validate.sh"

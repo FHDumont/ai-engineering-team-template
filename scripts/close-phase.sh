@@ -191,11 +191,14 @@ run_validate() {
     echo "skipped validate.sh: HEAD $(git rev-parse --short HEAD) already validated green in this phase"
     return 0
   fi
-  local t0 secs
+  local t0 secs sha
+  sha="$(git rev-parse HEAD)"
   t0="$(date +%s)"
   "$HERE/validate.sh" || die "validate.sh failed"
   secs=$(( $(date +%s) - t0 ))
-  trace_event phase_validate sha="$(git rev-parse HEAD)" secs="$secs"
+  [ "$(git rev-parse HEAD)" = "$sha" ] || return 0
+  git diff --quiet && git diff --cached --quiet || return 0
+  trace_event phase_validate sha="$sha" secs="$secs"
 }
 
 # True when the trace holds a pre_review of this branch on exactly HEAD.
