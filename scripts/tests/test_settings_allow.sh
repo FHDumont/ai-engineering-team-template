@@ -32,5 +32,5 @@ assert_eq "" "$missing" "allow lists every method script by name"
 adopt="$(awk '$0 == "## Adotar num repositório que já existe" {on=1; next} /^## / {on=0} on' "$REPO/README.md")"
 assert_contains "$adopt" "diff" "adoption shows the permission diff"
 assert_contains "$adopt" "ok" "adoption waits for the owner's ok before the new settings are used"
-assert_contains "$(awk '$0 == "### 10.4 \`.claude/settings.json\`" {on=1; next} /^### / {on=0} on' "$REPO/docs/process-design.md")" "pelo nome" "the design says allow lists scripts by name"
+assert_contains "$(awk '/^### 10.4 / {on=1; next} /^### / {on=0} on' "$REPO/docs/process-design.md")" "pelo nome" "the design says allow lists scripts by name"
 finish
