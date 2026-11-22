@@ -39,7 +39,7 @@ Onde cada regra está descrita: 1 e 2 na §4.3; 3 na §9.4; 4 na §6.1; 5 na §2
 
 ## 2. Regras para todo agente
 
-1. **O dono do repo nunca roda script nem mexe em configuração do repo.** O setup do método (labels, proteção de branch, configurações) é pré-aprovado: o agente roda `scripts/setup-repo.sh` sozinho sempre que algo sair do padrão. **O setup é obrigatório:** nada do método funciona antes dele. A conferência é uma só, `scripts/setup-repo.sh --check`: lê uma vez as labels, os ajustes do repo, a proteção da `main` e as ofertas (§8.3) e sai 0 só com tudo conferido e nenhuma oferta sem resposta. Faltou algo, sai 7 com uma linha `missing:` por parte e a frase a dizer, "configurar o repo" (skill `setup`); plano sem proteção de branch, sai 0 em modo sem proteção depois de registrá-lo (§10.5), e sai 7 só enquanto o modo não está registrado. Travas: o `scripts/phase-start.sh` roda a conferência antes de tudo e recusa sem criar nada (nenhuma opção a pula, nem `--no-check`); o `scripts/open-issue.sh` dá a mesma mensagem quando o `gh` recusa a issue por falta das labels; o hook `session-setup-check.sh` avisa o agente no início da sessão (§6.2).
+1. **O dono do repo nunca roda script nem mexe em configuração do repo.** O setup do método (labels, proteção de branch, configurações) é pré-aprovado: o agente roda `scripts/setup-repo.sh` sozinho sempre que algo sair do padrão. **O setup é obrigatório:** nada do método funciona antes dele. A conferência é uma só, `scripts/setup-repo.sh --check`: lê uma vez as labels, os ajustes do repo, a proteção da `main` e as ofertas (§8.3) e sai 0 só com tudo conferido e nenhuma oferta sem resposta. Faltou algo, sai 7 com uma linha `missing:` por parte e a frase a dizer, "configurar o repo" (skill `setup`); plano sem proteção de branch, sai 7 até o ok do dono gravar o modo (§10.5). Travas: o `scripts/phase-start.sh` roda a conferência antes de tudo e recusa sem criar nada (nenhuma opção a pula, nem `--no-check`); o `scripts/open-issue.sh` dá a mesma mensagem quando o `gh` recusa a issue por falta das labels; o hook `session-setup-check.sh` avisa o agente no início da sessão (§6.2).
 2. **Idioma** conforme a §1.
 3. **Toda decisão do dono é um quadro de escolha** (`AskUserQuestion`), uma pergunta por decisão, que começa por `Fase #n — título`. O hook `block-card-title.sh` barra o quadro sem esse começo quando há fase aberta. Nunca peça ao dono para digitar o número de um item.
    - Só a sessão principal pergunta. A sessão filha manda a dúvida por mensagem e recebe `respondido: <decisão>`.
@@ -464,7 +464,8 @@ A tabela é a árvore de arquivos do método. Caminho sem `<…>` precisa existi
 | `.github/ISSUE_TEMPLATE/config.yml` | desliga a issue em branco |
 | `.github/pull_request_template.md` | corpo do PR |
 | `.github/labels.tsv` | labels do repo (§8.1) |
-| `.github/sensitive-paths` | globs dos caminhos sensíveis (§10.3) |
+| `.github/sensitive-paths` | globs dos caminhos sensíveis (§10.3); o arquivo do repo só acrescenta |
+| `.github/required-checks` | checks extras exigidos na proteção; a atualização não apaga |
 | `.github/workflows/ci.yml` | o CI único (§9.2) |
 | `.github/workflows/issues-label.yml` | labels automáticas das issues |
 | `.github/workflows/deploy-<alvo>.yml` | deploy, só quando há app (§9.4) |
@@ -604,7 +605,7 @@ O `deploy-*.yml` roda só por `workflow_dispatch`; o primeiro job roda o `script
 
 Aplicadas e lidas de volta pelo `setup-repo.sh`:
 
-- Checks exigidos: `CI` e o commit status `review/independent`. Sem "branch atualizada" obrigatória (um rebase geraria SHA novo e derrubaria o status da revisão).
+- Checks exigidos: `CI` e o commit status `review/independent`, mais as linhas de `.github/required-checks` (arquivo do repo; a atualização não o sobrescreve). Sem "branch atualizada" obrigatória (um rebase geraria SHA novo e derrubaria o status da revisão). O setup lista cada check que sairia e cada `strict` que afrouxaria, e só aplica com ok do dono (`--owner-ok`); sem esse ok o `--check` fica sujo.
 - 0 aprovações exigidas: os agentes usam a conta do dono, que não aprova o próprio PR.
 - Histórico linear obrigatório; vale para admins; sem force-push; sem deleção.
 - Repo: auto-merge ligado; só rebase (merge commit e squash desligados); branch apagada no merge.
@@ -612,7 +613,7 @@ Aplicadas e lidas de volta pelo `setup-repo.sh`:
 
 ### 10.5 Modo sem proteção de branch
 
-Repositório privado em conta gratuita não tem proteção de branch. Nele o `setup-repo.sh` não falha: grava a variável do repositório `PROCESS_BRANCH_MODE=unprotected` (lida de volta), avisa e sai 0; `--check` e `end-check.sh` aceitam o modo. As travas passam a ser de script:
+Repositório privado em conta gratuita não tem proteção de branch. Uma resposta "Upgrade to GitHub" não grava o modo sozinha. O setup lista a entrada no modo sem proteção e só grava `PROCESS_BRANCH_MODE=unprotected` (lida de volta) com ok do dono; sem esse ok o `--check` fica sujo. Com o modo gravado, `--check` e `end-check.sh` aceitam. As travas passam a ser de script:
 
 - `close-phase.sh --merge` lê pela API, no HEAD, que o check run `CI` terminou com `success` e que o status `review/independent` é `success`; senão recusa com saída 11. Os demais portões (revisão no trace, sessão filha, `needs-owner-ok`) não mudam.
 - O hook `.githooks/pre-push` recusa push para a `main` quando a variável existe.
