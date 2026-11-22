@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Tests of close-phase.sh --merge, part 2: pre-review, owner ok, review evidence, protection, unprotected mode.
+# Tests of close-phase.sh --merge: pre-review, owner ok, review evidence, protection, unprotected mode.
 # shellcheck source=scripts/tests/close_phase_common.sh
 source "$(dirname "$0")/close_phase_common.sh"
 

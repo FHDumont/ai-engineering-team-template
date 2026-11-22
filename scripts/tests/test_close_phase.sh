@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Tests of close-phase.sh --merge, part 1: child session gate and notes to the phase.
+# Tests of close-phase.sh --merge: child session gate and notes to the phase.
 # shellcheck source=scripts/tests/close_phase_common.sh
 source "$(dirname "$0")/close_phase_common.sh"
 
