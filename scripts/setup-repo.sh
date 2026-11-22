@@ -319,7 +319,7 @@ unprotected_mode() { # unprotected_mode <gh output>
 }
 
 sync_protection() {
-  local body want have raw extra extras_json checks_json want_checks
+  local body want have raw extras_json checks_json want_checks
   extras_json="$(extra_required_checks | jq -R -s -c 'split("\n") | map(select(length > 0 and . != "CI" and . != "review/independent"))')"
   [ -n "$extras_json" ] || extras_json='[]'
   checks_json="$(jq -nc --argjson extra "$extras_json" '[{"context":"CI","app_id":15368},{"context":"review/independent"}] + [ $extra[] | {context: .} ]')"

@@ -29,7 +29,6 @@ for f in "$REPO"/scripts/*.sh "$REPO"/scripts/*.py; do
 done
 assert_eq "" "$missing" "allow lists every method script by name"
 
-readme="$(cat "$REPO/README.md")"
 adopt="$(awk '$0 == "## Adotar num repositório que já existe" {on=1; next} /^## / {on=0} on' "$REPO/README.md")"
 assert_contains "$adopt" "diff" "adoption shows the permission diff"
 assert_contains "$adopt" "ok" "adoption waits for the owner's ok before the new settings are used"
