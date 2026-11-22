@@ -329,7 +329,7 @@ Roda só na sessão filha; na sessão que abriu a fase, `--prepare`, `--publish-
 
 **Modelo de ameaça.** Os hooks do agente são salvaguarda contra engano, não barreira. A barreira é a proteção da `main` (`CI` + `review/independent`, vale para admin), os hooks do git e o deny do `.claude/settings.json`. Desvio de um hook por ofuscação deliberada é achado `size:small`.
 
-Os hooks do agente saem 2 quando barram; os do git saem 1. Todo hook tem teste. A tabela lista todo arquivo de `.claude/hooks/` e de `.githooks/`; o `check-docs.sh` confere.
+Os hooks do agente saem 2 quando barram; os do git saem 1. Todo hook tem teste. A tabela lista todo arquivo de `.claude/hooks/` e de `.githooks/`; o `check-docs.sh` confere e falha se um hook citado no `.claude/settings.json` não existe.
 
 | Hook | Evento | O que barra |
 |---|---|---|
@@ -362,10 +362,12 @@ Os hooks do git são instalados pelo `check-env.sh` (`core.hooksPath=.githooks`)
 5. `git add` e `git stage` com `-A`, `.`, `:/` e `-u`;
 6. `git push` com `--force`, `-f`, `--mirror` e refspec `+`;
 7. `git reset --hard`;
-8. merge de PR direto: `gh pr merge`, `gh api … pulls/N/merge`, `gh api graphql` com mutation de merge e de proteção; toda escrita em `branches/*/protection`;
-9. deploy fora do `deploy.sh`: `gh workflow run`, `gh run rerun`, `gh api` em `…/dispatches` e `…/rerun`;
-10. os mesmos casos dentro de `bash -c`, `eval`, heredoc entregue a shell, `echo … | bash`, `$(…)`, depois de `env`, `command`, `nice`, `timeout` e `sudo`, em blocos e com caminho absoluto;
-11. falha fechado: comando ilegível ou grande demais (>256 KB ou >400 partes) que cita git ou gh é barrado.
+8. `git clean` com `-f` ou `--force`;
+9. `git branch -D` (e `--delete --force`);
+10. merge de PR direto: `gh pr merge`, `gh api … pulls/N/merge`, `gh api graphql` com mutation de merge e de proteção; toda escrita em `branches/*/protection`;
+11. deploy fora do `deploy.sh`: `gh workflow run`, `gh run rerun`, `gh api` em `…/dispatches` e `…/rerun`;
+12. os mesmos casos dentro de `bash -c`, `eval`, heredoc entregue a shell, `echo … | bash`, `$(…)`, depois de `env`, `command`, `nice`, `timeout` e `sudo`, em blocos e com caminho absoluto;
+13. falha fechado: comando ilegível ou grande demais (>256 KB ou >400 partes) que cita git ou gh é barrado.
 
 ### 6.3 Trace
 

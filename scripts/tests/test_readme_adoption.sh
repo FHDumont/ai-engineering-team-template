@@ -18,7 +18,8 @@ assert_not_contains "$adopt" "TODO" "the chapter has no placeholder"
 # Topics the chapter must cover.
 for topic in "gh auth status" "proteção de branch" "branch de adoção" "O que sai" "O que entra" \
   "O que NÃO se copia" "workflow_dispatch" "# deploy-paths:" "scripts/validate.sh" \
-  "scripts/check-docs.sh" "configurar o repo" "labels antigas" "Primeira fase"; do
+  "scripts/check-docs.sh" "configurar o repo" "labels antigas" "Primeira fase" \
+  "Inventarie os hooks" "deny"; do
   assert_contains "$adopt" "$topic" "the chapter covers: $topic"
 done
 assert_contains "$adopt" "deploy-example.yml" "the chapter says deploy-example.yml is not copied"

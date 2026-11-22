@@ -23,8 +23,9 @@
 # branch-protection mutation (inline, by -F query=@file or --input; a request
 # that cannot be read is blocked) and any write on …/branches/*/protection
 # (a method other than GET, or request fields, which make gh send a POST).
-# Also blocks every deploy dispatch outside scripts/deploy.sh: `gh workflow run`,
-# `gh run rerun`, and `gh api` on a …/dispatches or …/rerun endpoint.
+# Also blocks `git clean` with `-f`/`--force` and `git branch -D` (or
+# `--delete --force`). Also blocks every deploy dispatch outside scripts/deploy.sh:
+# `gh workflow run`, `gh run rerun`, and `gh api` on a …/dispatches or …/rerun endpoint.
 #
 # Fails closed: a line that cannot be read safely, or a command too large
 # to check quickly (>256 KB or >400 parts), that cites git/gh is
@@ -504,6 +505,37 @@ def check_git(args, state, env):
     if sub == "reset":
         if any(abbrev(a, "--hard", 4) for a in rest):
             block("never git reset --hard")
+        return
+
+    if sub == "clean":
+        for a in rest:
+            if abbrev(a, "--force", 5):
+                block("never git clean -f")
+            flags = short_flags(a)
+            if flags and "f" in flags:
+                block("never git clean -f")
+        return
+
+    if sub == "branch":
+        force_delete = False
+        delete = False
+        for a in rest:
+            if a in ("-D",):
+                force_delete = True
+            if a in ("-d", "--delete") or abbrev(a, "--delete", 5):
+                delete = True
+            if a in ("-f", "--force") or abbrev(a, "--force", 5):
+                force_delete = force_delete or delete
+            flags = short_flags(a)
+            if flags and "D" in flags:
+                force_delete = True
+            if flags and "d" in flags:
+                delete = True
+            if flags and "f" in flags and delete:
+                force_delete = True
+        if force_delete:
+            block("never git branch -D")
+        return
 
 
 GH_VALUED = ("-R", "--repo", "-X", "--method", "-H", "--header", "-f", "-F", "--field",
