@@ -61,6 +61,7 @@ case "\$*" in
   "pr view 12 --json body"*) printf '%s\n' "\${FAKE_PR_BODY:-Resumo}" ;;
   "pr view 12"*"labels,headRefOid,baseRefName"*) jq -cn --arg l "$1" --arg s "$SHA" --arg b "\${FAKE_BASE:-main}" '{labels: (\$l | split(",") | map(select(length>0)) | map({name: .})), headRefOid: \$s, baseRefName: \$b}' ;;
   "pr view 12"*"headRefOid --jq"*) echo "$SHA" ;;
+  "issue view 5"*"--json comments"*) cat "$TMP/comments.json" 2>/dev/null || true ;;
   "issue view 5"*"labels"*) printf '%s\n' "\${FAKE_ISSUE_LABELS:-type:feature}" | tr ',' '\n' ;;
   "api repos/owner/repo/commits/$SHA/status"*) echo "$2" ;;
   # Unprotected mode: FAKE_MODE=1 records it; FAKE_CI is the state of the CI check run on HEAD.
@@ -162,6 +163,38 @@ handler "type:feature,needs-owner-ok" success
 assert_status 5 "refuses merge with needs-owner-ok" sh -c "cd '$repo' && '$CLOSE' --merge"
 assert_contains "$(last_output)" "needs-owner-ok" "says why"
 assert_not_contains "$(gh_calls)" "pr merge" "never calls merge when refused"
+
+# Notes to the phase (#74): a comment "Para: fase #5" with no later comment of the phase refuses.
+note() { printf '**De:** gerenciadora · **Para:** fase #%s · **Pedido:** %s · **Responde a:** —\nmedir a suíte' "${1:-5}" "${2:-medir}"; }
+reply() { printf '**De:** fase #5 · **Para:** gerenciadora · **Pedido:** %s · **Responde a:** https://x/1\nfeito' "${1:-medir}"; }
+comments() { # comments <body>...: writes the comments of the issue, oldest first
+  for b in "$@"; do jq -cn --arg b "$b" --arg u "https://github.com/owner/repo/issues/5#c$RANDOM" '{body: $b, url: $u}'; done |
+    jq -s '{comments: .}' >"$TMP/comments.json"
+}
+child_session 5
+handler "type:feature" success
+comments "$(note)"
+assert_status 12 "refuses merge with a note to the phase without answer" sh -c "cd '$repo' && '$CLOSE' --merge"
+assert_contains "$(last_output)" "issues/5#c" "names the unanswered note"
+assert_not_contains "$(gh_calls)" "pr merge" "no merge with a note pending"
+comments "$(note)" "$(reply)"
+assert_status 0 "merges when the phase answered the note" sh -c "cd '$repo' && '$CLOSE' --merge"
+comments "$(note)" "$(reply)" "$(note 5 outro)"
+assert_status 12 "a note after the answer is pending again" sh -c "cd '$repo' && '$CLOSE' --merge"
+comments "$(note 6)" "owner comment with no header"
+assert_status 0 "a note to another phase or a comment with no header does not block" sh -c "cd '$repo' && '$CLOSE' --merge"
+comments "$(note 50)"
+assert_status 0 "a note to phase #50 does not block phase #5" sh -c "cd '$repo' && '$CLOSE' --merge"
+rm -f "$TMP/comments.json"
+handler "type:feature" success
+assert_status 1 "an unreadable issue refuses the merge" env FAKE_GH_FAIL="issue view 5.*--json comments" sh -c "cd '$repo' && '$CLOSE' --merge"
+assert_not_contains "$(gh_calls)" "pr merge" "no merge when the comments cannot be read"
+
+# Pre-review (#75): --pre-review records the event; --prepare warns, never refuses, without it.
+assert_status 2 "pre-review needs a clean or findings verdict" sh -c "cd '$repo' && '$CLOSE' --pre-review --verdict success"
+assert_status 0 "pre-review records clean" sh -c "cd '$repo' && '$CLOSE' --pre-review --verdict clean --round 2"
+assert_eq "clean 2 $SHA" "$(jq -r 'select(.event == "pre_review") | [.verdict, .round, .sha] | join(" ")' "$PROCESS_EVENTS_FILE" | tail -1)" "pre_review lands in the trace with verdict, round and HEAD"
+assert_contains "$(jq -r 'select(.event == "pre_review") | .branch' "$PROCESS_EVENTS_FILE")" "feat/issue-5-x" "pre_review names the branch"
 
 handler "type:feature,area:auth" success
 assert_status 5 "refuses merge with sensitive area label" sh -c "cd '$repo' && '$CLOSE' --merge"
@@ -426,6 +459,7 @@ use_fake_gh "$TMP/handler.sh"
 : >"$PUSH_LOG"
 rm -rf "$AI_METHOD_CACHE/progress"
 assert_status 0 "prepare runs on a branch without issue number" sh -c "cd '$repo' && scripts/close-phase.sh --prepare --body-file '$TMP/body.md'"
+assert_contains "$(last_output)" "warning: no pre_review of HEAD" "prepare warns without a pre_review of HEAD"
 calls="$(gh_calls)"
 assert_contains "$calls" "issue view 1" "reads the issue from Closes #1"
 assert_contains "$calls" "--add-label type:chore --add-label end:lab-test" "copies the issue labels to the PR"

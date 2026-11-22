@@ -4,6 +4,7 @@
 #: Usage:
 #:   close-phase.sh --prepare --title "chore: ..." --body-file F [--issue N]
 #:   close-phase.sh --publish-review F --verdict success|failure [--round N]
+#:   close-phase.sh --pre-review --verdict clean|findings [--round N]
 #:   close-phase.sh --check
 #:   close-phase.sh --merge [--owner-ok] [--wait]
 #:   close-phase.sh --cleanup
@@ -41,7 +42,12 @@
 #:   Run it before and while waiting for CI; --merge runs it too.
 #: --prepare, --check and --merge --wait record their steps in
 #:   ~/.cache/ai-method/progress/ (scripts/progress.sh), never in the output.
-#: --merge: refuses with needs-owner-ok, a sensitive area label or a diff in
+#: --pre-review: records pre_review (sha of HEAD, verdict, round) in the trace after the
+#:   cheap review of the close-reviewer (only the issue and the diff; no tests, no push,
+#:   no status). --prepare warns, without refusing, when the trace holds no pre_review
+#:   of the HEAD it starts from.
+#: --merge: first refuses (exit 12) while the issue holds a comment headed "Para: fase #n"
+#:   (scripts/lib/author.sh) after the last comment of the phase itself; then refuses with needs-owner-ok, a sensitive area label or a diff in
 #:   .github/sensitive-paths (union of the base's list and the PR's; no readable
 #:   list on the base: refused), unless --owner-ok (only after the owner's ok in a
 #:   choice question). --owner-ok only counts with needs-owner-ok already on the
@@ -97,6 +103,7 @@ while [ $# -gt 0 ]; do
   case "$1" in
     -h|--help) print_help "$0"; exit 0 ;;
     --prepare) mode=prepare; shift ;;
+    --pre-review) mode=prereview; shift ;;
     --publish-review) mode=review; review_file="$2"; shift 2 ;;
     --verdict) verdict="$2"; shift 2 ;;
     --round) round="$2"; shift 2 ;;
@@ -130,7 +137,7 @@ fi
 [ -n "$issue" ] || issue="$branch_issue"
 # The session that opened the phase (the manager) never closes it: the child session does.
 case "$mode" in
-  prepare|review|check|merge)
+  prepare|prereview|review|check|merge)
     if [ "$(phase_opener_state "$issue" "${CLAUDE_CODE_SESSION_ID:-}" "$ROOT")" = opener ]; then
       die "this session opened phase #$issue: forward the request to the child session (send_message) and stop" 9
     fi ;;
@@ -172,7 +179,25 @@ run_validate() {
   trace_event phase_validate sha="$(git rev-parse HEAD)" secs="$secs"
 }
 
+# True when the trace holds a pre_review of this branch on exactly HEAD.
+pre_reviewed_head() {
+  local events
+  events="$(events_file "$ROOT")" && [ -f "$events" ] || return 1
+  jq -e -s --arg b "$branch" --arg s "$(git rev-parse HEAD)" \
+    'any(.[]; .event == "pre_review" and .branch == $b and .sha == $s)' "$events" >/dev/null 2>&1
+}
+
+pre_review() {
+  case "$verdict" in clean|findings) ;; *) die "--verdict must be clean or findings" 2 ;; esac
+  git diff --quiet && git diff --cached --quiet || die "uncommitted changes: the pre-review reads the committed diff"
+  trace_event pre_review sha="$(git rev-parse HEAD)" verdict="$verdict" round="${round:-1}"
+  pre_reviewed_head || die "pre_review was not recorded in the trace"
+  echo "recorded pre_review=$verdict on $(git rev-parse --short HEAD) (read back)"
+}
+
 prepare() {
+  pre_reviewed_head ||
+    echo "warning: no pre_review of HEAD $(git rev-parse --short HEAD) in the trace: run the close-reviewer pre-review (issue and diff only) before --prepare"
   [ -n "$body_file" ] && [ -f "$body_file" ] || die "--body-file is required (fill .github/pull_request_template.md)"
   "$HERE/check-attribution.sh" --text-file "$body_file" >/dev/null || die "PR body has AI attribution"
   progress_step "validate.sh"
@@ -432,9 +457,34 @@ unprotected_gate() { # unprotected_gate <sha>
   echo "unprotected mode: CI and review/independent are success on ${sha:0:12} (read through the API)"
 }
 
+# Notes to the phase left unanswered on its issue: the comments whose header says
+# "Para: fase #n" (scripts/lib/author.sh) after the last comment the phase itself wrote
+# ("De: fase #n"). Prints the url of each; a read that fails is an error (fails closed).
+pending_notes() {
+  local json
+  [ -n "$issue" ] || return 0
+  json="$(gh issue view "$issue" --repo "$repo" --json comments)" ||
+    die "cannot read the comments of issue #$issue: merge blocked"
+  [ -n "$json" ] || return 0
+  printf '%s' "$json" | jq -r --arg n "$issue" '
+    (.comments // []) as $c
+    | ($c | map(.body | test("(^|\n)\\*\\*De:\\*\\* fase #" + $n + " ·")) | rindex(true) // -1) as $last
+    | $c | to_entries[]
+    | select(.key > $last and (.value.body | test("(^|\n)\\*\\*De:\\*\\* [^\n]+ · \\*\\*Para:\\*\\* fase #" + $n + " ·")))
+    | .value.url // "(comment without url)"' ||
+    die "cannot parse the comments of issue #$issue: merge blocked"
+}
+
 merge() {
-  local n info labels sha state
+  local n info labels sha state notes
   n="$(pr_number)"; [ -n "$n" ] || die "no open PR for $branch"
+  notes="$(pending_notes)"
+  if [ -n "$notes" ]; then
+    echo "refused: issue #$issue has a note to phase #$issue with no answer:"
+    echo "$notes"
+    echo "read it, follow it, and answer with a comment headed by scripts/lib/author.sh (De: fase #$issue); then run --merge again"
+    exit 12
+  fi
   info="$(gh pr view "$n" --repo "$repo" --json labels,headRefOid,baseRefName)"
   labels="$(echo "$info" | jq -r '.labels[].name')"
   sha="$(echo "$info" | jq -r .headRefOid)"
@@ -677,6 +727,7 @@ abort() {
 case "$mode" in
   abort) abort ;;
   prepare) prepare ;;
+  prereview) pre_review ;;
   review) publish_review ;;
   check) check_pr ;;
   merge) merge ;;
