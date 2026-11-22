@@ -21,7 +21,19 @@ printf '#!/usr/bin/env bash\ncd "$1"; exec sleep 300\n' >"$TMP/fake/server"
 printf '#!/usr/bin/env bash\ncd "$1"; "$2" -p task --session-id sid-app >/dev/null 2>&1\n' >"$TMP/Claude.app/Contents/app.sh"
 chmod +x "$TMP/fake/"* "$TMP/Claude.app/Contents/app.sh"
 PIDS=""
-trap 'kill $PIDS 2>/dev/null || true; test_sweep; rm -rf "$TMP"' EXIT
+# stop-126-start
+stop_test_pids() {
+  local p kids
+  for p in $PIDS; do
+    # Read the descendants before the parent is signaled: after that they are
+    # reparented and no longer listed under it (issue #126).
+    kids="$(proc_descendants "$p" 2>/dev/null | tr '\n' ' ')"
+    # shellcheck disable=SC2086
+    kill -KILL $kids "$p" 2>/dev/null || true
+  done
+}
+# stop-126-end
+trap 'stop_test_pids; test_sweep; rm -rf "$TMP"' EXIT
 spawn() { "$@" >/dev/null 2>&1 & PIDS="$PIDS $!"; }
 export PROCS_APP_MARK="$TMP/Claude.app"
 # A zombie of this shell counts as dead.
@@ -230,4 +242,23 @@ run91 0 "--close-idle with no --under" --close-idle
 assert_eq alive "$(state91 8101)" "a headless session outside this repository stays"
 assert_eq dead "$(state91 8102)" "an idle headless session of this repository is stopped"
 # case-91-end
+
+# The trap must stop the sleep the fake claude leaves in / (issue #126).
+# case-126-start
+mkdir -p "$TMP/fake126"
+printf '#!/usr/bin/env bash\n(cd /; exec sleep 300)\n' >"$TMP/fake126/claude"
+chmod +x "$TMP/fake126/claude"
+"$TMP/fake126/claude" -p task >/dev/null 2>&1 &
+pid126=$!
+PIDS="$PIDS $pid126"
+sleep 0.4
+child126="$(/bin/ps -axo pid=,ppid= | awk -v p="$pid126" '$2 == p { print $1; exit }')"
+stop_test_pids
+sleep 0.3
+st126="$(/bin/ps -o stat= -p "$child126" 2>/dev/null || true)"
+case "$st126" in ""|Z*) st126=dead ;; *) st126=alive ;; esac
+/bin/kill -KILL "$child126" "$pid126" 2>/dev/null || true
+wait "$pid126" 2>/dev/null || true
+assert_eq dead "$st126" "the trap stops the sleep child of the fake claude"
+# case-126-end
 finish
