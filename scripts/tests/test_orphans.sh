@@ -113,4 +113,17 @@ o3="$(orphan "$TMP/tmp.orph")"
 sleep 1
 AI_METHOD_ORPHAN_MIN_AGE=3600 procs_cleanup_worktree "$TMP/nowhere" 66 "" >/dev/null
 assert_eq alive "$(alive "$o3")" "a young orphan stays below the minimum age"
+# 6. cost (issue #71): the scan of the orphans spawns a fixed number of processes, however
+# many processes hang from init (some 600 on a Mac). Fake ps and lsof list 800 of them
+# and a counting awk shows the scan does not start one process per row.
+mkdir -p "$TMP/scan"
+{ i=1000; while [ "$i" -lt 1800 ]; do echo "$i 1 05:00 sleep 300"; i=$((i + 1)); done; } >"$TMP/scan/ps.out"
+{ i=1000; while [ "$i" -lt 1799 ]; do printf 'p%s\nn/somewhere/else\n' "$i"; i=$((i + 1)); done; echo "p1799"; echo "n$TMP/scan/wt"; } >"$TMP/scan/lsof.out"
+printf '#!/bin/sh\ncat "%s/scan/ps.out"\n' "$TMP" >"$TMP/scan/ps"
+printf '#!/bin/sh\ncat "%s/scan/lsof.out"\n' "$TMP" >"$TMP/scan/lsof"
+printf '#!/bin/sh\necho x >>"%s/scan/awk.count"\nexec /usr/bin/awk "$@"\n' "$TMP" >"$TMP/scan/awk"
+chmod +x "$TMP/scan/ps" "$TMP/scan/lsof" "$TMP/scan/awk"
+found="$(PATH="$TMP/scan:$PATH" procs_orphans "$TMP/scan/wt")"
+assert_eq 1799 "$found" "the scan still finds the one orphan of the folder among 800"
+[ "$(wc -l <"$TMP/scan/awk.count" | tr -d ' ')" -le 12 ] && ok || bad "the scan started $(wc -l <"$TMP/scan/awk.count" | tr -d ' ') awk processes for 800 rows"
 finish

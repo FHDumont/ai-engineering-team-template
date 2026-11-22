@@ -39,22 +39,22 @@ assert_eq "close-phase.sh" "$(basename "$(ls "$copy/scripts/close-phase.sh")")" 
 by_hand="$(grep -lE 'cp +-[A-Za-z]+ +"?\$\{?(SCRIPTS|REPO/scripts)' "$TESTS_DIR"/test_*.sh "$REPO"/.claude/hooks/tests/test_*.sh 2>/dev/null | grep -v "/$(basename "$0")\$" || true)"
 assert_eq "" "$by_hand" "no test copies scripts/ without copy_scripts"
 
-# The session-opener lock of close-phase.sh turned off on purpose: test_close_phase.sh
-# fails in seconds and leaves no process behind. The mark is forced, so a real
-# validate.sh reached by mistake refuses at once instead of running the suite. This is
-# the one copy by hand: it needs the real scripts, with only the lock changed.
-broken="$TMP/broken"
-mkdir -p "$broken/.github"
-cp -R "$SCRIPTS" "$broken/scripts"
-cp "$REPO/.github/sensitive-paths" "$REPO/.github/labels.tsv" "$broken/.github/"
-sed 's/= opener ]; then/= lock-off ]; then/' "$SCRIPTS/close-phase.sh" >"$broken/scripts/close-phase.sh"
-assert_eq 1 "$(grep -c '= lock-off ]; then' "$broken/scripts/close-phase.sh")" "the lock of the copy is off"
-start="$(date +%s)"
-assert_status 1 "test_close_phase.sh fails with the lock off" env PROCESS_VALIDATE_RUNNING=1 perl -e 'alarm 120; exec @ARGV' bash "$broken/scripts/tests/test_close_phase.sh"
-took=$(( $(date +%s) - start ))
-assert_contains "$(last_output)" "not ok: the opening session cannot run --prepare" "the failure is the lock that did not fire"
-[ "$took" -lt 120 ] && ok || bad "test_close_phase.sh with the lock off took ${took}s"
-assert_eq "" "$(pgrep -f "$broken/scripts" || true)" "no process of the broken copy is left alive"
+# The time limit is a parameter that grows with the load (issue #71), never a fixed number.
+assert_eq 600 "$(AI_METHOD_TEST_TIMEOUT_SECONDS=600 AI_METHOD_FAKE_LOAD1=3 slots_test_timeout)" "the limit is the parameter on a free machine"
+assert_eq 1800 "$(AI_METHOD_TEST_TIMEOUT_SECONDS=600 AI_METHOD_WARN_LOAD1=8 AI_METHOD_FAKE_LOAD1=20 slots_test_timeout)" "the limit triples with load1 20 over warn 8"
+assert_eq 7 "$(AI_METHOD_TEST_TIMEOUT_SECONDS=7 AI_METHOD_WARN_LOAD1=8 AI_METHOD_FAKE_LOAD1=8 slots_test_timeout)" "the limit does not grow at the warn load"
+assert_status 142 "an alarm of the limit kills a slow command" env AI_METHOD_TEST_TIMEOUT_SECONDS=1 AI_METHOD_FAKE_LOAD1=1 bash -c 'source "$1/lib.sh"; test_limited sleep 5' _ "$TESTS_DIR"
+assert_status 0 "the same slow command passes when the load stretches the limit" env AI_METHOD_TEST_TIMEOUT_SECONDS=1 AI_METHOD_WARN_LOAD1=1 AI_METHOD_FAKE_LOAD1=9 bash -c 'source "$1/lib.sh"; test_limited sleep 2' _ "$TESTS_DIR"
+# test_close_phase.sh never runs from here (issue #71): it runs once, in the normal suite.
+# A stub in its place stands for it, and the real validate.sh refuses under the mark, so
+# a test that reached validate.sh from inside the suite would fail at once, not nest it.
+nested="$(make_repo)"
+mkdir -p "$nested/scripts/lib" "$nested/scripts/tests"
+cp "$SCRIPTS/validate.sh" "$nested/scripts/validate.sh"
+cp "$SCRIPTS/lib/common.sh" "$SCRIPTS/lib/slots.sh" "$SCRIPTS/lib/progress.sh" "$SCRIPTS/lib/procs.sh" "$SCRIPTS/lib/machine-limits.env.example" "$nested/scripts/lib/"
+printf '#!/usr/bin/env bash\n"$(dirname "$0")/../validate.sh" --tests\n' >"$nested/scripts/tests/test_close_phase.sh"
+assert_status 1 "a test that reaches validate.sh from the suite fails at once" env -u PROCESS_VALIDATE_RUNNING "$nested/scripts/validate.sh" --tests
+assert_contains "$(last_output)" "already running" "the nested validate.sh says why it refuses"
 
 # Missing product dependency: outside the CI the failure names the folder, the module
 # and the install command; in the CI nothing changes.

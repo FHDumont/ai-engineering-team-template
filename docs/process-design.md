@@ -399,6 +399,7 @@ O histórico `~/.cache/ai-method/history.tsv` (espera e duração de cada valida
 | `AI_METHOD_WARN_LOAD1` | 8 | load de 1 min | acima disso avisa (não bloqueia) |
 | `AI_METHOD_WARN_FREE_MEM_MB` | 1024 | MB | memória livre abaixo disso avisa |
 | `AI_METHOD_WARN_SWAP_MB` | 2048 | MB | swap em uso acima disso avisa |
+| `AI_METHOD_TEST_TIMEOUT_SECONDS` | 600 | segundos | limite de tempo dos testes que usam alarme ou espera; multiplicado por load1 ÷ `WARN_LOAD1` (arredondado para cima) quando a máquina está acima do aviso, então nenhum teste cai por tempo com a máquina carregada (#71) |
 | `AI_METHOD_LINT_BASE` | main | ref do git | base do lint incremental do `validate.sh --lint` |
 | `AI_METHOD_IDLE_HOURS` | 4 | horas | sessão parada há mais que isso: `sessions.sh --close-idle` encerra a headless e o fim da fase lista as do app não arquivadas |
 

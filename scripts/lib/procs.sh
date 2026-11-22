@@ -119,28 +119,30 @@ orphan_cwd_match() { # orphan_cwd_match <cwd>
 # starting is not an orphan yet). Never this process.
 # shellcheck disable=SC2120  # callers pass dirs, or none for the temporary-folder sweep
 procs_orphans() { # procs_orphans [dir...]
-  local rows pid et cmd cwd d min="${AI_METHOD_ORPHAN_MIN_AGE:-60}" ok
+  local rows cwds pid et cwd min="${AI_METHOD_ORPHAN_MIN_AGE:-60}" dirs=""
+  local d
+  for d in "$@"; do dirs="$dirs${dirs:+$'\n'}${d%/}"; done
   rows="$(ps -axo pid=,ppid=,etime=,command= | awk '$2 == 1 && $1 != 1 { print }')"
   [ -n "$rows" ] || return 0
-  local pids
-  pids="$(printf '%s\n' "$rows" | awk '{ printf "%s%s", (n++ ? "," : ""), $1 }')"
-  local cwds
-  cwds="$(lsof -a -d cwd -Fpn -p "$pids" 2>/dev/null | awk '/^p/ { pid = substr($0, 2) } /^n/ { print pid "\t" substr($0, 2) }')"
-  printf '%s\n' "$rows" | while read -r pid _ et cmd; do
-    [ "$pid" != "$$" ] || continue
-    cwd="$(printf '%s\n' "$cwds" | awk -F'\t' -v p="$pid" '$1 == p { print $2; exit }')"
-    ok=0
-    if [ $# -gt 0 ]; then
-      for d in "$@"; do
-        d="${d%/}"
-        case "$cwd" in "$d"|"$d"/*) ok=1 ;; esac
-        case "$cmd" in *"$d"/*|*"$d") ok=1 ;; esac
-      done
-    else
-      orphan_cwd_match "$cwd" || continue
-      awk -v s="$(etime_seconds "$et")" -v m="$min" 'BEGIN { exit !(s >= m) }' && ok=1
-    fi
-    [ "$ok" = 1 ] && echo "$pid"
+  cwds="$(lsof -a -d cwd -Fpn -p "$(printf '%s\n' "$rows" | awk '{ printf "%s%s", (n++ ? "," : ""), $1 }')" 2>/dev/null | awk '/^p/ { pid = substr($0, 2) } /^n/ { print pid "\t" substr($0, 2) }')"
+  # One pass joins the rows with their cwds; the shell only sees the candidates.
+  if [ $# -gt 0 ]; then
+    awk -v self="$$" -v dirs="$dirs" 'BEGIN { n = split(dirs, D, "\n") }
+      NR == FNR { split($0, a, "\t"); if (!(a[1] in cwd)) cwd[a[1]] = a[2]; next }
+      { pid = $1; if (pid == self) next
+        line = $0; sub(/^[ ]*[0-9]+[ ]+[0-9]+[ ]+[^ ]+[ ]*/, "", line); ok = 0
+        for (i = 1; i <= n; i++) { d = D[i]
+          if (cwd[pid] == d || index(cwd[pid], d "/") == 1) ok = 1
+          if (index(line, d "/") || (length(line) >= length(d) && substr(line, length(line) - length(d) + 1) == d)) ok = 1 }
+        if (ok) print pid }' <(printf '%s\n' "$cwds") <(printf '%s\n' "$rows")
+    return 0
+  fi
+  # No dir: only the rows whose cwd looks temporary reach the shell (orphan_cwd_match).
+  awk -v self="$$" 'NR == FNR { split($0, a, "\t"); if (!(a[1] in cwd)) cwd[a[1]] = a[2]; next }
+    $1 != self && ($1 in cwd) && cwd[$1] ~ /(\/tmp\.|\/validate-tests\.|\/validate\.|\/\.worktrees\/)/ { print $1 "\t" $3 "\t" cwd[$1] }' \
+    <(printf '%s\n' "$cwds") <(printf '%s\n' "$rows") | while IFS=$'\t' read -r pid et cwd; do
+    orphan_cwd_match "$cwd" || continue
+    awk -v s="$(etime_seconds "$et")" -v m="$min" 'BEGIN { exit !(s >= m) }' && echo "$pid"
   done
   return 0
 }
