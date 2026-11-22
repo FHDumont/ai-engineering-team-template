@@ -83,8 +83,25 @@ assert_contains "$(last_output)" "orphan process" "validate.sh lists the orphan"
 assert_contains "$(last_output)" "$(cat "$TMP/leaves.pid")" "validate.sh names the pid"
 sleep 1
 assert_eq dead "$(alive "$(cat "$TMP/leaves.pid")")" "validate.sh stops the orphan"
-# A clean suite stays green.
+# The same with a test that loads lib.sh (issue #83): under validate.sh its sweep by cwd is
+# left to the end of the run, which must still find what the test left in its removed folder.
 rm "$vrepo/scripts/tests/test_leaves.sh"
+cp "$TESTS_DIR/lib.sh" "$vrepo/scripts/tests/lib.sh"
+cat >"$vrepo/scripts/tests/test_leaves_lib.sh" <<L
+#!/usr/bin/env bash
+source "\$(dirname "\$0")/lib.sh"
+mkdir -p "\$TMP/wt"
+# Detached (parent 1) with its cwd in the folder: only the search by cwd finds it.
+bash -c 'cd "\$1"; nohup sleep 300 </dev/null >/dev/null 2>&1 & echo \$! >"\$2"' _ "\$TMP/wt" "$TMP/leaves-lib.pid"
+finish
+L
+assert_status 1 "validate.sh fails when a test with lib.sh leaves a process in its folder" \
+  sh -c "cd '$vrepo' && env -u PROCESS_VALIDATE_RUNNING scripts/validate.sh --tests"
+assert_contains "$(last_output)" "$(cat "$TMP/leaves-lib.pid")" "validate.sh lists the process left in the folder of a lib.sh test"
+sleep 1
+assert_eq dead "$(alive "$(cat "$TMP/leaves-lib.pid")")" "validate.sh stops the process left in the folder of a lib.sh test"
+rm "$vrepo/scripts/tests/test_leaves_lib.sh" "$vrepo/scripts/tests/lib.sh"
+# A clean suite stays green.
 printf '#!/usr/bin/env bash\nexit 0\n' >"$vrepo/scripts/tests/test_clean.sh"
 assert_status 0 "validate.sh is green without orphans" \
   sh -c "cd '$vrepo' && env -u PROCESS_VALIDATE_RUNNING scripts/validate.sh --tests"
