@@ -248,8 +248,6 @@ assert_contains "$setup" "AI_METHOD_SLOTS_FASE" "setup explains each machine lim
 assert_contains "$setup" "over-target" "setup says the owner is called again only on over-target"
 assert_contains "$(cat "$REPO/README.md")" "meta de tempo" "the quick start mentions the time target"
 
-finish
-
 # Notes to the headless child (#74) and the cheap pre-review (#75).
 execute="$(cat "$REPO/.claude/skills/execute/SKILL.md")"
 reviewer="$(cat "$REPO/.claude/agents/close-reviewer.md")"
@@ -260,3 +258,5 @@ assert_contains "$close" "no máximo 2 vezes" "close-phase limits the pre-review
 assert_contains "$reviewer" "Pré-revisão" "close-reviewer knows the pre-review mode"
 assert_contains "$design" "Pré-revisão" "the design describes the pre-review"
 assert_contains "$design" "Recado à filha headless" "the design describes the note to the headless child"
+
+finish
