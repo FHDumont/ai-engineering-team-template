@@ -41,7 +41,7 @@ rm "$repo/.process/setup-ok"
 fake_setup freeplan
 assert_status 0 "never blocks (plan)" run s-plan
 assert_contains "$(last_output)" "load the setup skill" "plan: points to the setup skill"
-assert_contains "$(last_output)" "missing: protection of main" "plan: names what is missing"
+assert_contains "$(last_output)" "missing: owner ok to enter unprotected" "plan: names what is missing"
 fake_setup unprotected
 assert_status 0 "never blocks (unprotected mode)" run s-unprotected
 assert_eq "" "$(last_output)" "unprotected mode: says nothing"
