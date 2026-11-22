@@ -23,7 +23,10 @@ rm -rf "$repo/docs" "$repo/.process"
 
 git -C "$repo" switch --quiet -c feat/issue-4-x
 cat >"$TMP/handler.sh" <<'H'
-case "$1 $2" in "issue view") echo "end:lab-test" ;; esac
+case "$*" in
+  *"--json comments"*) echo '{"comments":[]}' ;;
+  "issue view"*) echo "end:lab-test" ;;
+esac
 H
 use_fake_gh "$TMP/handler.sh"
 out="$(cd "$repo" && "$SCRIPTS/status.sh" --state esperando --need "testar no lab o filtro")"
@@ -34,6 +37,27 @@ assert_eq "**Estado:** esperando você
 **Próximo passo:** ao terminar, parar para o teste no lab (fase #4)" "$out" "bold lines separated by blank lines, lab-test shortcut, no main warning"
 out="$(cd "$repo" && "$SCRIPTS/status.sh" --state esperando)"
 assert_contains "$out" '**Você precisa:** dizer "fechar fase" aqui' "lab-test default need is the shortcut"
+# Lab-test stop with an unanswered note to the phase (#122): refused, exit 12.
+cat >"$TMP/handler.sh" <<H
+case "\$*" in
+  *"--json comments"*) cat "$TMP/lab_comments.json" ;;
+  "issue view"*) echo "end:lab-test" ;;
+esac
+H
+use_fake_gh "$TMP/handler.sh"
+jq -n --arg b $'**De:** gerenciadora · **Para:** fase #4 · **Pedido:** parar · **Responde a:** —\nsegure' \
+  '{comments: [{body: $b, url: "https://github.com/owner/repo/issues/4#c9"}]}' >"$TMP/lab_comments.json"
+assert_status 12 "lab-test stop is refused with an unanswered note" \
+  sh -c "cd '$repo' && '$SCRIPTS/status.sh' --state esperando --need 'testar no lab o filtro'"
+assert_contains "$(last_output)" "issues/4#c9" "names the unanswered note"
+assert_not_contains "$(last_output)" "**Estado:**" "prints no status block when a note is pending"
+cat >"$TMP/handler.sh" <<'H'
+case "$*" in
+  *"--json comments"*) echo '{"comments":[]}' ;;
+  "issue view"*) echo "end:lab-test" ;;
+esac
+H
+use_fake_gh "$TMP/handler.sh"
 assert_not_contains "$out" '`' "no backtick or code fence"
 # Reader that exits at once: the old code (one echo per line) died with SIGPIPE.
 first="$(cd "$repo" && { "$SCRIPTS/status.sh" --state trabalhando --offline | true; echo "rc=${PIPESTATUS[0]}"; })"

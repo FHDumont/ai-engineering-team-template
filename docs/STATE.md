@@ -29,5 +29,5 @@ Repositório criado a partir do template do método (`docs/process-design.md`). 
 - `close-phase.sh --check`: conflito real no cherry-pick sai 4; `mergeable` UNKNOWN após 5 leituras sai 8; sem check no HEAD em ~180 s sai 7.
 - **Meta de tempo:** padrão do método (fase 45 min, `validate.sh` 240 s); o projeto sobrepõe em `.github/time-targets.tsv` (a atualização do template não sobrescreve). `machine-slots.sh --report` imprime `over-target:`; a skill `integrate` abre quadro ao dono no fim do grupo.
 - **Headless:** desligado por padrão. Recusa por falta de fala do dono vira cartão ou espera, não `start-headless.sh`. Fase sem `phase_session` aparece como "aberta, sem sessão".
-- **Recado à filha headless:** comentário na issue com `Para: fase #n`; a filha o relê antes de cada etapa e do `--merge`, que sai 12 até ela responder com `De: fase #n`.
+- **Recado à filha:** comentário na issue com `Para: fase #n` (app e headless, além da mensagem); a filha o relê antes de cada etapa, da parada de lab-test e do `--merge`, que sai 12 até ela responder com `De: fase #n`. O ok do dono no merge vale para um SHA (`--owner-ok <sha>`).
 - **Pré-revisão:** antes do `--prepare`, `close-reviewer` só com issue e diff; `close-phase.sh --pre-review --verdict clean|findings` grava `pre_review` no trace; o `--prepare` só avisa sem ela no HEAD.

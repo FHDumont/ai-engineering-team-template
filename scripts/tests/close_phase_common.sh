@@ -64,7 +64,13 @@ case "\$*" in
   "pr view 12 --json body"*) printf '%s\n' "\${FAKE_PR_BODY:-Resumo}" ;;
   "pr view 12"*"labels,headRefOid,baseRefName"*) jq -cn --arg l "$1" --arg s "$SHA" --arg b "\${FAKE_BASE:-main}" '{labels: (\$l | split(",") | map(select(length>0)) | map({name: .})), headRefOid: \$s, baseRefName: \$b}' ;;
   "pr view 12"*"headRefOid --jq"*) echo "$SHA" ;;
-  "issue view 5"*"--json comments"*) cat "$TMP/comments.json" 2>/dev/null || true ;;
+  "issue view 5"*"--json comments"*)
+    n=\$(( \$(cat "$TMP/cmt_reads" 2>/dev/null || echo 0) + 1 )); echo "\$n" >"$TMP/cmt_reads"
+    if [ -f "$TMP/comments_later.json" ] && [ "\$n" -ge "\${FAKE_NOTE_FROM_READ:-999}" ]; then
+      cat "$TMP/comments_later.json"
+    else
+      cat "$TMP/comments.json" 2>/dev/null || true
+    fi ;;
   "issue view 5"*"labels"*) printf '%s\n' "\${FAKE_ISSUE_LABELS:-type:feature}" | tr ',' '\n' ;;
   "api repos/owner/repo/commits/$SHA/status"*) echo "$2" ;;
   # Unprotected mode: FAKE_MODE=1 records it; FAKE_CI is the state of the CI check run on HEAD.
@@ -90,5 +96,5 @@ case "\$*" in
 esac
 H
   use_fake_gh "$TMP/handler.sh"
-  rm -f "$TMP/reads" "$TMP/owner-label"
+  rm -f "$TMP/reads" "$TMP/owner-label" "$TMP/cmt_reads"
 }

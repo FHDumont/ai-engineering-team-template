@@ -33,13 +33,21 @@ assert_contains "$(last_output)" "AI attribution" "says why"
 assert_not_contains "$(gh_calls)" "pr merge" "never merges a signed PR"
 
 handler "type:feature,needs-owner-ok" success
-assert_status 0 "merges with --owner-ok after the owner's choice" sh -c "cd '$repo' && '$CLOSE' --merge --owner-ok"
+assert_status 2 "--owner-ok without a SHA is refused" sh -c "cd '$repo' && '$CLOSE' --merge --owner-ok"
+assert_contains "$(last_output)" "--owner-ok needs the SHA" "says the SHA is required"
+assert_not_contains "$(gh_calls)" "pr merge" "never merges on --owner-ok without a SHA"
+handler "type:feature,needs-owner-ok" success
+assert_status 5 "--owner-ok for another SHA is refused" sh -c "cd '$repo' && '$CLOSE' --merge --owner-ok deadbeefdeadbeefdeadbeefdeadbeefdeadbeef"
+assert_contains "$(last_output)" "does not match" "says the SHA does not match HEAD"
+assert_not_contains "$(gh_calls)" "pr merge" "never merges on an ok bound to another SHA"
+handler "type:feature,needs-owner-ok" success
+assert_status 0 "merges with --owner-ok after the owner's choice" sh -c "cd '$repo' && '$CLOSE' --merge --owner-ok '$SHA'"
 assert_contains "$(gh_calls)" "<!-- owner-ok sha:$SHA -->" "records the owner's ok on the PR"
 
 # --owner-ok only counts with needs-owner-ok already on the PR: a refusal
 # puts the label there, read back, so the owner sees the PR waiting before any ok.
 handler "type:feature,area:auth" success
-assert_status 5 "--owner-ok without the label on the PR is refused" sh -c "cd '$repo' && '$CLOSE' --merge --owner-ok"
+assert_status 5 "--owner-ok without the label on the PR is refused" sh -c "cd '$repo' && '$CLOSE' --merge --owner-ok '$SHA'"
 assert_contains "$(last_output)" "--owner-ok does not count" "says the flag did not count"
 assert_not_contains "$(gh_calls)" "pr merge" "never merges on --owner-ok without the label"
 assert_not_contains "$(gh_calls)" "<!-- owner-ok" "records no owner's ok without the label"

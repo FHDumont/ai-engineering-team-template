@@ -29,6 +29,8 @@ trap "" PIPE
 HERE="$(cd "$(dirname "$0")" && pwd)"
 # shellcheck source=scripts/lib/common.sh
 source "$HERE/lib/common.sh"
+# shellcheck source=scripts/lib/notes.sh
+source "$HERE/lib/notes.sh"
 
 state="" need="" next="" issue="" offline=0
 while [ $# -gt 0 ]; do
@@ -141,6 +143,18 @@ fi
 if [ "$end" = "end:lab-test" ] && [ "$state" = "esperando você" ]; then
   close_hint='dizer "fechar fase" aqui ou na sessão da fase (atalho /close-phase)'
   need="${need:+$need; }$close_hint"
+  if [ "$offline" = 0 ] && [ -n "$issue" ]; then
+    notes="$(phase_pending_notes "$issue")" || {
+      echo "refused: cannot read the comments of issue #$issue: lab-test stop blocked" >&2
+      exit 12
+    }
+    if [ -n "$notes" ]; then
+      echo "refused: issue #$issue has a note to phase #$issue with no answer:" >&2
+      echo "$notes" >&2
+      echo "read it, follow it, and answer with a comment headed by scripts/lib/author.sh (De: fase #$issue) before the lab-test stop" >&2
+      exit 12
+    fi
+  fi
 fi
 # A phase session leaves its state in the trace: the main session reads it.
 if [ -n "$issue" ]; then
