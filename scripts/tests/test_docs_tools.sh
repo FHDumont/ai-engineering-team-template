@@ -152,7 +152,7 @@ for form in bug.yml feature.yaml; do
   assert_status 1 "fails the issue form $form" env REPO_ROOT="$d" "$CHECK"
   assert_contains "$(last_output)" ".github/ISSUE_TEMPLATE/$form is an issue form" "names the issue form $form"
 done
-forms="$(cd "$REPO" && git ls-files .github/ISSUE_TEMPLATE | grep -E '\.ya?ml$' | grep -vxF .github/ISSUE_TEMPLATE/config.yml || true)"
+forms="$(cd "$REPO" && git ls-files -co --exclude-standard .github/ISSUE_TEMPLATE | grep -E '\.ya?ml$' | grep -vxF .github/ISSUE_TEMPLATE/config.yml || true)"
 assert_eq "" "$forms" "this repository has no issue form"
 
 # archive-adr: moves, swaps the link and marks it "substituída"; check-docs stays green.
