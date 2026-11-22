@@ -37,7 +37,9 @@ phase 7; phase 8
 printf '7\tfeat/issue-7-x\t%s\n8\tfeat/issue-8-x\t%s\n9\tfeat/issue-9-x\t%s\n' \
   "$repo/.worktrees/issue-7" "$repo/.worktrees/issue-8" "$repo/.worktrees/issue-9" >"$REGISTRY"
 # A server left running in the worktree is stopped, and the end message says to archive.
-(cd "$repo/.worktrees/issue-7" && exec sleep 300) >/dev/null 2>&1 &
+# Own process group, same session: the caller's group (a pipe) is spared.
+python3 -c 'import os,sys; os.setpgid(0,0); os.chdir(sys.argv[1]); os.execvp("sleep", ["sleep", "300"])' \
+  "$repo/.worktrees/issue-7" >/dev/null 2>&1 &
 leftover=$!
 sleep 1
 assert_status 0 "cleanup of a merged phase" sh -c "cd '$repo/.worktrees/issue-7' && scripts/close-phase.sh --cleanup"
