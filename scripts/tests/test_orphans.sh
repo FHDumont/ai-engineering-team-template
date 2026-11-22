@@ -9,8 +9,6 @@ source "$(dirname "$0")/lib.sh"
 source "$SCRIPTS/lib/procs.sh"
 
 export AI_METHOD_ORPHAN_ROOT="$TMP"
-# This test checks the sweep of lib.sh by cwd itself, so it keeps it on (validate.sh turns it off).
-unset AI_METHOD_SWEEP_AT_END
 PIDF="$TMP/pids"
 : >"$PIDF"
 trap 'xargs kill -KILL <"$PIDF" 2>/dev/null || true; test_sweep; rm -rf "$TMP"' EXIT
@@ -83,8 +81,9 @@ assert_contains "$(last_output)" "orphan process" "validate.sh lists the orphan"
 assert_contains "$(last_output)" "$(cat "$TMP/leaves.pid")" "validate.sh names the pid"
 sleep 1
 assert_eq dead "$(alive "$(cat "$TMP/leaves.pid")")" "validate.sh stops the orphan"
-# The same with a test that loads lib.sh (issue #83): under validate.sh its sweep by cwd is
-# left to the end of the run, which must still find what the test left in its removed folder.
+# A test that loads lib.sh (issue #83): what it leaves detached in its folder is stopped by
+# its own sweep (the search by cwd looks at the detached processes), so the suite is green
+# and nothing stays alive.
 rm "$vrepo/scripts/tests/test_leaves.sh"
 cp "$TESTS_DIR/lib.sh" "$vrepo/scripts/tests/lib.sh"
 cat >"$vrepo/scripts/tests/test_leaves_lib.sh" <<L
@@ -95,11 +94,10 @@ mkdir -p "\$TMP/wt"
 bash -c 'cd "\$1"; nohup sleep 300 </dev/null >/dev/null 2>&1 & echo \$! >"\$2"' _ "\$TMP/wt" "$TMP/leaves-lib.pid"
 finish
 L
-assert_status 1 "validate.sh fails when a test with lib.sh leaves a process in its folder" \
+assert_status 0 "validate.sh is green when a lib.sh test leaves a detached process in its folder" \
   sh -c "cd '$vrepo' && env -u PROCESS_VALIDATE_RUNNING scripts/validate.sh --tests"
-assert_contains "$(last_output)" "$(cat "$TMP/leaves-lib.pid")" "validate.sh lists the process left in the folder of a lib.sh test"
 sleep 1
-assert_eq dead "$(alive "$(cat "$TMP/leaves-lib.pid")")" "validate.sh stops the process left in the folder of a lib.sh test"
+assert_eq dead "$(alive "$(cat "$TMP/leaves-lib.pid")")" "the sweep of lib.sh stops the process left in the folder of its test"
 rm "$vrepo/scripts/tests/test_leaves_lib.sh" "$vrepo/scripts/tests/lib.sh"
 # A clean suite stays green.
 printf '#!/usr/bin/env bash\nexit 0\n' >"$vrepo/scripts/tests/test_clean.sh"
