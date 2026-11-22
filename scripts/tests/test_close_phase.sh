@@ -79,6 +79,7 @@ assert_not_contains "$(gh_calls)" "pr merge" "never calls merge when refused"
 
 # Notes to the phase (#74): a comment "Para: fase #5" with no later comment of the phase refuses.
 note() { printf '**De:** gerenciadora · **Para:** fase #%s · **Pedido:** %s · **Responde a:** —\nmedir a suíte' "${1:-5}" "${2:-medir}"; }
+# shellcheck disable=SC2120  # optional argument, default used in most calls
 reply() { printf '**De:** fase #5 · **Para:** gerenciadora · **Pedido:** %s · **Responde a:** https://x/1\nfeito' "${1:-medir}"; }
 comments() { # comments <body>...: writes the comments of the issue, oldest first
   for b in "$@"; do jq -cn --arg b "$b" --arg u "https://github.com/owner/repo/issues/5#c$RANDOM" '{body: $b, url: $u}'; done |

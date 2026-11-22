@@ -45,6 +45,7 @@ repo_slug() {
 }
 
 # Current branch (empty on a detached HEAD).
+# shellcheck disable=SC2120  # other files pass a directory
 current_branch() {
   git -C "${1:-.}" branch --show-current 2>/dev/null
 }
