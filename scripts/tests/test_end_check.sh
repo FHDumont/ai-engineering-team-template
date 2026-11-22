@@ -50,6 +50,15 @@ assert_not_contains "$(last_output)" "mode: unprotected" "protected mode: no mod
 check 0 "the unprotected mode is not an error" FAKE_MODE=1
 assert_contains "$(last_output)" "mode: unprotected" "unprotected mode: named in the ok line"
 
+# CI of origin/main: green passes, red names the run, in progress says to wait, absent follows phase-start.
+check 0 "a green CI of main passes" FAKE_BASE_CI=green
+fails_with "a red CI of main" "CI of origin/main" FAKE_BASE_CI=red
+assert_contains "$(last_output)" "actions/runs/3" "red CI names the run"
+check 1 "CI of main still running" FAKE_BASE_CI=running
+assert_contains "$(last_output)" "still running" "in-progress CI is named"
+assert_contains "$(last_output)" "wait for it" "in-progress CI says to wait"
+fails_with "an absent CI of main with no voucher" "no check 'CI'" FAKE_BASE_CI=absent FAKE_BASE_PR=none
+
 # Extra local branch.
 git -C "$repo" branch feat/issue-5-x
 fails_with "an extra local branch" "extra local branch (feat/issue-5-x)"

@@ -19,6 +19,8 @@
 #:
 #: With --issue N (the end of one phase, by its session), fails with a worktree,
 #: a local branch, a registry line, a remote branch or an open PR of phase N.
+#: Online, also fails when the check CI of origin/main is red (names the run) or
+#: still running (says to wait); absent follows the same rule as phase-start.sh.
 #:
 #: In the unprotected mode (repository variable PROCESS_BRANCH_MODE, a plan with no
 #: branch protection) nothing here changes; the ok line names the mode.
@@ -115,6 +117,39 @@ else
     deploy="$("$HERE/deploy.sh" --check 2>&1)" ||
       fail "deploy not checked ($(printf '%s' "$deploy" | tail -1)): the main session runs scripts/deploy.sh"
   fi
+fi
+
+# The CI of origin/main: a red or unfinished base is not "pronto" (phase-start.sh would refuse).
+if [ "$offline" = 0 ]; then
+  git -C "$main_root" fetch --quiet origin main || fail "cannot fetch origin/main to read its CI"
+  base="$(git -C "$main_root" rev-parse origin/main)"
+  ci_json="$(gh api "repos/$repo/commits/$base/check-runs?per_page=100" 2>&1)" || {
+    fail "could not read the check 'CI' of origin/main ${base:0:9} (gh api failed)"
+    ci_json=""
+  }
+  ci=""
+  if [ -n "$ci_json" ]; then
+    ci="$(printf '%s' "$ci_json" | jq -r '[.check_runs[]? | select(.name == "CI")] | sort_by(.started_at // "") | last
+      | if . == null then "absent" else "\(.status)/\(.conclusion // "none") \(.html_url // "")" end' 2>/dev/null || true)"
+    if [ "$ci" = absent ]; then
+      runs_json="$(gh api "repos/$repo/actions/runs?head_sha=$base&per_page=100" 2>/dev/null || true)"
+      ci="$(printf '%s' "$runs_json" | jq -r '[.workflow_runs[]? | select(.status != "completed")] | last
+        | if . == null then "absent" else "in_progress/none \(.html_url // "")" end' 2>/dev/null || echo absent)"
+    fi
+  fi
+  case "$ci" in
+    completed/success*) ;;
+    queued/*|in_progress/*|waiting/*|pending/*|requested/*)
+      fail "CI of origin/main ${base:0:9} is still running (${ci#* }): wait for it" ;;
+    ""|absent)
+      prs="$(gh api "repos/$repo/commits/$base/pulls" 2>/dev/null | jq -r '.[]? | select(.merged_at != null) | .number' 2>/dev/null || true)"
+      if [ -z "$prs" ]; then
+        fail "no check 'CI' on origin/main ${base:0:9} and no merged PR vouches for it"
+      fi
+      ;;
+    *)
+      fail "CI of origin/main ${base:0:9} is ${ci%% *} (${ci#* })" ;;
+  esac
 fi
 
 if [ "$fails" -gt 0 ]; then
