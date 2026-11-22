@@ -117,4 +117,152 @@ assert_status 1 "open-parallel refuses an issue already registered" sh -c "cd '$
 : >"$REGISTRY"
 assert_status 0 "integrate with an empty registry" sh -c "cd '$repo' && scripts/integrate-parallel.sh --dry-run --interval 0"
 assert_contains "$(last_output)" "nothing to wait for" "says there is nothing to wait for"
+
+# --cleanup with its stdout piped to a sibling whose cwd is the worktree (issue #120).
+# ps delegates to the real binary; lsof and kill are fakes, so nothing is signaled.
+# case-120-start
+repo120="$(make_repo)"
+copy_scripts "$repo120"
+printf '.worktrees/\n.process/\n' >"$repo120/.gitignore"
+git -C "$repo120" add scripts .gitignore
+git -C "$repo120" commit --quiet -m "chore: scripts"
+git clone --quiet --bare "$repo120" "$TMP/remote120.git"
+git -C "$repo120" remote add origin "$TMP/remote120.git"
+git -C "$repo120" fetch --quiet origin
+git -C "$repo120" branch --quiet --set-upstream-to=origin/main main
+git -C "$repo120" worktree add --quiet -b "feat/issue-120-x" "$repo120/.worktrees/issue-120" main
+wt120="$repo120/.worktrees/issue-120"
+cat >"$TMP/handler120.sh" <<'H'
+case "$*" in
+  "pr list"*"--state merged"*) echo 120 ;;
+esac
+H
+use_fake_gh "$TMP/handler120.sh"
+export FAKE_GH_HINT=1
+printf 'enable -n kill\n' >"$TMP/bin/disable-kill"
+# 8301 is another session (an observer). 8302 shares this session and has its own
+# process group (a server of the phase). Neither pid is a real process.
+sid120="$(/bin/ps -o sess= -p $$ | tr -d ' ')"
+printf '%s\t%s\t%s\t%s\t%s\n' \
+  "8301" "1" "830101" "830101" "cat" \
+  "8302" "1" "830202" "$sid120" "sleep 300" >"$TMP/ps120.tab"
+export FAKE_PS_TAB="$TMP/ps120.tab" FAKE_REAL_PS="/bin/ps"
+cat >"$TMP/bin/ps" <<'PS'
+#!/bin/sh
+tab="${FAKE_PS_TAB:?}"
+spec="" pid=""
+while [ $# -gt 0 ]; do
+  case "$1" in
+    -p) pid="$2"; shift 2 ;;
+    -o|-axo) spec="$2"; shift 2 ;;
+    *) shift ;;
+  esac
+done
+emit() {
+  fpid=$(printf '%s' "$1" | awk -F '\t' '{ print $1 }')
+  fppid=$(printf '%s' "$1" | awk -F '\t' '{ print $2 }')
+  fpgid=$(printf '%s' "$1" | awk -F '\t' '{ print $3 }')
+  fsid=$(printf '%s' "$1" | awk -F '\t' '{ print $4 }')
+  fcmd=$(printf '%s' "$1" | awk -F '\t' '{ print $5 }')
+  case "$spec" in
+    ppid=) printf '%s\n' "$fppid" ;;
+    command=) printf '%s\n' "$fcmd" ;;
+    pgid=) printf '%s\n' "$fpgid" ;;
+    sess=) printf '%s\n' "$fsid" ;;
+    stat=) printf 'S\n' ;;
+    "pid=,command=") printf '%s %s\n' "$fpid" "$fcmd" ;;
+    "pid=,ppid=") printf '%s %s\n' "$fpid" "$fppid" ;;
+    *) printf '%s %s\n' "$fpid" "$fcmd" ;;
+  esac
+}
+if [ -n "$pid" ]; then
+  row=$(awk -F '\t' -v p="$pid" '$1 == p { print; exit }' "$tab")
+  if [ -n "$row" ]; then emit "$row"; exit 0; fi
+  exec "$FAKE_REAL_PS" "$@"
+fi
+exec "$FAKE_REAL_PS" "$@"
+PS
+cat >"$TMP/bin/lsof" <<'LSOF'
+#!/bin/sh
+tab="${FAKE_LSOF_TAB:?}"
+pids=""
+while [ $# -gt 0 ]; do
+  case "$1" in
+    -p) pids="$2"; shift 2 ;;
+    *) shift ;;
+  esac
+done
+if [ -z "$pids" ]; then
+  awk -F '\t' '{ printf "p%s\nn%s\n", $1, $2 }' "$tab"
+else
+  awk -F '\t' -v pids="$pids" '
+    {
+      n = split(pids, a, ",")
+      for (i = 1; i <= n; i++) if (a[i] == $1) printf "p%s\nn%s\n", $1, $2
+    }
+  ' "$tab"
+fi
+exit 0
+LSOF
+cat >"$TMP/bin/kill" <<'KILL'
+#!/bin/sh
+log="${FAKE_KILL_LOG:?}"
+dead="${FAKE_PS_DEAD:?}"
+trace="${PROCESS_EVENTS_FILE:-}"
+early="${FAKE_KILL_EARLY:-}"
+sig=""
+for arg in "$@"; do
+  case "$arg" in
+    -*) sig="${arg#-}" ;;
+    *)
+      if [ "$sig" = "0" ]; then
+        if [ -f "$dead" ] && grep -qx "$arg" "$dead"; then exit 1; fi
+        exit 0
+      fi
+      if [ -n "$trace" ] && [ -n "$early" ] && ! grep -q "\"pid\":\"$arg\"" "$trace" 2>/dev/null; then
+        printf '%s\n' "$arg" >>"$early"
+      fi
+      printf '%s\n' "$arg" >>"$dead"
+      printf '%s %s\n' "${sig:-TERM}" "$arg" >>"$log"
+      ;;
+  esac
+done
+exit 0
+KILL
+chmod +x "$TMP/bin/ps" "$TMP/bin/lsof" "$TMP/bin/kill"
+: >"$TMP/dead120"
+: >"$TMP/kill120"
+: >"$TMP/early120"
+export FAKE_PS_DEAD="$TMP/dead120" FAKE_KILL_LOG="$TMP/kill120" FAKE_KILL_EARLY="$TMP/early120"
+fifo120="$TMP/fifo120"
+mkfifo "$fifo120"
+out120="$TMP/out120"
+: >"$out120"
+(
+  cd "$wt120" || exit 1
+  while IFS= read -r line; do
+    printf '%s\n' "$line" >>"$out120"
+    if grep -E -q "(^| )$$( |$)" "$FAKE_KILL_LOG" 2>/dev/null; then exit 0; fi
+  done <"$fifo120"
+) &
+sib120=$!
+printf '%s\t%s\n' "$sib120" "$wt120" "8301" "$wt120" "8302" "$wt120" >"$TMP/lsof120.tab"
+export FAKE_LSOF_TAB="$TMP/lsof120.tab"
+rc120=0
+env PATH="$TMP/bin:$PATH" BASH_ENV="$TMP/bin/disable-kill" FAKE_GH_HINT=1 \
+  bash -c 'cd "$1" && exec "$2" --cleanup' _ "$wt120" "$wt120/scripts/close-phase.sh" >"$fifo120" 2>&1 || rc120=$?
+wait "$sib120" 2>/dev/null || true
+assert_eq 0 "$rc120" "cleanup piped to a sibling in the worktree exits 0"
+assert_eq "" "$(git -C "$repo120" branch --list 'feat/issue-120-x')" "cleanup deletes the local branch"
+assert_not_contains "$(cat "$TMP/kill120")" "TERM $sib120" "the pipe reader is not signaled"
+assert_not_contains "$(cat "$TMP/kill120")" "TERM 8301" "a process of another session that only has this cwd is not signaled"
+assert_contains "$(cat "$TMP/kill120")" "TERM 8302" "a server of this session in its own process group is stopped"
+assert_eq "" "$(cat "$TMP/early120")" "every signaled process is in the trace before the signal"
+assert_contains "$(cat "$PROCESS_EVENTS_FILE")" "\"pid\":\"$srv120\"" "the trace names the stopped pid"
+assert_contains "$(cat "$PROCESS_EVENTS_FILE")" "sleep" "the trace names the command"
+assert_contains "$(cat "$PROCESS_EVENTS_FILE")" "$wt120" "the trace names the directory"
+assert_not_contains "$(cat "$out120")" "hint:" "gh hint lines are not forwarded"
+last120="$(awk 'NF { line = $0 } END { print line }' "$out120")"
+assert_contains "$last120" "Archive this session" "the last line of cleanup is the result"
+# case-120-end
 finish

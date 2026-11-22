@@ -7,6 +7,10 @@
 # "gh: forced failure") on stderr and exits FAKE_GH_FAIL_STATUS (default 1)
 # without running the handler. The handler may also `exit <n>` by itself.
 printf '%s\n' "$*" >>"${FAKE_GH_LOG:?FAKE_GH_LOG not set}"
+# A test opts in: the real gh prints "hint:" lines (gh event listen) on stderr.
+if [ -n "${FAKE_GH_HINT:-}" ]; then
+  printf '%s\n' "hint: gh event listen" >&2
+fi
 if [ -n "${FAKE_GH_FAIL:-}" ] && printf '%s' "$*" | grep -qE -- "$FAKE_GH_FAIL"; then
   echo "${FAKE_GH_FAIL_MSG:-gh: forced failure}" >&2
   exit "${FAKE_GH_FAIL_STATUS:-1}"
