@@ -34,12 +34,35 @@ case "$*" in
     else printf '{"tree":{"sha":"%s"}}\n' "$(git rev-parse 'origin/main^{tree}')"; fi
     exit 0 ;;
 esac
+# The workflow runs of the base commit (phase-start.sh, #62): FAKE_BASE_RUNS is none (default),
+# done (a finished run) or running; with FAKE_BASE_CI=jobwait the run is going while the check
+# CI is still absent (the counter of check-runs says how many reads happened).
+case "$*" in
+  "api repos/$GH_REPO/actions/runs?head_sha="*)
+    runs_mode="${FAKE_BASE_RUNS:-none}"
+    if [ "${FAKE_BASE_CI:-}" = jobwait ]; then
+      reads="$(cat "$FAKE_BASE_CI_COUNT" 2>/dev/null || echo 0)"
+      if [ "$reads" -le "${FAKE_BASE_CI_RUNNING:-2}" ]; then runs_mode=running; else runs_mode=none; fi
+    fi
+    case "$runs_mode" in
+      none) echo '{"workflow_runs":[]}' ;;
+      done) echo '{"workflow_runs":[{"status":"completed","conclusion":"failure","html_url":"https://github.com/owner/repo/actions/runs/5"}]}' ;;
+      running) echo '{"workflow_runs":[{"status":"in_progress","conclusion":null,"html_url":"https://github.com/owner/repo/actions/runs/6"}]}' ;;
+    esac
+    exit 0 ;;
+esac
 # The check "CI" of the base commit (phase-start.sh): FAKE_BASE_CI is green (default), red,
 # running, absent or wait (running on the first FAKE_BASE_CI_RUNNING reads, then green: the
 # run of main that finishes while phase-start.sh waits for it).
 case "$*" in
   "api repos/$GH_REPO/commits/"*"/check-runs?per_page=100")
     ci_mode="${FAKE_BASE_CI:-green}"
+    if [ "$ci_mode" = jobwait ]; then
+      # Tests running, the job CI not born yet; green once the run is over.
+      reads="$(cat "$FAKE_BASE_CI_COUNT" 2>/dev/null || echo 0)"
+      echo "$((reads + 1))" >"$FAKE_BASE_CI_COUNT"
+      if [ "$reads" -lt "${FAKE_BASE_CI_RUNNING:-2}" ]; then ci_mode=notyet; else ci_mode=green; fi
+    fi
     if [ "$ci_mode" = wait ]; then
       reads="$(cat "$FAKE_BASE_CI_COUNT" 2>/dev/null || echo 0)"
       echo "$((reads + 1))" >"$FAKE_BASE_CI_COUNT"
@@ -49,6 +72,7 @@ case "$*" in
       green) echo '{"check_runs":[{"name":"lint","status":"completed","conclusion":"failure"},{"name":"CI","status":"completed","conclusion":"success","started_at":"2026-01-02T00:00:00Z","html_url":"https://github.com/owner/repo/actions/runs/2"}]}' ;;
       red) echo '{"check_runs":[{"name":"CI","status":"completed","conclusion":"failure","started_at":"2026-01-02T00:00:00Z","html_url":"https://github.com/owner/repo/actions/runs/3"}]}' ;;
       running) echo '{"check_runs":[{"name":"CI","status":"in_progress","conclusion":null,"started_at":"2026-01-02T00:00:00Z","html_url":"https://github.com/owner/repo/actions/runs/4"}]}' ;;
+      notyet) echo '{"check_runs":[{"name":"Tests","status":"in_progress","conclusion":null,"started_at":"2026-01-02T00:00:00Z"}]}' ;;
       absent) echo '{"check_runs":[{"name":"lint","status":"completed","conclusion":"success"}]}' ;;
     esac
     exit 0 ;;

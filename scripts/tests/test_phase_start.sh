@@ -92,6 +92,15 @@ rm -f "$TMP/ci.count"
 assert_status 0 "phase-start waits for the CI of main (two merges in a row) and opens" env FAKE_BASE_CI=wait FAKE_BASE_CI_COUNT="$TMP/ci.count" FAKE_BASE_PR=tree PHASE_START_CI_WAIT=30 PHASE_START_CI_POLL=1 CLAUDE_CODE_SESSION_ID=manager sh -c "cd '$repo' && scripts/phase-start.sh 7 --dry-run"
 assert_contains "$(last_output)" "is green" "says the CI of the base turned green"
 assert_eq 1 "$(($(cat "$TMP/ci.count") > 1))" "it read the check again while the run was going"
+# #62: right after a merge the run of main has Tests going and no job CI yet. The gate looks at the
+# workflow run of the commit, waits, and opens when the CI turns green.
+rm -f "$TMP/ci.count"
+assert_status 0 "phase-start waits while Tests runs and the job CI does not exist yet" env FAKE_BASE_CI=jobwait FAKE_BASE_CI_COUNT="$TMP/ci.count" FAKE_BASE_PR=tree PHASE_START_CI_WAIT=30 PHASE_START_CI_POLL=1 CLAUDE_CODE_SESSION_ID=manager sh -c "cd '$repo' && scripts/phase-start.sh 7 --dry-run"
+assert_contains "$(last_output)" "is green" "says the CI turned green after the job was born"
+assert_not_contains "$(last_output)" "no check 'CI'" "does not refuse for the absent job"
+# A finished run without a green CI refuses as before.
+assert_status 1 "phase-start refuses a finished run without the check CI" env FAKE_BASE_CI=absent FAKE_BASE_RUNS=done sh -c "cd '$repo' && scripts/phase-start.sh 7 --no-check"
+assert_contains "$(last_output)" "no check 'CI' on the base commit" "a finished run keeps the absent message"
 # The wait has a deadline: a run that does not finish refuses, creating nothing.
 assert_status 1 "phase-start refuses when the CI of main does not finish before the deadline" env FAKE_BASE_CI=running sh -c "cd '$repo' && scripts/phase-start.sh 7 --no-check"
 assert_contains "$(last_output)" "did not finish" "says the run did not finish in time"

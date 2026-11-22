@@ -29,8 +29,8 @@
 #: GitHub API reading the check is reported as such, with its error, not as absent). Absent is accepted when
 #: the merged PR that holds the commit (gh api commits/<sha>/pulls) had CI green on its head
 #: with the same tree. ci.yml also runs on push to main, so a run of main that is still going is waited
-#: for (PHASE_START_CI_WAIT seconds, default 900; progress step "waiting for the CI of main"); with no run there is
-#: nothing to wait for. The merge gate
+#: for (PHASE_START_CI_WAIT seconds, default 900; progress step "waiting for the CI of main"), even before the
+#: job CI exists (the workflow run of the commit counts); with no run there is nothing to wait for. The merge gate
 #: already requires a green CI on main; the suite runs at the end (close-phase.sh
 #: --prepare) and in CI. The environment is checked by check-env.sh (tools and
 #: declared dependencies, no tests). A failure in the middle of the opening undoes
@@ -103,6 +103,16 @@ read_base_ci() { # sets ci_json and ci from the check "CI" of the base commit
   ci="$(printf '%s' "$ci_json" |
     jq -r '[.check_runs[]? | select(.name == "CI")] | sort_by(.started_at // "") | last
       | if . == null then "absent" else "\(.status)/\(.conclusion // "none") \(.html_url // "")" end' 2>/dev/null || true)"
+  # The job CI is born only after the jobs it depends on: with no check CI yet, a workflow run of
+  # the commit that is still going is the run to wait for (#62).
+  if [ "$ci" = absent ]; then
+    local runs_json
+    runs_json="$(gh api "repos/$(repo_slug)/actions/runs?head_sha=$base&per_page=100" 2>&1)" ||
+      die "could not read the workflow runs of the base commit ${base:0:9} (gh api failed: ${runs_json:-no output}): no phase opens; fix the access to GitHub and open again; nothing was created"
+    ci="$(printf '%s' "$runs_json" |
+      jq -r '[.workflow_runs[]? | select(.status != "completed")] | last
+        | if . == null then "absent" else "in_progress/none \(.html_url // "")" end' 2>/dev/null || echo absent)"
+  fi
 }
 read_base_ci
 # ci.yml also runs on push to main: a run that is still going is the only thing worth waiting for
