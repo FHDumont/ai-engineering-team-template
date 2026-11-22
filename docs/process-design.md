@@ -631,6 +631,8 @@ O agente `close-reviewer`, aberto com o par do peso `reviewer` (§3), lê a issu
 | Rodada N+1 | olha só o diff desde a rodada N e as regressões que ele causou |
 | 3ª rodada de "mudanças pedidas" | a filha para e avisa a sessão principal, que faz o quadro ao dono: corrigir, aceitar com achado, pausar |
 | Registro | toda rodada, aprovada e reprovada, vira comentário no PR |
+| Pré-revisão | antes do `--prepare`, o `close-reviewer` lê só a issue e o diff (sem testes, push ou CI); `close-phase.sh --pre-review` grava `pre_review` no trace; grave ou médio: corrige e repete, no máximo 2 vezes, sem `--prepare`; o `--prepare` só avisa sem `pre_review` do HEAD; a rodada oficial não muda |
+| Recado à filha headless | comentário na issue com `Para: fase #n`: a filha o relê antes de cada etapa e do `--merge`, que recusa (saída 12) até ela responder com `De: fase #n` |
 
 ### 10.3 Nunca fecha sozinho
 
