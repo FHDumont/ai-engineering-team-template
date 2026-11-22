@@ -60,7 +60,7 @@ jobs:
         run: |
           stdin_grep() { local r=0; grep "$@" >/dev/null || r=$?; cat >/dev/null || true; return $r; }
           # Files of the PR (since the merge-base), one per line.
-          files="$(git diff --name-only "$BASE_SHA...$HEAD_SHA")"
+          files="$(git diff --name-only --no-renames -z "$BASE_SHA...$HEAD_SHA" | tr '\0' '\n')"
           echo "$files"
           has() { echo "$files" | stdin_grep -qE "$1" && echo true || echo false; }
           # By exclusion: a doc is a file in docs/ or a .md, except the issue
@@ -84,7 +84,7 @@ jobs:
           # the suite would run again on the same code. Looks back 15 commits.
           if [ "$run_tests" = true ]; then
             for c in $(git rev-list --max-count=15 "$BASE_SHA..$HEAD_SHA" | tail -n +2); do
-              delta="$(git diff --name-only "$c" "$HEAD_SHA" 2>/dev/null || echo "?")"
+              delta="$(git diff --name-only --no-renames -z "$c" "$HEAD_SHA" 2>/dev/null | tr '\0' '\n' || echo "?")"
               [ "$(needs_tests "$delta")" = false ] || break
               done_ok="$(gh api "repos/$GITHUB_REPOSITORY/commits/$c/check-runs" --jq '[.check_runs[] | select(.name == "Tests" and .conclusion == "success")] | length' 2>/dev/null || echo 0)"
               if [ "${done_ok:-0}" -gt 0 ]; then run_tests=false; echo "tests already passed on $c, code unchanged since"; break; fi
@@ -158,7 +158,7 @@ jobs:
           HEAD_SHA: ${{ github.event.pull_request.head.sha }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
         run: |
-          touched="$(git diff --name-only "$BASE_SHA...$HEAD_SHA" | python3 base/scripts/lib/sensitive_paths.py base/.github/sensitive-paths)"
+          touched="$(git diff --name-only --no-renames -z "$BASE_SHA...$HEAD_SHA" | python3 base/scripts/lib/sensitive_paths.py base/.github/sensitive-paths)"
           if [ -n "$touched" ]; then
             echo "sensitive paths:"; echo "$touched"
             gh api "repos/$GITHUB_REPOSITORY/issues/$PR_NUMBER/labels" -f "labels[]=needs-owner-ok" >/dev/null

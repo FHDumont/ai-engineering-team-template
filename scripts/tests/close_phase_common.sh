@@ -25,6 +25,7 @@ mkdir -p "$TMP/hooks"
 printf '#!/bin/sh\necho push >>"%s"\n' "$PUSH_LOG" >"$TMP/hooks/pre-push"
 chmod +x "$TMP/hooks/pre-push"
 git -C "$repo" config core.hooksPath "$TMP/hooks"
+git -C "$repo" config core.quotepath true
 # Gate of --merge: the trace the gate reads is .process/events.jsonl of the checkout
 # (PROCESS_EVENTS_FILE never redirects it). The phase needs phase_opened, and the
 # session that merges must be another one, with its own phase_session (check-env.sh)
