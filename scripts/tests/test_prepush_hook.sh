@@ -4,6 +4,7 @@
 source "$(dirname "$0")/lib.sh"
 
 repo="$(make_repo)"
+copy_scripts "$repo"
 cp -R "$REPO/.githooks" "$repo/.githooks"
 git -C "$repo" config core.hooksPath .githooks
 git clone --quiet --bare "$repo" "$TMP/remote.git"
