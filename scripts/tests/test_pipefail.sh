@@ -45,7 +45,7 @@ offenders=""
 while IFS= read -r f; do
   [ -f "$f" ] || continue
   case "$f" in
-    */scripts/tests/*|*/.claude/hooks/tests/*) continue ;;
+    scripts/tests/*|*/scripts/tests/*|.claude/hooks/tests/*|*/.claude/hooks/tests/*) continue ;;
   esac
   grep -qE 'set -euo pipefail|set -eo pipefail|pipefail' "$f" || continue
   hits="$(grep -nE '[^[:space:]] \| grep -[a-zA-Z]*q' "$f" | grep -vE '^[0-9]+:[[:space:]]*#' || true)"
