@@ -101,11 +101,21 @@ proc_tmp_roots() {
 }
 
 # True when <dir> is a temporary folder of the method's tests, or a folder that is gone
-# from a worktree (.worktrees/<x>).
+# from a worktree (.worktrees/<x>). AI_METHOD_ORPHAN_ROOT, when set, also limits the
+# gone-worktree branch: a path outside that root is not a match.
 orphan_cwd_match() { # orphan_cwd_match <cwd>
-  local d="$1" r
+  local d="$1" r root
   [ -n "$d" ] || return 1
-  case "$d" in */.worktrees/*) [ -d "$d" ] || return 0 ;; esac
+  case "$d" in
+    */.worktrees/*)
+      [ -d "$d" ] && return 1
+      if [ -n "${AI_METHOD_ORPHAN_ROOT:-}" ]; then
+        root="${AI_METHOD_ORPHAN_ROOT%/}"
+        case "$d" in "$root"/*) return 0 ;; *) return 1 ;; esac
+      fi
+      return 0
+      ;;
+  esac
   case "$d" in */tmp.*|*/validate-tests.*|*/validate.*) ;; *) return 1 ;; esac
   for r in $(proc_tmp_roots); do
     case "$d" in "$r"/*) return 0 ;; esac
@@ -147,27 +157,8 @@ procs_orphans() { # procs_orphans [dir...]
   return 0
 }
 
-# Stops the orphans left by another run (temporary folders, worktrees that are gone) with
-# their children. Prints one line per stopped process.
-procs_stop_orphans() {
-  local prot p all="" stop=""
-  prot="$(proc_chain "$$" | tr '\n' ' ')$(app_claude_chains)"
-  for p in $(procs_orphans); do
-    # shellcheck disable=SC2086
-    proc_stoppable "$p" $prot || continue
-    all="$all $p $(proc_descendants "$p" | tr '\n' ' ')"
-  done
-  for p in $(printf '%s\n' "$all" | tr ' ' '\n' | grep . | sort -un); do
-    # shellcheck disable=SC2086
-    proc_stoppable "$p" $prot || continue
-    stop="$stop $p"
-    echo "stopped orphan process $p: $(proc_cmd "$p" | cut -c1-100)"
-  done
-  # shellcheck disable=SC2086
-  [ -z "$stop" ] || proc_stop $stop
-}
-
 # Stops the processes of a phase worktree and the headless child of the trace.
+# An orphan outside that worktree is not stopped (sessions.sh --list only marks it).
 # Prints one line per stopped process.
 procs_cleanup_worktree() { # procs_cleanup_worktree <worktree> <issue> [trace file]
   local wt="$1" issue="$2" trace="${3:-}" prot cand="" p hp hs all="" stop="" line
@@ -197,5 +188,4 @@ procs_cleanup_worktree() { # procs_cleanup_worktree <worktree> <issue> [trace fi
   # shellcheck disable=SC2086
   [ -z "$stop" ] || proc_stop $stop
   [ -n "$stop" ] || echo "no process left in the worktree"
-  procs_stop_orphans
 }

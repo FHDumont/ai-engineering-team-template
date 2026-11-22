@@ -77,7 +77,8 @@
 #:   session and stops.
 #: --cleanup: after the merge, stops the processes whose directory is in the worktree
 #:   and the headless child of the trace (with its MCPs; never a child of the
-#:   Claude.app), then, like the rest below, records phase_closed in the trace, sets the issue
+#:   Claude.app). It does not scan the machine and does not stop an orphan outside
+#:   that worktree. Then, like the rest below, records phase_closed in the trace, sets the issue
 #:   to Done and resets the "Fase atual" view filter (or leaves the group of
 #:   another active phase), takes out of .worktrees/parallel-active.tsv the line
 #:   of the phase and every line whose worktree is gone, removes the local
