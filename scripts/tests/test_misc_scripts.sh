@@ -22,7 +22,7 @@ for name in \
   archive-adr.sh ask-bot.sh auto-label.py check-attribution.sh check-docs.sh \
   check-env.sh check-workflows.py ci-gate.sh close-phase.sh deploy.sh \
   end-check.sh gen-changelog.py gen-docs.sh gen-roadmap.py init-env.sh \
-  integrate-parallel.sh label-issue.sh machine-slots.sh measure-session.py \
+  integrate-parallel.sh label-issue.sh machine-slots.sh measure-session.py method-diff.sh \
   new-phase.sh notify-bot.sh open-issue.sh open-parallel.sh phase-start.sh \
   progress.sh redo-phase.sh search-history.sh sessions.sh setup-repo.sh \
   setup-runner.sh start-headless.sh status.sh summarize-thread.sh \

@@ -2,6 +2,7 @@
 #: setup-repo.sh: apply the method's standard to the GitHub repository (idempotent).
 #:
 #: Usage: setup-repo.sh [--dry-run | --check] [--owner-ok] [--only labels|settings|protection]
+#:        setup-repo.sh --record-origin <sha>
 #:
 #: 1. Labels: syncs with .github/labels.tsv (creates, updates color and
 #:    description, renames from old names with `gh label edit --name`) and
@@ -62,9 +63,19 @@ while [ $# -gt 0 ]; do
     --offers) mode=offers; shift ;;
     --project) mode=project; shift ;;
     --decline) mode=decline; decline="${2:-}"; shift 2 ;;
+    --record-origin) mode=origin; origin="$2"; shift 2 ;;
     *) die "unknown option: $1 (see --help)" 2 ;;
   esac
 done
+# Records the template commit this repository was copied from. No network.
+if [ "$mode" = origin ]; then
+  [ -n "${origin:-}" ] || die "--record-origin needs the template commit" 2
+  dest="${REPO_ROOT:-$ROOT}"
+  mkdir -p "$dest/.github"
+  printf '%s\n' "$origin" >"$dest/.github/method-origin"
+  echo "recorded method origin $origin"
+  exit 0
+fi
 require_cmd gh jq
 repo="$(repo_slug)"
 branch="${SETUP_BRANCH:-main}"
