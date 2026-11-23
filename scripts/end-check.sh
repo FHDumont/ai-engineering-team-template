@@ -8,10 +8,12 @@
 #: state when it fails.
 #:
 #: Without --issue (the end of the group, by the main session), fails with:
-#:   - a local branch other than main, or main behind or ahead of origin/main;
-#:   - a worktree other than the main checkout;
+#:   - a local branch of a phase (the name contains issue-<n>), or main behind or ahead of origin/main;
+#:   - a worktree of a phase (the path contains issue-<n>);
 #:   - a line in .worktrees/parallel-active.tsv;
-#:   - an untracked file or an uncommitted change in the main checkout;
+#:   - an uncommitted change in the main checkout;
+#:   A local branch, a worktree or an untracked file the phase did not create is a
+#:   warn: line, not a failure. Do not delete those to make this check green.
 #:   - a remote branch with no open PR;
 #:   - a spec in docs/specs that cites no open issue;
 #:   - ROADMAP.md different from the generated one (scripts/gen-roadmap.py);
@@ -51,6 +53,7 @@ TAB="$(printf '\t')"
 
 fails=0
 fail() { echo "fail: $*"; fails=$((fails + 1)); }
+warn() { echo "warn: $*"; }
 list() { paste -sd, - | sed 's/,/, /g'; }
 
 worktrees="$(git -C "$main_root" worktree list --porcelain | sed -n 's/^worktree //p' | sed 1d)"
@@ -83,16 +86,23 @@ if [ -n "$issue" ]; then
   fi
 else
   # The end of the group: only an updated main is left, here and on GitHub.
-  left="$(printf '%s\n' "$branches" | grep -vxE 'main|master' | list || true)"
+  # A branch or worktree whose name is not a phase (issue-<n>) was not created by
+  # the method. Same for an untracked file: there is no record of what already
+  # existed. Warning, not failure — deleting it to go green is forbidden.
+  left="$(printf '%s\n' "$branches" | grep -vxE 'main|master' | grep -E 'issue-[0-9]+' | list || true)"
   [ -z "$left" ] || fail "extra local branch ($left): at the end git branch shows only main"
-  left="$(printf '%s\n' "$worktrees" | grep . | list || true)"
+  left="$(printf '%s\n' "$branches" | grep -vxE 'main|master' | grep -vE 'issue-[0-9]+' | list || true)"
+  [ -z "$left" ] || warn "local branch the phase did not create ($left): do not delete it to make this check green"
+  left="$(printf '%s\n' "$worktrees" | grep -E 'issue-[0-9]+' | list || true)"
   [ -z "$left" ] || fail "extra worktree ($left)"
+  left="$(printf '%s\n' "$worktrees" | grep -vE 'issue-[0-9]+' | grep . | list || true)"
+  [ -z "$left" ] || warn "worktree the phase did not create ($left): do not delete it to make this check green"
   if [ -s "$registry" ]; then
     fail "$registry is not empty (#$(cut -f1 "$registry" | paste -sd' ' - | sed 's/ / #/g')): scripts/close-phase.sh --cleanup takes the lines out"
   fi
   dirty="$(git -C "$main_root" status --porcelain --untracked-files=all)"
   left="$(printf '%s\n' "$dirty" | sed -n 's/^?? //p' | list)"
-  [ -z "$left" ] || fail "untracked file in the main checkout ($left)"
+  [ -z "$left" ] || warn "untracked file in the main checkout ($left): do not delete a file this phase did not create to make this check green"
   left="$(printf '%s\n' "$dirty" | grep -v '^??' | cut -c4- | list || true)"
   [ -z "$left" ] || fail "uncommitted change in the main checkout ($left)"
   if [ "$offline" = 0 ]; then

@@ -59,15 +59,25 @@ assert_contains "$(last_output)" "still running" "in-progress CI is named"
 assert_contains "$(last_output)" "wait for it" "in-progress CI says to wait"
 fails_with "an absent CI of main with no voucher" "no check 'CI'" FAKE_BASE_CI=absent FAKE_BASE_PR=none
 
-# Extra local branch.
+# Extra local branch of a phase still fails. A branch the phase did not create is a warning.
 git -C "$repo" branch feat/issue-5-x
 fails_with "an extra local branch" "extra local branch (feat/issue-5-x)"
 git -C "$repo" branch -D feat/issue-5-x >/dev/null
+git -C "$repo" branch notes
+check 0 "a local branch the phase did not create does not fail" 
+assert_contains "$(last_output)" "warn: local branch the phase did not create (notes)" "names the branch and does not require deleting it"
+assert_contains "$(last_output)" "do not delete" "forbids deleting a branch the phase did not create"
+git -C "$repo" branch -D notes >/dev/null
 
-# Extra worktree.
+# Extra worktree of a phase still fails. A worktree the phase did not create is a warning.
 git -C "$repo" worktree add --quiet --detach "$repo/.worktrees/issue-5" main
 fails_with "an extra worktree" "extra worktree ($repo/.worktrees/issue-5)"
 git -C "$repo" worktree remove --force "$repo/.worktrees/issue-5"
+mkdir -p "$repo/.claude/worktrees"
+git -C "$repo" worktree add --quiet --detach "$repo/.claude/worktrees/other" main
+check 0 "a worktree the phase did not create does not fail"
+assert_contains "$(last_output)" "warn: worktree the phase did not create ($repo/.claude/worktrees/other)" "names the worktree and does not require deleting it"
+git -C "$repo" worktree remove --force "$repo/.claude/worktrees/other"
 
 # Registry that is not empty.
 printf '5\tfeat/issue-5-x\t%s\n' "$repo/.worktrees/issue-5" >"$repo/.worktrees/parallel-active.tsv"
@@ -93,9 +103,11 @@ git -C "$repo" commit --quiet -m "docs: spec of an open issue" docs/specs/old.md
 git -C "$repo" push --quiet origin main
 check 0 "a spec that cites an open issue passes"
 
-# Untracked file and uncommitted change in the main checkout.
+# An untracked file the phase did not create is a warning, not a failure.
 echo x >"$repo/loose.txt"
-fails_with "an untracked file" "untracked file in the main checkout (loose.txt)"
+check 0 "an untracked file the phase did not create does not fail"
+assert_contains "$(last_output)" "warn: untracked file in the main checkout (loose.txt)" "names the untracked file"
+assert_contains "$(last_output)" "do not delete a file this phase did not create" "forbids deleting it to go green"
 rm "$repo/loose.txt"
 echo edit >>"$repo/README.md"
 fails_with "an uncommitted change" "uncommitted change in the main checkout (README.md)"
