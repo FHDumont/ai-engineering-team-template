@@ -594,6 +594,8 @@ O arquivo é a fonte. Jobs: `changes`, `policy`, `lint`, `tests`, `workflows` e 
 | Permissões mínimas | `permissions: {}` no topo, liberadas por job |
 | Sem trabalho repetido | o shellcheck roda uma vez, dentro do `validate.sh` |
 
+Na atualização, quando o `.github/workflows/ci.yml` muda e a aplicação não, o filtro `app` pula o build: o job sai `skipped` e o `CI` verde não prova o build. No PR, inclua `.github/workflows/ci.yml` no filtro `app`, ou rode o build numa cópia local e registre o resultado.
+
 Execução sem fato novo é defeito, mesmo verde. A detecção fica nos scripts que já decidem pular, com o prefixo `no-new-fact:` (não há alvo novo de produção):
 
 | Cenário | Detecção |
