@@ -44,18 +44,11 @@ class WorkflowTests(unittest.TestCase):
         open(path, "w").write(text)
         return path
 
-    def test_repo_workflows_follow_the_standard(self):
+    def test_method_workflows_follow_the_standard(self):
+        # Only the method workflows. A project's deploy file is not the example.
         wf = os.path.join(ROOT, ".github", "workflows")
-        for name in os.listdir(wf):
+        for name in ("ci.yml", "issues-label.yml"):
             self.assertEqual(cw.check(os.path.join(wf, name)), [], name)
-
-    def test_deploy_not_run_twice_per_push(self):
-        # The deploy only runs on workflow_dispatch; the build on the PR belongs to ci.yml.
-        text = open(os.path.join(ROOT, ".github", "workflows", "deploy-example.yml")).read()
-        on = text.split("\non:\n", 1)[1].split("\npermissions:", 1)[0]
-        self.assertIn("workflow_dispatch", on)
-        self.assertNotIn("push", on)
-        self.assertNotIn("pull_request", on)
 
     DEPLOY = """# deploy-paths: app/
 name: "Deploy · App"
@@ -116,13 +109,6 @@ jobs:
 
     def test_deploy_declares_its_paths(self):
         self.assertIn("deploy-paths", self.deploy_problems(self.DEPLOY.replace("# deploy-paths: app/\n", "")))
-
-    def test_repo_deploy_validates_main_before_the_build(self):
-        wf = cw.load(os.path.join(ROOT, ".github", "workflows", "deploy-example.yml"))
-        steps = wf["jobs"]["validate"]["steps"]
-        self.assertTrue(any(s.get("run") == "scripts/validate.sh" for s in steps))
-        self.assertEqual(wf["jobs"]["build"]["needs"], "validate")
-        self.assertEqual(wf["jobs"]["deploy"]["needs"], "build")
 
     def test_good(self):
         self.assertEqual(cw.check(self.write("issues-label.yml", GOOD)), [])

@@ -4,13 +4,16 @@
 source "$(dirname "$0")/lib.sh"
 OPEN="$SCRIPTS/open-issue.sh"
 
+area="$(grep -m1 '^area:' "$REPO/.github/labels.tsv" | cut -f1)"
+group_label="$(grep -m1 '^group:' "$REPO/.github/labels.tsv" | cut -f1)"
+group="${group_label#group:}"
 full=(--section "Objetivo" "Corrigir o fuso." --section "Pronto quando" "- [ ] teste"
-      --section "Arquivos ou áreas afetadas" "area:app" --section "Prioridade sugerida" "média"
+      --section "Arquivos ou áreas afetadas" "$area" --section "Prioridade sugerida" "média"
       --section "Como reproduzir" "Abrir a página; esperado BRT, atual UTC.")
 
 out="$("$OPEN" --type bug --title "Datas no fuso errado" "${full[@]}" --end auto-close --dry-run)"
 assert_contains "$out" "## Como reproduzir" "keeps template titles"
-assert_contains "$out" "labels: type:bug,area:app,priority:medium,end:auto-close" "labels from template, body and options"
+assert_contains "$out" "labels: type:bug,$area,priority:medium,end:auto-close" "labels from template, body and options"
 assert_not_contains "$out" "<!--" "guide comments are replaced"
 
 out="$("$OPEN" --type bug --title x "${full[@]}" --priority high --dry-run)"
@@ -51,18 +54,18 @@ export TMP
 use_fake_gh "$TMP/handler.sh"
 fake_setup ok
 out="$("$OPEN" --type feature --title "Filtro" --section Objetivo "Filtrar." --section "Pronto quando" "- [ ] ok" \
-  --section "Arquivos ou áreas afetadas" "area:app" --section "Prioridade sugerida" "média" --group app --group novo)"
+  --section "Arquivos ou áreas afetadas" "$area" --section "Prioridade sugerida" "média" --group "$group" --group novo)"
 assert_eq "https://github.com/owner/repo/issues/9" "$out" "prints the issue URL"
 calls="$(gh_calls)"
-assert_not_contains "$calls" "label create group:app" "known group label is never recreated"
+assert_not_contains "$calls" "label create $group_label" "known group label is never recreated"
 assert_not_contains "$calls" "--force" "never overwrites labels"
 assert_contains "$calls" "--label type:feature --label roadmap" "applies template labels"
-assert_contains "$calls" "--label group:app" "applies group label"
+assert_contains "$calls" "--label $group_label" "applies group label"
 assert_contains "$calls" "label create group:novo --repo owner/repo --color d4c5f9 --description Grupo de afinidade" "creates an unknown group label"
 
 # Failures: gh exiting 0 does not prove the issue exists.
 create=("$OPEN" --type feature --title "Filtro" --section Objetivo "Filtrar." --section "Pronto quando" "- [ ] ok"
-        --section "Arquivos ou áreas afetadas" "area:app" --section "Prioridade sugerida" "média")
+        --section "Arquivos ou áreas afetadas" "$area" --section "Prioridade sugerida" "média")
 assert_status 1 "fails when gh issue create returns no URL" env FAKE_NO_URL=1 "${create[@]}"
 assert_contains "$(last_output)" "returned no issue URL" "says no URL came back"
 assert_status 1 "fails when gh issue create fails" env FAKE_GH_FAIL='^issue create' "${create[@]}"

@@ -23,12 +23,14 @@ H
 export TMP
 use_fake_gh "$TMP/handler.sh"
 printf 'type:bug\npriority:low\n' >"$TMP/labels"
-assert_status 0 "applies labels" "$LABEL" 5 --type bug --priority high --area scripts --group app
+group_label="$(grep -m1 '^group:' "$REPO/.github/labels.tsv" | cut -f1)"
+group="${group_label#group:}"
+assert_status 0 "applies labels" "$LABEL" 5 --type bug --priority high --area scripts --group "$group"
 assert_contains "$(last_output)" "(read back)" "success is declared after reading back"
 calls="$(gh_calls)"
 assert_contains "$calls" "--add-label priority:high" "adds priority"
 assert_contains "$calls" "--remove-label priority:low" "removes the previous priority"
-assert_not_contains "$calls" "label create group:app" "known group label is not recreated"
+assert_not_contains "$calls" "label create $group_label" "known group label is not recreated"
 assert_status 1 "refuses unknown label" "$LABEL" 5 --add nope
 assert_status 2 "needs a number" "$LABEL" abc
 

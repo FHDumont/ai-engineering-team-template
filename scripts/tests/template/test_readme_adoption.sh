@@ -2,7 +2,7 @@
 # Test of the adoption chapters of README.md: every path and script command they
 # cite exists in this repository, and the topics the issue asks for are covered.
 # shellcheck source=scripts/tests/lib.sh
-source "$(dirname "$0")/lib.sh"
+source "$(dirname "$0")/../lib.sh"
 
 readme="$REPO/README.md"
 section() { # section <heading>: the text of a "## " section of the README
@@ -25,6 +25,10 @@ done
 assert_contains "$adopt" "deploy-example.yml" "the chapter says deploy-example.yml is not copied"
 assert_contains "$adopt" "docs/specs/" "the chapter says docs/specs/ is not copied"
 assert_contains "$adopt" "CHANGELOG.md" "the chapter says CHANGELOG.md is not copied"
+assert_contains "$(cat "$REPO/README.md")" "meta de tempo" "the quick start mentions the time target"
+assert_contains "$(cat "$REPO/AGENTS.md")" "docs/repo-notes.md" "AGENTS.md points at the project rules"
+n="$(wc -w <"$REPO/AGENTS.md" | tr -d ' ')"
+[ "$n" -le 480 ] && ok || bad "AGENTS.md has $n words (leave room under 500)"
 assert_contains "$adopt" "git worktree add" "adoption uses a worktree"
 assert_not_contains "$adopt" "git switch -c" "adoption does not switch the main checkout"
 assert_contains "$adopt" "não apague" "adoption does not wipe an existing glossary"

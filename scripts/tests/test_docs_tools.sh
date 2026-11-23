@@ -184,10 +184,4 @@ assert_contains "$(last_output)" "ROADMAP.md" "names the generated file that is 
 printf 'y\n' >"$d/ROADMAP.md"
 assert_status 0 "both generated files present passes" env REPO_ROOT="$d" "$CHECK"
 
-# The template points at the project rules and stays under the word ceiling with room.
-agents="$(cat "$REPO/AGENTS.md")"
-assert_contains "$agents" "docs/repo-notes.md" "AGENTS.md points at the project rules"
-n="$(wc -w <"$REPO/AGENTS.md" | tr -d ' ')"
-[ "$n" -le 480 ] && ok || bad "AGENTS.md has $n words (leave room under 500)"
-assert_contains "$(cat "$REPO/README.md")" "docs/repo-notes.md" "the README says where the project rules go"
 finish

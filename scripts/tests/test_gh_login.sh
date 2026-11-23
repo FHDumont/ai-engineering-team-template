@@ -25,7 +25,7 @@ while IFS= read -r line; do
     scripts/lib/project.sh:*'-s $GH_SCOPES"') ok ;; # the definition itself
     *) bad "a gh auth login that is not the single command: $line" ;;
   esac
-done <<<"$(git -C "$REPO" grep -nI --untracked -e 'gh auth login -' -- . || true)"
+done <<<"$(method_grep "$REPO" -nI --untracked -e 'gh auth login -' || true)"
 
 # Nothing in the repo asks for or runs another gh auth command, feeds a token to gh
 # or sets the token variables. Allowed: the test itself, the specs (transient), the
@@ -40,7 +40,7 @@ while IFS= read -r line; do
       if printf '%s' "$line" | grep -qiE 'nunca|never'; then continue; fi ;;
   esac
   offenders="$offenders$line"$'\n'
-done <<<"$(git -C "$REPO" grep -nIE --untracked -e "$banned" -- . || true)"
+done <<<"$(method_grep "$REPO" -nIE --untracked -e "$banned" || true)"
 assert_eq "" "$offenders" "no gh auth refresh/logout/setup-git, --with-token or token variable outside the rule"
 
 # The same filter refuses a planted line (the check is not vacuous).

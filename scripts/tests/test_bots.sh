@@ -275,11 +275,37 @@ assert_contains "$bot_hits" "untracked-bot-name.txt" "an untracked file with a f
 rm -f "$REPO/scripts/untracked-bot-name.txt"
 
 # Names of one repository (the list of docs/repo-notes.md, when the file exists) stay out of
-# the method's code; the bots file is the repository's own data.
+# the method's code. An empty list must not make grep fail. A name that appears only
+# outside the method paths is the project's and is not a hit.
+repo_only_names() { # repo_only_names <file>
+  awk '$0 == "## Nomes só deste repositório" { p = 1; next } p && /^## / { exit } p && /^- / { print }' "$1" | grep -oE '`[^`]+`' | tr -d '`' || true
+}
+name_hits() { # name_hits <repo> <names, one per line>
+  local repo="$1" names="$2" name hits="" one paths
+  [ -n "$names" ] || return 0
+  paths="$(method_existing "$repo")"
+  [ -n "$paths" ] || return 0
+  while IFS= read -r name; do
+    [ -n "$name" ] || continue
+    # shellcheck disable=SC2086
+    one="$(cd "$repo" && git grep -nI --untracked -F -e "$name" -- $paths ':!scripts/tests/template' ':!.github/bots.tsv' ':!docs/repo-notes.md' 2>/dev/null || true)"
+    hits="$hits$one"
+  done <<<"$names"
+  printf '%s' "$hits" | cut -c1-120
+}
 if [ -f "$REPO/docs/repo-notes.md" ]; then
-  names="$(awk '$0 == "## Nomes só deste repositório" { p = 1; next } p && /^## / { exit } p && /^- / { print }' "$REPO/docs/repo-notes.md" | grep -oE '`[^`]+`' | tr -d '`')"
-  hits="$(cd "$REPO" && git ls-files -co --exclude-standard scripts .claude/hooks .githooks .github | grep -vxF .github/bots.tsv | tr '\n' '\0' | xargs -0 grep -nF -- "$names" 2>/dev/null | cut -c1-120 || true)"
-  assert_eq "" "$hits" "the method's code cites no repository-only name"
+  assert_eq "" "$(name_hits "$REPO" "$(repo_only_names "$REPO/docs/repo-notes.md")")" "the method's code cites no repository-only name"
 fi
+empty_repo="$(make_repo)"
+mkdir -p "$empty_repo/scripts" "$empty_repo/docs" "$empty_repo/.github/workflows"
+echo 'method' >"$empty_repo/scripts/keep.sh"
+printf '# Notas\n\n## Nomes só deste repositório\n\n(nenhum nome)\n' >"$empty_repo/docs/repo-notes.md"
+printf 'name: build\nruns-on: project-runner-99\n' >"$empty_repo/.github/workflows/build.yml"
+git -C "$empty_repo" add scripts docs .github && git -C "$empty_repo" commit --quiet -m "chore: fixture"
+assert_eq "" "$(name_hits "$empty_repo" "$(repo_only_names "$empty_repo/docs/repo-notes.md")")" "an empty name list does not fail the scan"
+printf '\n- `project-runner-99`\n' >>"$empty_repo/docs/repo-notes.md"
+assert_eq "" "$(name_hits "$empty_repo" "$(repo_only_names "$empty_repo/docs/repo-notes.md")")" "a name only outside the method is not a hit"
+echo 'project-runner-99' >>"$empty_repo/scripts/keep.sh"
+assert_contains "$(name_hits "$empty_repo" "$(repo_only_names "$empty_repo/docs/repo-notes.md")")" "scripts/keep.sh" "a name inside a method file is a hit"
 
 finish

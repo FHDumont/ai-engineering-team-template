@@ -19,8 +19,17 @@ def body(**sections):
     return "\n".join("## %s\n\n%s\n" % (k, v) for k, v in sections.items())
 
 
+def first_area():
+    path = os.path.join(ROOT, ".github", "labels.tsv")
+    for line in open(path, encoding="utf-8"):
+        if line.startswith("area:"):
+            return line.split("\t", 1)[0]
+    raise AssertionError("labels.tsv has no area label")
+
+
+AREA = first_area()
 FULL_FEATURE = {"Objetivo": "Listar issues", "Pronto quando": "- [ ] lista",
-                "Arquivos ou áreas afetadas": "area:app", "Prioridade sugerida": "alta"}
+                "Arquivos ou áreas afetadas": AREA, "Prioridade sugerida": "alta"}
 
 
 class TemplateTests(unittest.TestCase):
@@ -65,7 +74,7 @@ class AutoLabelTests(unittest.TestCase):
         r = auto_label.compute(body(**FULL_FEATURE, **{"Sugestão de fim": "auto-close"}), ["type:feature"])
         self.assertEqual(r["missing"], [])
         self.assertIn("priority:high", r["add"])
-        self.assertIn("area:app", r["add"])
+        self.assertIn(AREA, r["add"])
         self.assertIn("end:auto-close", r["add"])
         self.assertNotIn("needs-context", r["add"])
 
