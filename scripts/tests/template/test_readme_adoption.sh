@@ -18,6 +18,8 @@ assert_contains "$update" "linhas de método do" "the update guide reviews the m
 assert_contains "$update" "time-targets.tsv" "the update guide asks for the time target when it is missing"
 assert_contains "$update" "machine-limits.env" "the update guide asks for the machine limits when they are missing"
 assert_contains "$update" "divergências locais" "the update guide says where local divergences are recorded"
+assert_contains "$update" "caminho absoluto" "the update guide says which copies apply during the update phase"
+assert_contains "$(cat "$REPO/.claude/skills/execute/SKILL.md")" "caminho absoluto" "the execute skill tells the child to read the worktree skills by path"
 
 # Topics the chapter must cover.
 for topic in "gh auth status" "proteção de branch" "branch de adoção" "O que sai" "O que entra" \
