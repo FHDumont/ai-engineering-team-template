@@ -40,6 +40,8 @@ by_hand="$(grep -lE 'cp +-[A-Za-z]+ +"?\$\{?(SCRIPTS|REPO/scripts)' "$TESTS_DIR"
 assert_eq "" "$by_hand" "no test copies scripts/ without copy_scripts"
 
 # The time limit is a parameter that grows with the load (issue #71), never a fixed number.
+assert_status 0 "a performance overrun warns and does not fail" env -u CI bash -c 'source "$1/lib/common.sh"; warn_over_expected demo 14 10; exit 0' _ "$SCRIPTS"
+assert_eq "warn: over-expected demo 14 10" "$(last_output)" "the warning names what, the measurement and the expectation"
 assert_eq 600 "$(AI_METHOD_TEST_TIMEOUT_SECONDS=600 AI_METHOD_FAKE_LOAD1=3 slots_test_timeout)" "the limit is the parameter on a free machine"
 assert_eq 1800 "$(AI_METHOD_TEST_TIMEOUT_SECONDS=600 AI_METHOD_WARN_LOAD1=8 AI_METHOD_FAKE_LOAD1=20 slots_test_timeout)" "the limit triples with load1 20 over warn 8"
 assert_eq 7 "$(AI_METHOD_TEST_TIMEOUT_SECONDS=7 AI_METHOD_WARN_LOAD1=8 AI_METHOD_FAKE_LOAD1=8 slots_test_timeout)" "the limit does not grow at the warn load"

@@ -300,6 +300,7 @@ trap finish_run EXIT
 trap 'exit 130' INT
 trap 'exit 143' TERM
 
+export AI_METHOD_OVER_EXPECTED="${AI_METHOD_OVER_EXPECTED:-$RDIR/over-expected}"
 slots_wait validate "$(issue_from_branch "$(current_branch)")" "$ROOT" || exit $?
 slots_load_report | grep '^warn:' || true
 t0="$(now_epoch)"
@@ -317,6 +318,11 @@ if [ "$tests" = 1 ]; then
 fi
 set -e
 history_add validate "$(slots_repo_name)" "$(issue_from_branch "$(current_branch)")" "$SLOT_WAIT" "$(( $(now_epoch) - t0 ))"
+warn_over_expected "validate.sh" "$(( $(now_epoch) - t0 ))" 240 || true
+if [ -s "${AI_METHOD_OVER_EXPECTED:-}" ]; then
+  echo "over-expected:"
+  cat "$AI_METHOD_OVER_EXPECTED"
+fi
 # The local cache: a full green run on a clean tree is the result --prepare reuses.
 if [ "$rc" = 0 ] && [ "$lint" = 1 ] && [ "$tests" = 1 ] && [ "$incremental" = 0 ]; then
   if git diff --quiet && git diff --cached --quiet; then

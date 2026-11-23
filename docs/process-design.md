@@ -398,13 +398,18 @@ O histórico `~/.cache/ai-method/history.tsv` (espera e duração de cada valida
 | `AI_METHOD_SLOTS_VALIDATE` | 2 | execuções | `validate.sh` ao mesmo tempo na máquina; o próximo espera na fila |
 | `AI_METHOD_TEST_JOBS` | CPUs ÷ `SLOTS_VALIDATE` (mín. 1) | testes | testes de um `validate.sh` ao mesmo tempo, cada um na sua pasta temporária; 1 roda em série; a CI usa o mesmo padrão |
 | `AI_METHOD_SLOTS_FASE` | 3 | fases | fases abertas ao mesmo tempo; sem vaga, `new-phase.sh` e `open-parallel.sh` saem 75 |
-| `AI_METHOD_WAIT_TIMEOUT_SECONDS` | 1200 | segundos | espera máxima por vaga ou pela execução do mesmo worktree; depois, `validate.sh` sai 4 |
+| `AI_METHOD_WAIT_TIMEOUT_SECONDS` | 1200 | segundos | espera esperada por vaga ou pelo mesmo worktree: passou disso e o trabalho segue vivo, avisa `warn: over-expected` e continua |
+| `AI_METHOD_HANG_TIMEOUT_SECONDS` | 3× a espera esperada | segundos | limite de travamento: aí sim `validate.sh` sai 4. Trabalho que morreu libera a vaga e não bloqueia |
+| `PHASE_START_CI_WAIT` | 900 | segundos | espera esperada pela CI da base: avisa e continua enquanto o run está vivo |
+| `PHASE_START_CI_HANG` | 3× `PHASE_START_CI_WAIT` | segundos | limite de travamento da abertura: o run que não terminou recusa a fase |
 | `AI_METHOD_POLL_SECONDS` | 2 | segundos | pausa entre duas olhadas na fila |
 | `AI_METHOD_WARN_LOAD1` | 8 | load de 1 min | acima disso avisa (não bloqueia) |
 | `AI_METHOD_WARN_FREE_MEM_MB` | 1024 | MB | memória livre abaixo disso avisa |
 | `AI_METHOD_WARN_SWAP_MB` | 2048 | MB | swap em uso acima disso avisa |
 | `AI_METHOD_TEST_TIMEOUT_SECONDS` | 600 | segundos | limite de tempo dos testes que usam alarme ou espera; multiplicado por load1 ÷ `WARN_LOAD1` (arredondado para cima) quando a máquina está acima do aviso, então nenhum teste cai por tempo com a máquina carregada (#71) |
 | `AI_METHOD_LINT_BASE` | main | ref do git | base do lint incremental do `validate.sh --lint` |
+
+Prazo de desempenho (o esperado) avisa `warn: over-expected <o quê> <medido> <esperado>`, sai 0 e, na CI, vira annotation `::warning::`. O fim da validação, do fecho e do grupo junta esses avisos num bloco `over-expected:`. Só o limite de travamento muda o código de saída. A skill `integrate`, com esse aviso e sem issue aberta sobre ele, pergunta uma vez se abre a issue.
 | `AI_METHOD_IDLE_HOURS` | 4 | horas | headless deste checkout com idade maior que isso (`etime`, não o tempo sem atividade) e CPU abaixo de 1%: `sessions.sh --close-idle` encerra; o fim da fase lista as do app não arquivadas |
 
 **Progresso dos scripts longos.** `validate.sh` (o lint e cada teste), `phase-start.sh` e `new-phase.sh` (cada passo da abertura) e `close-phase.sh` (`--prepare`, `--check` e `--merge --wait`: validação, push, PR, espera do CI e do merge) gravam o andamento em `~/.cache/ai-method/progress/<repo>-<issue>.jsonl` (`AI_METHOD_CACHE` troca a pasta; sem fase, `<repo>-main.jsonl`), por `scripts/lib/progress.sh`. O agente não lê esses arquivos (economia de token): a saída dele continua só com o resultado. Quem lê é o dono, por `scripts/progress.sh`, e o painel (claude-runs-painel). Contrato para o painel:

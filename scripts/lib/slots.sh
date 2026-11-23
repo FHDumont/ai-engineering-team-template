@@ -200,8 +200,11 @@ slots_holders() { # slots_holders <class>
 
 # Takes a slot, waiting in the queue up to the timeout. Sets SLOT_DIR and SLOT_WAIT.
 slots_wait() { # slots_wait <class> <issue> <worktree>
-  local start now last=0
+  local start now last=0 elapsed expected hang warned=0
   start="$(now_epoch)"
+  expected="$AI_METHOD_WAIT_TIMEOUT_SECONDS"
+  hang="${AI_METHOD_HANG_TIMEOUT_SECONDS:-$((expected * 3))}"
+  [ "$hang" -gt "$expected" ] || hang="$expected"
   while :; do
     now="$(now_epoch)"
     if slots_try "$1" "$2" "$3" "$((now - start))"; then
@@ -209,10 +212,17 @@ slots_wait() { # slots_wait <class> <issue> <worktree>
       SLOT_WAIT=$((now - start))
       return 0
     fi
-    if [ $((now - start)) -ge "$AI_METHOD_WAIT_TIMEOUT_SECONDS" ]; then
-      echo "error: no $1 slot after $((now - start))s (timeout); held by:" >&2
+    elapsed=$((now - start))
+    # The holder is still alive past the expected wait: warn and keep waiting.
+    # Block only at the hang limit (or once the holder is gone and the slot frees).
+    if [ "$elapsed" -ge "$hang" ]; then
+      echo "error: no $1 slot after ${elapsed}s (timeout); held by:" >&2
       slots_holders "$1" >&2
       return 4
+    fi
+    if [ "$warned" = 0 ] && [ "$elapsed" -gt "$expected" ]; then
+      warn_over_expected "$1-slot-wait" "$elapsed" "$expected"
+      warned=1
     fi
     if [ "$last" = 0 ] || [ $((now - last)) -ge 60 ]; then
       echo "waiting for a $1 slot (limit $(slots_limit "$1")); held by:"
