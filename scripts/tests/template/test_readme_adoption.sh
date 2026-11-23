@@ -26,6 +26,16 @@ assert_contains "$adopt" "deploy-example.yml" "the chapter says deploy-example.y
 assert_contains "$adopt" "docs/specs/" "the chapter says docs/specs/ is not copied"
 assert_contains "$adopt" "CHANGELOG.md" "the chapter says CHANGELOG.md is not copied"
 assert_contains "$(cat "$REPO/README.md")" "meta de tempo" "the quick start mentions the time target"
+readme="$(cat "$REPO/README.md")"
+warn_at="$(printf '%s\n' "$readme" | awk '/Antes de ligar a proteção/{print NR; exit}')"
+setup_at="$(printf '%s\n' "$readme" | awk '/O agente roda `scripts\/setup-repo.sh`/{print NR; exit}')"
+assert_contains "$readme" 'fix/issue-*' "the README names the phase branch the warning is about"
+assert_contains "$readme" '--owner-ok' "the README names --owner-ok"
+if [ -n "$warn_at" ] && [ -n "$setup_at" ] && [ "$warn_at" -lt "$setup_at" ]; then
+  ok
+else
+  bad "the README warns before setup turns protection on (warning line ${warn_at:-none}, setup line ${setup_at:-none})"
+fi
 assert_contains "$(cat "$REPO/AGENTS.md")" "docs/repo-notes.md" "AGENTS.md points at the project rules"
 n="$(wc -w <"$REPO/AGENTS.md" | tr -d ' ')"
 [ "$n" -le 480 ] && ok || bad "AGENTS.md has $n words (leave room under 500)"
