@@ -50,6 +50,13 @@ limit() { # limit <file> <min> <max>
 }
 limit AGENTS.md 300 500
 limit docs/STATE.md 1 500
+# Method facts live in the design. These sentences were true once and stayed
+# in STATE after the behavior changed (#118).
+if [ -f docs/STATE.md ]; then
+  if grep -q 'roda em todo PR' docs/STATE.md || grep -q 'saindo 6 sem proteção' docs/STATE.md; then
+    problem "docs/STATE.md repeats a method fact that is no longer true (the design is the source)"
+  fi
+fi
 limit docs/BOTS.md 1 450
 limit .claude/skills/plan/SKILL.md 1 400
 
