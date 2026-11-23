@@ -445,7 +445,7 @@ A tabela é a árvore de arquivos do método. Caminho sem `<…>` precisa existi
 | `docs/specs/<AAAA-MM-DD>-<grupo>.md` | spec em curso; sai no fecho da última fase aberta que ela cita e, se sobrar, no PR do `gen-docs.sh` |
 | `docs/adr/INDEX.md` | uma linha por ADR: número, título, vigente ou substituída |
 | `docs/adr/TEMPLATE.md` | modelo de ADR |
-| `docs/adr/ADR-<NNN>-<título>.md` | ADRs vigentes |
+| `docs/adr/ADR-<NNN>-<título>.md` | ADRs vigentes; `ADR-<NNN>.md` (sem título no nome) também vale |
 | `docs/adr/archive/` | ADRs substituídas |
 | `<pasta>/CLAUDE.md` | regra que só vale naquela pasta |
 | `.claude/settings.json` | atribuição vazia, permissões e hooks (§10.4) |

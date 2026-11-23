@@ -194,4 +194,13 @@ printf 'scripts/gate.sh\nscripts/missing-method.sh\n.claude/hooks/block-x.sh\n.g
 assert_status 1 "a manifest entry that is not on disk fails" env REPO_ROOT="$d" "$CHECK"
 assert_contains "$(last_output)" "method-files.txt lists scripts/missing-method.sh, which does not exist" "names the missing manifest entry"
 
+# ADR-NNN.md (no title in the file name) is a real ADR (#102).
+d="$(fixture)"
+echo "# ADR-003" >"$d/docs/adr/ADR-003.md"
+printf '| [ADR-003](ADR-003.md) | Sem título | vigente |\n' >>"$d/docs/adr/INDEX.md"
+assert_status 0 "accepts ADR-NNN.md without a title" env REPO_ROOT="$d" "$CHECK"
+assert_status 0 "archives an ADR named ADR-NNN.md" env REPO_ROOT="$d" "$SCRIPTS/archive-adr.sh" 003 --by 002
+assert_eq "yes" "$([ -f "$d/docs/adr/archive/ADR-003.md" ] && echo yes)" "untitled ADR moved to archive/"
+assert_status 0 "check-docs passes after archiving ADR-NNN.md" env REPO_ROOT="$d" "$CHECK"
+
 finish

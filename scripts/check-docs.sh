@@ -79,7 +79,9 @@ if [ -f "$index" ]; then
   while read -r num; do
     [ -n "$num" ] || continue
     found=""
-    for f in docs/adr/"$num"-*.md docs/adr/archive/"$num"-*.md; do [ -e "$f" ] && found=1; done
+    for f in docs/adr/"$num"-*.md docs/adr/"$num".md docs/adr/archive/"$num"-*.md docs/adr/archive/"$num".md; do
+      [ -e "$f" ] && found=1
+    done
     [ -n "$found" ] || problem "$index lists $num but the file is missing"
   done <<<"$(grep -oE '^\| *\[?ADR-[0-9]+' "$index" | grep -oE 'ADR-[0-9]+' || true)"
 else
