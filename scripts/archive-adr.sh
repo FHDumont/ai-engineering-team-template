@@ -3,11 +3,11 @@
 #:
 #: Usage: archive-adr.sh <NNN> --by <MMM> [--dry-run]
 #:
-#: Example: archive-adr.sh 001 --by 004 moves docs/adr/ADR-001-*.md to
-#: docs/adr/archive/ (git mv), fixes the link in docs/adr/INDEX.md and marks
-#: the line "substituída por ADR-004". Does not commit. Without the line of
-#: the ADR in the index it exits 1 and moves nothing; at the end it reads the
-#: file and the line back.
+#: Example: archive-adr.sh 001 --by 004 moves docs/adr/ADR-001-*.md (or
+#: ADR-001.md, when the name has no title) to docs/adr/archive/ (git mv),
+#: fixes the link in docs/adr/INDEX.md and marks the line "substituída por
+#: ADR-004". Does not commit. Without the line of the ADR in the index it
+#: exits 1 and moves nothing; at the end it reads the file and the line back.
 set -euo pipefail
 HERE="$(cd "$(dirname "$0")" && pwd)"
 # shellcheck source=scripts/lib/common.sh
@@ -28,9 +28,24 @@ done
 ROOT="${REPO_ROOT:-$(cd "$HERE/.." && pwd)}"
 cd "$ROOT"
 
-file="$(ls docs/adr/ADR-"$old"-*.md 2>/dev/null | head -1 || true)"
+# ADR-NNN-title.md or ADR-NNN.md. A repository that already numbered its
+# decisions as ADR-NNN.md does not have to rename them.
+adr_path() { # adr_path <NNN>
+  local n="$1" f
+  f="$(ls docs/adr/ADR-"$n"-*.md 2>/dev/null | head -1 || true)"
+  if [ -n "$f" ]; then
+    printf '%s\n' "$f"
+    return 0
+  fi
+  if [ -f "docs/adr/ADR-$n.md" ]; then
+    printf '%s\n' "docs/adr/ADR-$n.md"
+    return 0
+  fi
+  return 1
+}
+file="$(adr_path "$old" || true)"
 [ -n "$file" ] || die "ADR-$old not found in docs/adr/"
-ls docs/adr/ADR-"$by"-*.md >/dev/null 2>&1 || die "ADR-$by not found (create the new ADR first)"
+adr_path "$by" >/dev/null || die "ADR-$by not found (create the new ADR first)"
 name="$(basename "$file")"
 
 # The index must have the line of the ADR before anything moves.
