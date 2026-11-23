@@ -10,11 +10,11 @@ description: Passo único de fim de um grupo de fases, solo ou paralelo — espe
 3. Depois do último merge do grupo, lido de volta (`gh pr view --json state` devolve `MERGED` para cada PR), faça o passo único de fim, uma vez, no checkout principal, nesta ordem:
    1. `scripts/gen-docs.sh`, em segundo plano (ele espera o CI do PR e passa do tempo limite de um comando): gera `CHANGELOG.md` e `ROADMAP.md`, remove cada spec de `docs/specs/` cujas issues citadas estão todas fechadas, abre um PR só com esses dois arquivos e essas remoções, publica `review/independent`, faz o merge por rebase e lê o merge de volta. É o único caminho da spec que sobrou na `main`: nada de PR avulso nem de remoção à mão. Saída 3: o PR não entrou no prazo; leia o CI dele e rode de novo.
    2. `scripts/deploy.sh`: dispara o `deploy-*.yml` na `main`, espera o run, imprime a URL e lê o resultado. Saída 0 com `deployed:` ou `no deploy:`: cite a linha e a URL no status. Saída 3 ou 4: o deploy não saiu; leia o run pela URL, Estado `trabalhando`, e rode `scripts/deploy.sh` de novo depois da correção. Nunca `gh workflow run` nem `gh run rerun`: o hook barra. Negado pelo app: passo 4.
-   3. Arquive cada sessão filha, sem perguntar ao dono, nesta ordem única:
+   3. Arquive cada sessão filha. O ok é pedido uma vez, no ok da spec ou num quadro no fim do grupo, nesta ordem única:
       1. Confira que parou (`get_session`; rodando, `stop_session`).
-      2. Desligue o Remote Control dela: `set_remote_control` `false`. Sempre, mesmo que pareça desligado.
+      2. Desligue o Remote Control dela: `set_remote_control` `false`. Sempre, mesmo que pareça desligado. Se o app devolver um campo, repita uma vez, exatamente com esse campo.
       3. Leia de volta: `get_session` mostra `remoteControlState` `off`. Ainda ligado: repita o item 2 uma vez. Nunca arquive com ele ligado.
-      4. `archive_session`. A primeira chamada pode voltar pedindo a repetição com um campo que o app devolve: repita uma vez, exatamente com esse campo. Negado pelo app: passo 4.
+      4. `archive_session`. Se o app devolver um campo, repita uma vez, exatamente com esse campo. Negado pelo app: passo 4.
       5. Leia de volta: `get_session` mostra `isArchived`.
       6. Recusado por trabalho vivo (tarefa em segundo plano ou recorrente da filha): mande mensagem à filha (`send_message`): "pare as suas tarefas em segundo plano e recorrentes e responda quando não sobrar nenhuma". Com a resposta, tente de novo uma vez, do item 4.
       7. Só depois disso, se ainda não arquivou (sessão fixada ou em uso): abra um quadro ao dono (`AskUserQuestion`) que começa por `Fase #n — título`, com as opções "Tentar arquivar de novo" e "Deixar a sessão aberta", e rode `scripts/status.sh --state esperando --need "arquivar a sessão da fase #n"`.
