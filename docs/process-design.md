@@ -481,6 +481,7 @@ A tabela é a árvore de arquivos do método. Caminho sem `<…>` precisa existi
 | `.github/headless` | `on` liga a filha headless; a atualização não apaga |
 | `.github/method-files.txt` | arquivos do método que as tabelas de scripts e hooks listam; a aplicação não entra |
 | `.github/method-origin` | commit do template de onde o repo foi copiado; a atualização não apaga |
+| `.github/update-notice.md` | corpo da issue que avisa o adotante de uma atualização |
 | `.github/label-areas.tsv` | áreas por caminho e áreas sensíveis do `auto-label.py`; a atualização não apaga |
 | `.github/ci-extra-jobs` | jobs do repositório que o `ci-gate.sh` exige verdes; a atualização não apaga |
 | `.github/workflows/ci.yml` | o CI único (§9.2) |
