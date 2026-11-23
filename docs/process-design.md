@@ -242,13 +242,13 @@ Opcional. Os bots atuam nas pontas: abrem issues, respondem quando perguntados e
   ```
 - Depois de ~10 comentários, o `scripts/summarize-thread.sh` mantém um comentário fixo (`<!-- agreed-summary -->`) editado no lugar.
 
-### 5.3 Autoria visível
-
-Dono, gerenciadora, filhas e bots comentam como a mesma conta do GitHub. Todo comentário de agente ou bot abre com uma linha: `**De:** <papel> · **Para:** <papel> · **Pedido:** <ask_id> · **Responde a:** <link ou —>`, com papéis dono, gerenciadora, `fase #n`, revisor e `bot <nome>`. Comentário sem o cabeçalho é do dono. O cabeçalho identifica o papel e não é assinatura de IA: segue sem emoji e sem "Generated with" (regra 9 das regras para todo agente). O `scripts/lib/author.sh` gera a linha (`author_header`; `AUTHOR_FROM` troca o "De", padrão `fase #<n>` ou `gerenciadora`) e o `block-bot-comment.sh` cobra. O `--body-file` é um caminho literal de um arquivo que já existe. O `ask-bot.sh` já posta com ele; `ask-bot.sh --append <id> "texto"` acrescenta à pergunta aberta (marca `<!-- ask-append:<bot>:<id> -->`) e avisa o bot de novo. O `wait-reply.sh` avisa logo, no stderr, quando a pergunta não tem o cabeçalho (não foi postada pelo `ask-bot.sh`), e depois de `--warn-after` segundos sem resposta (padrão 180) avisa que o bot não reagiu e sugere `--retry`, sem parar de esperar. Uma conta por papel: o dono cria a GitHub App do agente do método e a de cada bot (issues e pull requests, escrita) e guarda o token no provedor de segredo (`GH_APP_METHOD_TOKEN`, `GH_APP_BOT_<SLUG>_TOKEN`, ambiente ou `.env`). Com o token, o comentário sai como a App; sem ele, sai com o `gh` do dono. `ROLE_APP_REQUIRE=1` recusa até a App existir. O agente não cria App nem segredo.
-
 ### 5.2 `docs/BOTS.md`
 
 No máximo 450 palavras (conferido pelo `check-docs.sh`). Uma linha por bot: slug, papel, o que responde, o que nunca faz. Traz também como guardar os segredos dos webhooks. A skill `ask-bot` aponta para ele; `.github/bots.tsv` é a configuração dos bots do repositório (slug, nome e referência de cada webhook); os scripts não citam nenhum bot, e as labels `ask:<slug>` saem da linha-modelo do `.github/labels.tsv`, uma por bot.
+
+### 5.3 Autoria visível
+
+Dono, gerenciadora, filhas e bots comentam como a mesma conta do GitHub. Todo comentário de agente ou bot abre com uma linha: `**De:** <papel> · **Para:** <papel> · **Pedido:** <ask_id> · **Responde a:** <link ou —>`, com papéis dono, gerenciadora, `fase #n`, revisor e `bot <nome>`. Comentário sem o cabeçalho é do dono. O cabeçalho identifica o papel e não é assinatura de IA: segue sem emoji e sem "Generated with" (regra 9 das regras para todo agente). O `scripts/lib/author.sh` gera a linha (`author_header`; `AUTHOR_FROM` troca o "De", padrão `fase #<n>` ou `gerenciadora`) e o `block-bot-comment.sh` cobra. O `--body-file` é um caminho literal de um arquivo que já existe. O `ask-bot.sh` já posta com ele; `ask-bot.sh --append <id> "texto"` acrescenta à pergunta aberta (marca `<!-- ask-append:<bot>:<id> -->`) e avisa o bot de novo. O `wait-reply.sh` avisa logo, no stderr, quando a pergunta não tem o cabeçalho (não foi postada pelo `ask-bot.sh`), e depois de `--warn-after` segundos sem resposta (padrão 180) avisa que o bot não reagiu e sugere `--retry`, sem parar de esperar. Uma conta por papel: o dono cria a GitHub App do agente do método e a de cada bot (issues e pull requests, escrita) e guarda o token no provedor de segredo (`GH_APP_METHOD_TOKEN`, `GH_APP_BOT_<SLUG>_TOKEN`, ambiente ou `.env`). Com o token, o comentário sai como a App; sem ele, sai com o `gh` do dono. `ROLE_APP_REQUIRE=1` recusa até a App existir. O agente não cria App nem segredo.
 
 ---
 
@@ -270,7 +270,7 @@ Todo script tem `--help`, um teste em `scripts/tests/` e saída curta em inglês
 | `scripts/start-headless.sh` | Abre a filha como `claude -p` no worktree só com headless ligado (§4.3); desligado por padrão | sessão principal |
 | `scripts/new-phase.sh` | Branch e worktree de uma fase solo; sai 1 sem spec | `phase-start.sh` |
 | `scripts/open-parallel.sh` | Worktrees do grupo paralelo e o registro `.worktrees/parallel-active.tsv`; sai 1 com sobra no registro | `phase-start.sh` |
-| `scripts/check-env.sh` | Confere o ambiente da fase: fora da `main`, spec da issue no git, par real da sessão (§3), git hooks instalados, testes rodando | sessão filha, antes da primeira etapa |
+| `scripts/check-env.sh` | Confere o ambiente da fase: fora da `main`, spec da issue no git, par real da sessão (§3) e git hooks instalados; não roda a suíte (§4.3) | sessão filha, antes da primeira etapa |
 | `scripts/status.sh` | Imprime o bloco de status (§2, regra 4) | todo agente, em toda parada |
 | `scripts/end-check.sh` | Confere o fim sem consertar nada e sai 1 listando cada sobra em linhas `fail:`. Do grupo: branch e worktree no padrão de fase (`issue-<n>`), registro não vazio, branch remota sem PR aberto, spec de issue fechada, mudança não commitada, `ROADMAP.md` diferente do gerado, deploy não conferido. Worktree, branch local e arquivo não rastreado que a fase não criou são `warn:`, não falha: ninguém apaga isso para deixar o check verde. Com `--issue <n>`: só a fase | `status.sh --state pronto`; sessão principal |
 | `scripts/close-phase.sh` | Fecha a fase (§6.1) | sessão filha |
