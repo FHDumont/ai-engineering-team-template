@@ -24,7 +24,9 @@
 #: line lists the paths of the app it deploys):
 #:   - a successful run on the same SHA: no dispatch (never twice on one SHA);
 #:   - a run still going on the same SHA: no dispatch, waits for that run;
-#:   - no change in the deploy paths since the last successful deploy: no dispatch;
+#:   - no change in the deploy paths since the last successful deploy: no dispatch.
+#:     A path in the line that starts with ! is excluded (an inert doc can be
+#:     left out). A change only in excluded paths is "no deploy:";
 #:   - otherwise dispatches once (workflow_dispatch on main), prints the run URL
 #:     and waits for the run (default 1800 s, read every 15 s).
 #:
@@ -135,6 +137,36 @@ wait_run() { # wait_run <workflow> <run id>
   echo "deployed: $wf on main at ${sha:0:12}: $url"
 }
 
+# True when nothing that this workflow publishes changed. A ! token is excluded.
+deploy_unchanged() { # deploy_unchanged <repo> <from> <to> <path list>
+  local repo="$1" from="$2" to="$3" list="$4" f p base skip hit
+  while IFS= read -r f; do
+    [ -n "$f" ] || continue
+    skip=0
+    for p in $list; do
+      case "$p" in
+        !*)
+          base="${p#!}"; base="${base%/}"
+          # shellcheck disable=SC2254  # the exclusion token is a glob on purpose
+          case "$f" in $base|$base/*) skip=1 ;; esac ;;
+      esac
+    done
+    [ "$skip" = 1 ] && continue
+    hit=0
+    for p in $list; do
+      case "$p" in
+        !*) ;;
+        *)
+          base="${p%/}"
+          # shellcheck disable=SC2254  # the path token is a glob on purpose
+          case "$f" in $base|$base/*) hit=1 ;; esac ;;
+      esac
+    done
+    [ "$hit" = 1 ] && return 1
+  done < <(git -C "$repo" diff --name-only "$from" "$to")
+  return 0
+}
+
 workflows="$(git -C "$main_root" ls-tree -r --name-only "$sha" -- .github/workflows | grep -E '/deploy-[^/]+\.yml$' || true)"
 if [ -z "$workflows" ]; then
   echo "no deploy: no deploy-*.yml workflow on main"
@@ -170,9 +202,10 @@ for path in $workflows; do
   last="$(echo "$runs" | jq -r '[.[] | select(.conclusion == "success")][0] | select(. != null) | "\(.headSha)\t\(.url)"')"
   if [ -n "$last" ]; then
     IFS="$(printf '\t')" read -r last_sha last_url <<<"$last"
-    # shellcheck disable=SC2086  # the paths are a space-separated list
+    # A token that starts with ! is a shell pattern of paths to leave out
+    # (!app/*.md). What remains of the other tokens is the deploy.
     if git -C "$main_root" cat-file -e "$last_sha^{commit}" 2>/dev/null &&
-       git -C "$main_root" diff --quiet "$last_sha" "$sha" -- $paths; then
+       deploy_unchanged "$main_root" "$last_sha" "$sha" "$paths"; then
       echo "no deploy: $wf has no change in ($paths) since the last deploy at ${last_sha:0:12}: $last_url"
       continue
     fi

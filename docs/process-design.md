@@ -607,7 +607,7 @@ O `deploy.sh`:
 | 3 | o run não terminou no prazo | lê o run pela URL e roda `deploy.sh` de novo |
 | 4 | o run falhou | lê o run, corrige e roda `deploy.sh` de novo |
 
-O `deploy-*.yml` roda só por `workflow_dispatch`; o primeiro job roda o `scripts/validate.sh` na `main` e todos os outros dependem dele; `concurrency` com `cancel-in-progress: false`. O `check-workflows.py` recusa deploy com outro gatilho, sem a linha `# deploy-paths:` e sem o job de validação. Disparo fora do `deploy.sh` é barrado pelo `block-dangerous-git.sh` (§6.2, item 9) e pelo deny do `.claude/settings.json`.
+O `deploy-*.yml` roda só por `workflow_dispatch`; o primeiro job roda o `scripts/validate.sh` na `main` só quando o SHA, ou a mesma árvore, não tem `CI` verde (`scripts/ci-already-green.sh`; falha de API ou check ausente roda a suíte) e todos os outros dependem dele; `concurrency` com `cancel-in-progress: false`. A linha `# deploy-paths:` aceita exclusão (`!caminho`). O `check-workflows.py` recusa deploy com outro gatilho, sem a linha `# deploy-paths:` e sem o job de validação, e aceita a suíte condicionada ao CI já verde. Disparo fora do `deploy.sh` é barrado pelo `block-dangerous-git.sh` (§6.2, item 9) e pelo deny do `.claude/settings.json`.
 
 ---
 

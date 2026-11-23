@@ -3,10 +3,12 @@
 # Only workflow_dispatch: the one that dispatches it is scripts/deploy.sh, run by
 # the main session after the last merge of the group (once per group). Never on
 # pull_request, push or schedule. The "Validate main" job runs
-# scripts/validate.sh on main before the build: a main that does not pass is
-# not published.
-# The "deploy-paths" line lists what this workflow publishes; deploy.sh only
-# dispatches when something there changed since the last successful deploy.
+# scripts/validate.sh on main before the build, unless this SHA or the same
+# tree already has green CI. An API failure or an absent check still runs the
+# suite. A main that does not pass is not published.
+# The "deploy-paths" line lists what this workflow publishes. A token that
+# starts with ! is excluded. deploy.sh dispatches only when something that
+# remains changed since the last successful deploy.
 # `runs-on` reads CI_RUNS_ON like ci.yml (default: a GitHub-hosted runner).
 # deploy-paths: app/ .github/workflows/deploy-example.yml
 name: "Deploy · Example"
@@ -30,10 +32,17 @@ jobs:
     timeout-minutes: 15
     permissions:
       contents: read
+      checks: read
     steps:
       - name: "Checkout"
         uses: actions/checkout@v4
+      - name: "See if this tree already has green CI"
+        id: gate
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: scripts/ci-already-green.sh "${{ github.sha }}" >> "$GITHUB_OUTPUT"
       - name: "Lint and tests on main"
+        if: steps.gate.outputs.skip != 'true'
         run: scripts/validate.sh
 
   build:
