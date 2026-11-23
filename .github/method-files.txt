@@ -21,6 +21,7 @@ scripts/integrate-parallel.sh
 scripts/label-issue.sh
 scripts/machine-slots.sh
 scripts/measure-session.py
+scripts/method-diff.sh
 scripts/new-phase.sh
 scripts/notify-bot.sh
 scripts/open-issue.sh
