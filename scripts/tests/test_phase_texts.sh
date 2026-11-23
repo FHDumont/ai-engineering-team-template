@@ -239,7 +239,10 @@ done
 reviewer="$(cat "$REPO/.claude/agents/close-reviewer.md")"
 assert_contains "$reviewer" "check-runs" "close-reviewer reads the Tests check of the SHA through the API"
 assert_contains "$reviewer" "só rode a suíte se o check \`Tests\` faltar ou falhar" "close-reviewer runs the suite only when the Tests check is missing or failed"
+assert_contains "$reviewer" "não rode a suíte local enquanto ele roda" "close-reviewer does not run the local suite while Tests is in progress"
+assert_not_contains "$reviewer" "em andamento sem resultado" "an in-progress Tests check is not a reason to run the suite"
 assert_contains "$close" "revisor lê o check \`Tests\` do SHA" "close-phase says the reviewer reads the CI result"
+assert_contains "$close" "não manda a suíte local enquanto o check \`Tests\` está em andamento" "close-phase tells the reviewer to wait for Tests"
 
 # Questions to the owner: only the sensitive list stops a phase; the rest goes to the PR.
 agents="$(cat "$REPO/AGENTS.md")"
