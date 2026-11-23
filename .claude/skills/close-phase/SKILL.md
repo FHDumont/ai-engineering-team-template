@@ -1,6 +1,6 @@
 ---
 name: close-phase
-description: Fecha a fase da branch atual pelo portão — PR, revisão independente publicada em review/independent e merge só com --rebase. Use quando a fase terminou (auto-close) ou o dono do repo disse "fechar fase", aqui ou na gerenciadora, que repassa. Frases: "fechar fase", "fechar a fase".
+description: Fecha a fase da branch atual pelo portão — PR, revisão independente publicada em review/independent e merge por rebase (o script faz). Use quando a fase terminou (auto-close) ou o dono do repo disse "fechar fase", aqui ou na gerenciadora, que repassa. Frases: "fechar fase", "fechar a fase".
 ---
 
 # Fechar a fase
