@@ -13,7 +13,7 @@ description: Planejamento nível 2 — lê por inteiro só as issues escolhidas 
 4a. §2.1: critério verificável.
 5. Escreva `docs/specs/AAAA-MM-DD-<group>.md`, seção por fase:
    - issue, objetivo, pronto quando, arquivos;
-   - etapas com `modelo: … · esforço: … · motivo: …`;
+   - etapas com `modelo: … · esforço: … · motivo: …` (`scripts/weights.sh <peso>`);
    - modo de fim, área sensível, solo ou paralela (`integration.md`).
 5b. Lab-test: a spec separa a prova da parada, a do fecho e a do pós-merge. O brief não pede na parada prova que só existe depois. Pós-merge escreve "issue fica aberta até a prova".
 6. Ok da spec: quadro (ou label `approved`). Aplique `end:*` e `group:*`.

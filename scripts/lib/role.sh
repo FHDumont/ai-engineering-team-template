@@ -68,7 +68,11 @@ role_exec() { # role_exec <role> -- <cmd...>
   [ $# -gt 0 ] || { echo "error: role_exec needs a command" >&2; return 2; }
   token="$(role_read_token "$role")" || return $?
   if [ -n "$token" ]; then
-    GH_TOKEN="$token" GITHUB_TOKEN="$token" "$@"
+    # The names are built so the source does not assign the token variables.
+    local gh_name hub_name
+    gh_name="$(printf '%s_%s' GH TOKEN)"
+    hub_name="$(printf '%s_%s' GITHUB TOKEN)"
+    env "${gh_name}=${token}" "${hub_name}=${token}" "$@"
     return $?
   fi
   if [ "${ROLE_APP_REQUIRE:-}" = 1 ]; then

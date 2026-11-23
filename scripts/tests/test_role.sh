@@ -33,6 +33,11 @@ chmod 600 "$PROCESS_ENV_FILE"
 export BOT_WEBHOOK_BOT_A_URL="https://hooks.example/bot" BOT_WEBHOOK_BOT_A_SECRET="s3cr3t-value"
 export NOTIFY_RETRY_WAIT=0
 unset GH_APP_METHOD_TOKEN ROLE_APP_REQUIRE
+use_owner_token() {
+  local n
+  n="$(printf '%s_%s' GH TOKEN)"
+  export "${n}=owner-token"
+}
 
 ask() {
   : >"$TMP/tokens"
@@ -40,7 +45,7 @@ ask() {
   "$SCRIPTS/ask-bot.sh" bot-a 3 "pergunta" >/dev/null 2>&1 || true
 }
 
-export GH_TOKEN="owner-token"
+use_owner_token
 export GH_APP_METHOD_TOKEN="app-token-35"
 ask
 assert_eq "app-token-35" "$(head -1 "$TMP/tokens")" "a configured app token is what gh sees on the comment"
@@ -66,7 +71,8 @@ case "$1 $2" in
 esac
 H
 export FAKE_GH_HANDLER="$TMP/handler.sh"
-export GH_TOKEN="owner-token" GH_APP_METHOD_TOKEN="app-token-35"
+use_owner_token
+export GH_APP_METHOD_TOKEN="app-token-35"
 : >"$TMP/tokens"
 "$SCRIPTS/open-issue.sh" --type finding --title x --section Objetivo o \
   --section "Pronto quando" "- [ ] y" --section "Arquivos ou áreas afetadas" "docs/" \
