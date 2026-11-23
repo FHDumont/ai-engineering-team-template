@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 #: status.sh: print the status block (in Portuguese) that ends every stop.
 #:
-#: Usage: status.sh --state trabalhando|esperando|pronto [--need "exact action"] \
+#: Usage: status.sh --state trabalhando|esperando|gerenciadora|pronto [--need "exact action"] \
 #:          [--next "next step"] [--issue N] [--offline]
 #:
 #: pronto runs scripts/end-check.sh (of the phase, with an issue; of the group,
@@ -48,7 +48,8 @@ case "$state" in
   trabalhando|pronto) ;;
   esperando) state="esperando você" ;;
   "esperando você") ;;
-  *) die "--state must be trabalhando, esperando or pronto" 2 ;;
+  gerenciadora) state="esperando a gerenciadora" ;;
+  *) die "--state must be trabalhando, esperando, gerenciadora or pronto" 2 ;;
 esac
 
 branch="$(current_branch)"
@@ -142,7 +143,10 @@ fi
 # The close-phase shortcut only applies in "esperando você" in lab-test.
 if [ "$end" = "end:lab-test" ] && [ "$state" = "esperando você" ]; then
   close_hint='dizer "fechar fase" aqui ou na sessão da fase (atalho /close-phase)'
-  need="${need:+$need; }$close_hint"
+  case "$need" in
+    *'fechar fase'*) ;;
+    *) need="${need:+$need; }$close_hint" ;;
+  esac
   if [ "$offline" = 0 ] && [ -n "$issue" ]; then
     notes="$(phase_pending_notes "$issue")" || {
       echo "refused: cannot read the comments of issue #$issue: lab-test stop blocked" >&2
