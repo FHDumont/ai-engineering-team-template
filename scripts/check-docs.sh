@@ -15,6 +15,8 @@
 #: - "## 6. Scripts": lists exactly the files of scripts/;
 #: - "### 6.2 Hooks": lists exactly the files of .claude/hooks/ and .githooks/;
 #: - "## 7. Arquivos": every path without a placeholder (<...> or *) exists.
+#:   CHANGELOG.md and ROADMAP.md may both be absent until the first group; if
+#:   either exists, both must.
 #:
 #: Repository-only names: the design, AGENTS.md and the skills (.claude/skills/*/*.md) cite
 #: no name listed under "## Nomes só deste repositório" of docs/repo-notes.md, when that file
@@ -130,11 +132,22 @@ if [ -f "$design" ]; then
   same_files scripts "$(section '## 6. Scripts' | first_column | grep '^scripts/' || true)" "$(files_of scripts)"
   same_files hooks "$(section '### 6.2 Hooks' | first_column | grep -E '^(\.claude/hooks|\.githooks)/' || true)" \
     "$(files_of .claude/hooks; files_of .githooks)"
+  # CHANGELOG.md and ROADMAP.md are generated at the end of the first group.
+  # Both may be absent until then. Once either exists, both are required.
+  generated_missing=""
   while read -r p; do
     [ -n "$p" ] || continue
     case "$p" in *'<'*|*'*'*) continue ;; esac
-    [ -e "$p" ] || problem "$design: the file table cites $p, which does not exist"
+    [ -e "$p" ] && continue
+    case "$p" in
+      CHANGELOG.md|ROADMAP.md) generated_missing="${generated_missing:+$generated_missing }$p" ;;
+      *) problem "$design: the file table cites $p, which does not exist" ;;
+    esac
   done <<<"$(section '## 7. Arquivos' | first_column)"
+  case "$generated_missing" in
+    ""|"CHANGELOG.md ROADMAP.md"|"ROADMAP.md CHANGELOG.md") ;;
+    *) problem "$design: the file table cites $generated_missing, which does not exist" ;;
+  esac
 
 else
   problem "$design missing"

@@ -130,5 +130,6 @@ Código, comentários no código, identificadores, nomes de arquivos, labels, no
 
 - Desenho do método: [docs/process-design.md](docs/process-design.md)
 - Regras para agentes: [AGENTS.md](AGENTS.md) · estado atual: [docs/STATE.md](docs/STATE.md) · glossário: [CONTEXT.md](CONTEXT.md)
+- Regras do projeto (nomes, medidas e o que não é do método): `docs/repo-notes.md`. O `AGENTS.md` aponta para esse arquivo e fica abaixo do teto de palavras, para o projeto poder acrescentar uma linha.
 - Decisões herdadas do método: [docs/adr/INDEX.md](docs/adr/INDEX.md)
 - Roadmap e changelog (gerados): [ROADMAP.md](ROADMAP.md) · [CHANGELOG.md](CHANGELOG.md)
