@@ -30,7 +30,7 @@ Onde cada regra está descrita: 1 e 2 na §4.3; 3 na §9.4; 4 na §6.1; 5 na §2
 
 | Inglês | Português (pt-BR) |
 |---|---|
-| Código, identificadores e comentários no código | Docs: `README.md`, este desenho, `AGENTS.md`, `docs/STATE.md`, ADRs, `docs/BOTS.md`, `CONTEXT.md`, texto das skills, comandos e agentes |
+| Código novo e o do método: identificadores e comentários no código. O código que já existe em outra língua permanece | Docs: `README.md`, este desenho, `AGENTS.md`, `docs/STATE.md`, ADRs, `docs/BOTS.md`, `CONTEXT.md`, texto das skills, comandos e agentes |
 | Nomes de arquivos, pastas e scripts | Issues (título e corpo) e o conteúdo dos templates de issue |
 | Labels (`type:feature`, `end:lab-test`, `needs-owner-ok`) | PRs (título, corpo, template) e comentários em issues e PRs |
 | Nomes de workflows, jobs, passos e checks (`CI`, `review/independent`) | O bloco de status no chat e toda conversa com o dono do repo |
@@ -39,7 +39,7 @@ Onde cada regra está descrita: 1 e 2 na §4.3; 3 na §9.4; 4 na §6.1; 5 na §2
 
 ## 2. Regras para todo agente
 
-1. **O dono do repo nunca roda script nem mexe em configuração do repo.** O setup do método (labels, proteção de branch, configurações) é pré-aprovado: o agente roda `scripts/setup-repo.sh` sozinho sempre que algo sair do padrão. **O setup é obrigatório:** nada do método funciona antes dele. A conferência é uma só, `scripts/setup-repo.sh --check`: lê uma vez as labels, os ajustes do repo, a proteção da `main` e as ofertas (§8.3) e sai 0 só com tudo conferido e nenhuma oferta sem resposta. Faltou algo, sai 7 com uma linha `missing:` por parte e a frase a dizer, "configurar o repo" (skill `setup`); plano sem proteção de branch, sai 7 até o ok do dono gravar o modo (§10.5). Travas: o `scripts/phase-start.sh` roda a conferência antes de tudo e recusa sem criar nada (nenhuma opção a pula, nem `--no-check`); o `scripts/open-issue.sh` dá a mesma mensagem quando o `gh` recusa a issue por falta das labels; o hook `session-setup-check.sh` avisa o agente no início da sessão (§6.2).
+1. **O dono do repo nunca roda script do método nem mexe em configuração do método.** O ambiente local do projeto, quando a regra do projeto é o dono operar, continua com o dono. O setup do método (labels, proteção de branch, configurações) é pré-aprovado: o agente roda `scripts/setup-repo.sh` sozinho sempre que algo sair do padrão. **O setup é obrigatório:** nada do método funciona antes dele. A conferência é uma só, `scripts/setup-repo.sh --check`: lê uma vez as labels, os ajustes do repo, a proteção da `main` e as ofertas (§8.3) e sai 0 só com tudo conferido e nenhuma oferta sem resposta. Faltou algo, sai 7 com uma linha `missing:` por parte e a frase a dizer, "configurar o repo" (skill `setup`); plano sem proteção de branch, sai 7 até o ok do dono gravar o modo (§10.5). Travas: o `scripts/phase-start.sh` roda a conferência antes de tudo e recusa sem criar nada (nenhuma opção a pula, nem `--no-check`); o `scripts/open-issue.sh` dá a mesma mensagem quando o `gh` recusa a issue por falta das labels; o hook `session-setup-check.sh` avisa o agente no início da sessão (§6.2).
 2. **Idioma** conforme a §1.
 3. **Toda decisão do dono é um quadro de escolha** (`AskUserQuestion`), uma pergunta por decisão, que começa por `Fase #n — título`. O hook `block-card-title.sh` barra o quadro sem esse começo quando há fase aberta. Nunca peça ao dono para digitar o número de um item.
    - Só a sessão principal pergunta. A sessão filha manda a dúvida por mensagem e recebe `respondido: <decisão>`.
