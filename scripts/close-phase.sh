@@ -248,7 +248,7 @@ inherit_validation() {
   [ -n "$prev" ] && [ "$prev" != "$head" ] || return 0
   suite_reads_diff "$prev" "$head" && return 0
   trace_event phase_validate sha="$head" inherited=1
-  echo "skipped validate.sh: $(git rev-parse --short HEAD) changes nothing the suite reads since ${prev:0:12}"
+  echo "skipped validate.sh: no-new-fact: nothing the suite reads ($(git rev-parse --short HEAD) since ${prev:0:12})"
 }
 
 # validate.sh once per HEAD: a second --prepare on the same commit (a retry after a
@@ -332,7 +332,7 @@ prepare() {
     remote_sha="$(git rev-parse "refs/remotes/origin/${branch}")"
   fi
   if [ "$remote_sha" = "$(git rev-parse HEAD)" ]; then
-    echo "already on origin: $branch was not pushed again"
+    echo "no-new-fact: already on origin: $branch was not pushed again"
   else
     progress_step "pushing the branch"
     git push --quiet -u origin "$branch"

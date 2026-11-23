@@ -1073,5 +1073,21 @@ class GhPinTests(unittest.TestCase):
         self.assertIn("gh_2.105.0_linux_amd64/bin", open(os.path.join(self.tmp, "gh.path")).read())
 
 
+class NoNewFactTests(unittest.TestCase):
+    def test_detection_is_named_where_the_design_table_says(self):
+        # #138: the skip that proved nothing new is recorded in the existing
+        # scripts, at the tokens the design table names. No new production target.
+        design = open(os.path.join(ROOT, "docs", "process-design.md"), encoding="utf-8").read()
+        close = open(os.path.join(ROOT, "scripts", "close-phase.sh"), encoding="utf-8").read()
+        ci = open(os.path.join(ROOT, ".github", "workflows", "ci.yml"), encoding="utf-8").read()
+        self.assertNotIn("scripts/repeated-work.sh", design + close + ci)
+        for token in ("no-new-fact: already on origin",
+                      "no-new-fact: already tested in the PR",
+                      "no-new-fact: tests already passed",
+                      "no-new-fact: nothing the suite reads"):
+            self.assertIn(token, design, token)
+            self.assertTrue(token in close or token in ci, token)
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=0)

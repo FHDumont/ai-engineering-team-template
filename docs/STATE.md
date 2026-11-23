@@ -5,16 +5,16 @@
 Repositório criado a partir do template do método (`docs/process-design.md`). Nenhuma fase rodou ainda.
 
 - **Projeto:** nome, objetivo e stack ainda não registrados; a skill `setup` registra aqui.
-- **Método:** scripts, hooks, skills, agentes e CI vêm do template, sem alteração. As decisões herdadas estão em `docs/adr/INDEX.md`.
+- **Método:** scripts, hooks, skills, agentes e CI. Decisões em `docs/adr/INDEX.md`.
 - **Modelo e esforço:** os pares de `scripts/lib/weights.tsv` são o padrão do template; ajuste o arquivo ao plano da conta.
 - **App:** `app/` é só um marcador para o workflow de exemplo; troque pelo código do projeto.
 - **Deploy:** `deploy-example.yml` é um exemplo que builda `app/` e guarda o artefato, sem publicar nada. Roda só por `workflow_dispatch`, disparado pelo `scripts/deploy.sh` na sessão principal.
 - **Fim do grupo:** passo único da sessão principal (skill `integrate`): `gen-docs.sh`, `deploy.sh`, arquivamento das sessões filhas, `end-check.sh`.
-- **CI:** um run por rodada; verificadores lidos da base do PR; o job `tests` roda em todo PR. `ci.yml`, verificadores, `deploy-*.yml` e `close-phase.sh` são caminho sensível.
+- **CI:** um run por rodada; verificadores da base do PR. Docs gerados são inertes; push na `main` só com eles não abre run. Reaproveitamento usa o resultado mais novo. Árvore já testada grava `no-new-fact:` e não sobe o agregador. `ci.yml` e `close-phase.sh` são caminho sensível.
 - **Runner:** hospedado pelo GitHub (`ubuntu-latest`); a variável `CI_RUNS_ON` não está definida.
 - **Bots (caminho B):** nenhum webhook configurado; `docs/BOTS.md` e `.github/bots.tsv` trazem só exemplos.
 - **Projects:** sem quadro.
-- **Progresso:** `validate.sh`, `phase-start.sh`, `new-phase.sh` e `close-phase.sh` gravam o andamento em `~/.cache/ai-method/progress/` (formato na `process-design` §6.4); `scripts/progress.sh` mostra ao dono, `status.sh` cita o passo.
+- **Progresso:** scripts longos gravam o andamento em `~/.cache/ai-method/progress/`; `scripts/progress.sh` mostra ao dono.
 
 ## Pendente
 
