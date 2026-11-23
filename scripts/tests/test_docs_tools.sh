@@ -171,4 +171,23 @@ grep -v 'ADR-001' "$d/docs/adr/INDEX.md" >"$d/index.new"; mv "$d/index.new" "$d/
 assert_status 1 "fails when the index has no line for the ADR" env REPO_ROOT="$d" "$SCRIPTS/archive-adr.sh" 001 --by 002
 assert_contains "$(last_output)" "has no line in docs/adr/INDEX.md" "says the index line is missing"
 assert_eq "yes" "$([ -f "$d/docs/adr/ADR-001-core.md" ] && echo yes)" "nothing is moved"
+
+# CHANGELOG.md and ROADMAP.md are generated at the end of the first group (#100).
+d="$(fixture)"
+edit_design "$d" '/^| `scripts\/` | scripts |$/a\
+| `CHANGELOG.md` | gerado no fim do primeiro grupo |\
+| `ROADMAP.md` | gerado no fim do primeiro grupo |'
+assert_status 0 "generated files are optional before the first group" env REPO_ROOT="$d" "$CHECK"
+printf 'x\n' >"$d/CHANGELOG.md"
+assert_status 1 "one generated file requires the other" env REPO_ROOT="$d" "$CHECK"
+assert_contains "$(last_output)" "ROADMAP.md" "names the generated file that is still missing"
+printf 'y\n' >"$d/ROADMAP.md"
+assert_status 0 "both generated files present passes" env REPO_ROOT="$d" "$CHECK"
+
+# The template points at the project rules and stays under the word ceiling with room.
+agents="$(cat "$REPO/AGENTS.md")"
+assert_contains "$agents" "docs/repo-notes.md" "AGENTS.md points at the project rules"
+n="$(wc -w <"$REPO/AGENTS.md" | tr -d ' ')"
+[ "$n" -le 480 ] && ok || bad "AGENTS.md has $n words (leave room under 500)"
+assert_contains "$(cat "$REPO/README.md")" "docs/repo-notes.md" "the README says where the project rules go"
 finish

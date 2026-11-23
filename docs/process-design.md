@@ -421,7 +421,7 @@ Fim da fase e processos: o `close-phase.sh --cleanup` encerra só os processos c
 
 ## 7. Arquivos
 
-A tabela é a árvore de arquivos do método. Caminho sem `<…>` precisa existir; o `check-docs.sh` confere.
+A tabela é a árvore de arquivos do método. Caminho sem `<…>` precisa existir; o `check-docs.sh` confere. `CHANGELOG.md` e `ROADMAP.md` podem faltar os dois até o fim do primeiro grupo; se um existir, o outro também.
 
 | Caminho | O que é |
 |---|---|
@@ -429,8 +429,8 @@ A tabela é a árvore de arquivos do método. Caminho sem `<…>` precisa existi
 | `CLAUDE.md` | só `@AGENTS.md` |
 | `CONTEXT.md` | glossário curto do domínio |
 | `README.md` | entrada para pessoas; aponta para a abertura de issue |
-| `CHANGELOG.md` | gerado pelo `gen-docs.sh` |
-| `ROADMAP.md` | gerado pelo `gen-docs.sh` |
+| `CHANGELOG.md` | gerado pelo `gen-docs.sh` no fim do primeiro grupo; ausente até lá |
+| `ROADMAP.md` | gerado pelo `gen-docs.sh` no fim do primeiro grupo; ausente até lá |
 | `docs/STATE.md` | estado atual, ≤500 palavras; a fase que muda o estado atualiza a sua parte |
 | `docs/BOTS.md` | caminho B, ≤450 palavras |
 | `docs/process-design.md` | este documento |
