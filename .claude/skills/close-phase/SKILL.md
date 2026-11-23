@@ -5,7 +5,7 @@ description: Fecha a fase da branch atual pelo portão — PR, revisão independ
 
 # Fechar a fase
 
-0. Comece avisando "agora vou finalizar, espere". Em `end:lab-test`, só rode esta skill depois do teste no lab e do "fechar fase" do dono. Diga "acabou" só após o merge e o arquivamento; antes disso nenhum bloco de status parece final.
+0. Comece avisando "agora vou finalizar, espere". Ao retomar por um recado, o primeiro registro é `scripts/status.sh --state trabalhando`, para a principal deixar de pedir o que o dono já disse. Em `end:lab-test`, só rode esta skill depois do teste no lab e do "fechar fase" do dono. Diga "acabou" só após o merge e o arquivamento; antes disso nenhum bloco de status parece final.
 
 0a. **Sessão que abriu a fase (gerenciadora): repasse e pare.** "Fechar fase" dito a ela vai à sessão da fase por `send_message`, e ela para com o bloco de status. Ela não roda o `close-phase.sh` (saída 9 nela) nem escreve no worktree (os hooks recusam). Os passos abaixo são da sessão da fase.
 
