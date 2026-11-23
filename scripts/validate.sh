@@ -34,6 +34,8 @@
 #:
 #: Never runs from inside its own tests: it sets PROCESS_VALIDATE_RUNNING=1 in the
 #: environment and, called again with the mark, exits 3 at once.
+#: A full green run (lint and tests) on a clean tree records phase_validate on HEAD
+#: so close-phase.sh --prepare can reuse it.
 set -euo pipefail
 HERE="$(cd "$(dirname "$0")" && pwd)"
 # shellcheck source=scripts/lib/common.sh
@@ -315,4 +317,10 @@ if [ "$tests" = 1 ]; then
 fi
 set -e
 history_add validate "$(slots_repo_name)" "$(issue_from_branch "$(current_branch)")" "$SLOT_WAIT" "$(( $(now_epoch) - t0 ))"
+# The local cache: a full green run on a clean tree is the result --prepare reuses.
+if [ "$rc" = 0 ] && [ "$lint" = 1 ] && [ "$tests" = 1 ] && [ "$incremental" = 0 ]; then
+  if git diff --quiet && git diff --cached --quiet; then
+    trace_event phase_validate sha="$(git rev-parse HEAD)" secs="$(( $(now_epoch) - t0 ))"
+  fi
+fi
 exit "$rc"

@@ -120,4 +120,50 @@ assert_contains "$(gh_calls)" "pr create --repo owner/repo --base main --head ch
 assert_not_contains "$(gh_calls)" "issues?state=all" "predicts no PR number"
 assert_eq "" "$(git -C "$repo" ls-tree -r --name-only HEAD | grep -E '^(CHANGELOG|ROADMAP)\.md$' || true)" "a new PR carries no generated file"
 
+# #139: the spec-removal commit --prepare itself creates changes no file the suite
+# reads, so the suite runs once. A later inert doc reuses that result; code does not.
+# A full green validate.sh on a clean tree is what --prepare reuses.
+git -C "$repo" switch --quiet -c fix/issue-1-spec origin/main
+mkdir -p "$repo/docs/specs"
+printf '# Spec\n\n## Fase #1 — remove\n\n' >"$repo/docs/specs/one.md"
+git -C "$repo" add docs/specs/one.md
+git -C "$repo" commit --quiet -m "docs(specs): add the spec of issue #1"
+SPEC_LOG="$TMP/spec-validate.log"; : >"$SPEC_LOG"
+printf '#!/usr/bin/env bash\necho run >>"%s"\n' "$SPEC_LOG" >"$repo/scripts/validate.sh"
+chmod +x "$repo/scripts/validate.sh"
+git -C "$repo" update-index --assume-unchanged scripts/validate.sh
+cat >"$TMP/handler.sh" <<'H'
+case "$*" in
+  "pr list"*"--state open"*) echo 12 ;;
+  "issue view 1"*) printf 'type:chore\n' ;;
+  "pr view 12"*) echo '{"number":12,"title":"chore: spec","labels":[{"name":"type:chore"}],"url":"u","body":""}' ;;
+  "issue list"*) printf '' ;;
+esac
+H
+use_fake_gh "$TMP/handler.sh"
+: >"$PUSH_LOG"
+assert_status 0 "prepare removes the spec and validates once" \
+  sh -c "cd '$repo' && scripts/close-phase.sh --prepare --title 'chore: spec' --body-file '$TMP/body.md'"
+assert_eq "docs(specs): remove the spec whose last open issue is #1" "$(git -C "$repo" log -1 --format=%s)" "prepare commits the spec removal"
+assert_eq "1" "$(wc -l <"$SPEC_LOG" | tr -d ' ')" "the first prepare runs the suite once"
+assert_eq "$(git -C "$repo" rev-parse HEAD)" "$(jq -r 'select(.event == "phase_validate" and .branch == "fix/issue-1-spec") | .sha' "$PROCESS_EVENTS_FILE" | tail -1)" "the spec-removal commit inherits the validation"
+assert_status 0 "second prepare on the spec-removal commit" \
+  sh -c "cd '$repo' && scripts/close-phase.sh --prepare --body-file '$TMP/body.md'"
+assert_eq "1" "$(wc -l <"$SPEC_LOG" | tr -d ' ')" "the spec-removal commit does not run the suite again"
+mkdir -p "$repo/docs"
+printf 'note\n' >"$repo/docs/note.md"
+git -C "$repo" add docs/note.md
+git -C "$repo" commit --quiet -m "docs: inert note"
+assert_status 0 "prepare after an inert doc" \
+  sh -c "cd '$repo' && scripts/close-phase.sh --prepare --body-file '$TMP/body.md'"
+assert_eq "1" "$(wc -l <"$SPEC_LOG" | tr -d ' ')" "an inert doc reuses the validation"
+printf 'x\n' >"$repo/scripts/z.sh"
+git -C "$repo" add scripts/z.sh
+git -C "$repo" commit --quiet -m "chore: code the suite reads"
+assert_status 0 "prepare after code the suite reads" \
+  sh -c "cd '$repo' && scripts/close-phase.sh --prepare --body-file '$TMP/body.md'"
+assert_eq "2" "$(wc -l <"$SPEC_LOG" | tr -d ' ')" "code the suite reads runs the suite again"
+git -C "$repo" update-index --no-assume-unchanged scripts/validate.sh
+assert_contains "$(cat "$SCRIPTS/validate.sh")" 'trace_event phase_validate' "a full green validate.sh records the result --prepare reuses"
+
 finish

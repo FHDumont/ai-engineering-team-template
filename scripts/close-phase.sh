@@ -17,7 +17,8 @@
 #:   close-phase.sh --abort [--discard]
 #:
 #: --prepare: runs validate.sh (not again when the trace holds a green run of this
-#:   branch on the same HEAD, with no change in the tree) and check-docs.sh and pushes ONCE per round; opens
+#:   branch on the same HEAD, or on a later commit that changes nothing the suite
+#:   reads, with no change in the tree) and check-docs.sh and pushes ONCE per round; opens
 #:   the PR, or edits it only if the title or body changed; copies the issue
 #:   labels to the PR. It does not regenerate CHANGELOG.md or ROADMAP.md (the
 #:   main session generates them once at the end, with gen-docs.sh) and does not
@@ -200,15 +201,54 @@ pr_number() {
 
 SENSITIVE_AREAS='area:billing area:auth area:migration area:credentials'
 
-# True when the trace holds a green validate.sh of this branch on exactly HEAD and the
-# tree has no change: the suite would run again on the same bytes (minutes for nothing).
-validated_head() {
-  local events head
+# SHA of the last green validate.sh this branch recorded, or empty.
+last_validate_sha() {
+  local events
   events="$(events_file "$ROOT")" || return 1
   [ -f "$events" ] || return 1
+  jq -rs --arg b "$branch" '[.[] | select(type == "object" and .event == "phase_validate" and .branch == $b)] | last | .sha // ""' "$events" 2>/dev/null
+}
+
+# True when the diff from $1 to $2 changes a path the suite reads. The inert set is
+# the one in ci.yml (needs_tests): docs/ and a root .md, except the design, AGENTS.md,
+# CLAUDE.md, CHANGELOG.md and ROADMAP.md. A diff that cannot be read counts as read.
+suite_reads_diff() { # suite_reads_diff <from> <to>
+  local files
+  files="$(git diff --name-only --no-renames -z "$1" "$2" 2>/dev/null | tr '\0' '\n' || echo "?")"
+  [ "$files" != "?" ] || return 0
+  if printf '%s\n' "$files" | grep -vE '^$' | grep -vE '^(docs/|[^/]+\.md$)' | stdin_grep -q .; then
+    return 0
+  fi
+  if printf '%s\n' "$files" | grep -E '^(docs/process-design\.md|AGENTS\.md|CLAUDE\.md|CHANGELOG\.md|ROADMAP\.md)$' | stdin_grep -q .; then
+    return 0
+  fi
+  return 1
+}
+
+# True when a green validate.sh of this branch already covers HEAD: the same commit,
+# or a later commit that changes nothing the suite reads, and the tree is clean.
+validated_head() {
+  local head prev
   git diff --quiet && git diff --cached --quiet || return 1
   head="$(git rev-parse HEAD)"
-  [ "$(jq -rs --arg b "$branch" '[.[] | select(type == "object" and .event == "phase_validate" and .branch == $b)] | last | .sha // ""' "$events" 2>/dev/null)" = "$head" ]
+  prev="$(last_validate_sha)" || return 1
+  [ -n "$prev" ] || return 1
+  [ "$prev" = "$head" ] && return 0
+  suite_reads_diff "$prev" "$head" && return 1
+  return 0
+}
+
+# The commit created after the green run (the spec removal) inherits it when the
+# suite would read none of the new bytes. Records phase_validate on that HEAD.
+inherit_validation() {
+  local head prev
+  git diff --quiet && git diff --cached --quiet || return 0
+  head="$(git rev-parse HEAD)"
+  prev="$(last_validate_sha)" || return 0
+  [ -n "$prev" ] && [ "$prev" != "$head" ] || return 0
+  suite_reads_diff "$prev" "$head" && return 0
+  trace_event phase_validate sha="$head" inherited=1
+  echo "skipped validate.sh: $(git rev-parse --short HEAD) changes nothing the suite reads since ${prev:0:12}"
 }
 
 # validate.sh once per HEAD: a second --prepare on the same commit (a retry after a
@@ -220,7 +260,11 @@ esac
 
 run_validate() {
   if validated_head; then
-    echo "skipped validate.sh: HEAD $(git rev-parse --short HEAD) already validated green in this phase"
+    if [ "$(last_validate_sha)" = "$(git rev-parse HEAD)" ]; then
+      echo "skipped validate.sh: HEAD $(git rev-parse --short HEAD) already validated green in this phase"
+    else
+      inherit_validation
+    fi
     return 0
   fi
   local t0 secs sha
@@ -230,6 +274,8 @@ run_validate() {
   secs=$(( $(date +%s) - t0 ))
   [ "$(git rev-parse HEAD)" = "$sha" ] || return 0
   git diff --quiet && git diff --cached --quiet || return 0
+  # validate.sh records a full green run itself; do not write the same SHA twice.
+  [ "$(last_validate_sha)" = "$sha" ] && return 0
   trace_event phase_validate sha="$sha" secs="$secs"
 }
 
@@ -272,6 +318,7 @@ prepare() {
 
   # Spec with no other open issue: leaves in a phase commit and its text goes into the body.
   remove_done_specs "$closing"
+  inherit_validation
   body_file="$(body_with_pairs "$body_file")"
   body_file="$(body_with_spec "$body_file")"
 
