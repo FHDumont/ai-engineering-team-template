@@ -149,7 +149,13 @@ same_or_opener() { # same_or_opener <real> <asked> <opener>
 }
 check_session_pair() {
   local asked real opener="" trace line where
-  if [ -z "$phase_issue" ] || [ -z "${CLAUDE_CODE_SESSION_ID:-}" ]; then
+  # Outside a phase there is nothing to record: an empty issue used to mark the
+  # session as a phase session and deploy.sh then refused it forever.
+  if [ -z "$phase_issue" ]; then
+    echo "warn: no phase issue or no session id: session pair not checked"
+    return 0
+  fi
+  if [ -z "${CLAUDE_CODE_SESSION_ID:-}" ]; then
     trace_event phase_session
     echo "warn: no phase issue or no session id: session pair not checked"
     return 0

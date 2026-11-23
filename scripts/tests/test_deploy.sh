@@ -128,6 +128,11 @@ assert_contains "$(last_output)" "phase_session of #98 in the trace" "names only
 assert_not_contains "$(last_output)" "#96" "does not name the phase it opened itself"
 assert_eq 0 "$(dispatches)" "no dispatch from the session of a phase it did not open"
 cp "$TMP/trace.bak" "$TRACE"
+# A phase_session with an empty issue is not a phase (#160): check-env outside a phase used to write one.
+jq -cn '{event: "phase_session", session_id: "main", issue: ""}' >"$TRACE"
+run 0 "an empty phase_session issue is not a phase session"
+assert_eq 1 "$(dispatches)" "an empty issue does not block the deploy"
+cp "$TMP/trace.bak" "$TRACE"
 
 # First deploy: dispatches once on main, prints the run URL, waits and reads the result.
 : >"$PROCESS_EVENTS_FILE"
@@ -186,4 +191,14 @@ git -C "$repo" commit --quiet -m "ci: no deploy"
 git -C "$repo" push --quiet origin main
 run 0 "nothing to deploy without a deploy workflow"
 assert_contains "$(last_output)" "no deploy-*.yml workflow" "says there is no deploy workflow"
+
+# Same session: check-env outside a phase, then deploy. No phase_session is recorded.
+git -C "$repo" switch --quiet -c chore/adoption
+: >"$TRACE"
+assert_status 0 "check-env outside a phase passes" env -u PROCESS_EVENTS_FILE CLAUDE_CODE_SESSION_ID=adopt sh -c "cd '$repo' && scripts/check-env.sh"
+assert_contains "$(last_output)" "no phase issue or no session id" "says the pair was not checked"
+assert_eq "" "$(jq -r 'select(.event == "phase_session") | .event' "$TRACE")" "check-env outside a phase records no phase_session"
+git -C "$repo" switch --quiet main
+run 0 "deploys in the session that ran check-env outside a phase" CLAUDE_CODE_SESSION_ID=adopt
+assert_not_contains "$(last_output)" "phase session" "that session is not refused as a phase session"
 finish

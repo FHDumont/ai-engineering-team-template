@@ -15,7 +15,8 @@
 #:   - there is no session id, or this session has in the trace a phase_session
 #:     of an issue it did not open (a phase session never deploys; a
 #:     phase_session of an issue the same session opened, phase_opened, is the
-#:     main session running check-env.sh and does not count);
+#:     main session running check-env.sh and does not count; a phase_session
+#:     with an empty issue, from check-env.sh outside a phase, does not count);
 #:   - .worktrees/parallel-active.tsv is not empty;
 #:   - a phase is open (a .worktrees/issue-<n> worktree) or a phase PR is open.
 #:
@@ -86,7 +87,7 @@ if [ "$check" = 0 ]; then
     phases="$(jq -rs --arg s "$sid" '
       [.[] | select(type == "object" and .session_id == $s)] as $e
       | [$e[] | select(.event == "phase_opened") | (.issue | tostring)] as $opened
-      | [$e[] | select(.event == "phase_session") | (.issue | tostring) | select(. as $i | $opened | index($i) | not) | "#\(.)"]
+      | [$e[] | select(.event == "phase_session") | (.issue | tostring) | select(test("^[0-9]+$")) | select(. as $i | $opened | index($i) | not) | "#\(.)"]
       | unique | join(", ")' "$trace" 2>/dev/null)" ||
       die "deploy refused: a line of $trace is not JSON"
     [ -z "$phases" ] || die "deploy refused: this session is a phase session (phase_session of $phases in the trace): the main session deploys"
