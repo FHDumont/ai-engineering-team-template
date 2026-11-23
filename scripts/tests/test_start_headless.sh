@@ -137,4 +137,5 @@ F
 before="$(events | wc -l)"
 assert_status 4 "exit 4 when the child dies at once" sh -c "cd '$repo' && PATH='$bin:$PATH' scripts/start-headless.sh 7"
 assert_eq "$before" "$(events | wc -l)" "no event for a child that died"
+assert_not_contains "$(cat "$repo/scripts/start-headless.sh")" "1 2 3 4 5 6 7 8 9 10" "the pid wait is not a fixed two seconds"
 finish

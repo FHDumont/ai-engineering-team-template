@@ -37,6 +37,8 @@ set -euo pipefail
 HERE="$(cd "$(dirname "$0")" && pwd)"
 # shellcheck source=scripts/lib/common.sh
 source "$HERE/lib/common.sh"
+# shellcheck source=scripts/lib/slots.sh
+source "$HERE/lib/slots.sh"
 
 issue="" dry=0 brief=""
 while [ $# -gt 0 ]; do
@@ -107,7 +109,30 @@ with open(sys.argv[1], "w") as pidfile:
     pidfile.write("%d\n" % os.getpid())
 os.execvp(sys.argv[2], sys.argv[2:])
 ' "$wt/.process/headless.pid" "${cmd[@]}") </dev/null >"$log" 2>&1 3>&- 4>&- 5>&- 6>&- 7>&- 8>&- 9>&- &
-for _ in 1 2 3 4 5 6 7 8 9 10; do [ -s "$wt/.process/headless.pid" ] && break; sleep 0.2; done
+bg=$!
+# The pid file is written by the wrapper before exec. Two seconds is the
+# expected wait; past that, warn and keep waiting. The hang limit grows with
+# the load (30s on a free machine, the same scale as slots_test_timeout).
+slots_load_limits
+hang=$(( $(slots_test_timeout) / 20 ))
+[ "$hang" -ge 2 ] || hang=2
+ticks=0
+hang_ticks=$((hang * 5))
+while [ ! -s "$wt/.process/headless.pid" ] && [ "$ticks" -lt "$hang_ticks" ]; do
+  sleep 0.2
+  ticks=$((ticks + 1))
+done
+if [ ! -s "$wt/.process/headless.pid" ]; then
+  # The child is running and the file never appeared: record it, do not cat a
+  # missing file and leave it without a trace.
+  pid="$bg"
+  warn_over_expected headless-pid "$hang" 2 || true
+  (cd "$wt" && trace_event phase_headless "issue=$issue" "pid=$pid" "child_session=$sid" \
+    "model=$model" "effort=$effort" "log=$log" "brief=$([ -n "$brief" ] && echo yes || echo no)")
+  echo "headless child of #$issue recorded without a pid file: pid $pid, session $sid"
+  echo "log: $log"
+  exit 0
+fi
 pid="$(cat "$wt/.process/headless.pid")"
 sleep 1
 if ! kill -0 "$pid" 2>/dev/null; then
