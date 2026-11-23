@@ -502,6 +502,48 @@ check_pr() { # check_pr [PR number]
   echo "ok: PR #$n mergeable ($s), $count check(s) on HEAD ${sha:0:12}"
 }
 
+# Pair of the close-reviewer from the trace (model and effort of its last stop).
+# Empty when the trace does not hold it: the script must not invent one.
+reviewer_trace_pair() { # reviewer_trace_pair <events file>
+  [ -f "$1" ] || return 0
+  jq -rs '
+    [ .[] | select(type == "object" and .event == "SubagentStop" and .agent_type == "close-reviewer" and (.model // "") != "") ] | last
+    | if . == null then "" else "Modelo do revisor: \(.model) · esforço: \(.effort // "?")" end
+  ' "$1" 2>/dev/null || true
+}
+
+# Path of the body to post. A self-reported "Modelo do revisor" line is replaced
+# by the trace pair, or dropped when the trace has none. A review without that
+# line is posted unchanged.
+reviewer_body() { # reviewer_body <review file> <events file>
+  local line posted
+  line="$(reviewer_trace_pair "$2")"
+  if [ -z "$line" ] && ! grep -q '^Modelo do revisor:' "$1"; then
+    printf '%s\n' "$1"
+    return 0
+  fi
+  posted="$(mktemp)"
+  python3 - "$1" "$posted" "$line" <<'PY'
+import sys
+src, dst, line = sys.argv[1:]
+text = open(src, encoding="utf-8").read().splitlines(True)
+out, seen = [], False
+for row in text:
+    if row.startswith("Modelo do revisor:"):
+        if line and not seen:
+            out.append(line + "\n")
+            seen = True
+        continue
+    out.append(row)
+if line and not seen:
+    if out and not out[-1].endswith("\n"):
+        out[-1] += "\n"
+    out.append(line + "\n")
+open(dst, "w", encoding="utf-8").write("".join(out))
+PY
+  printf '%s\n' "$posted"
+}
+
 publish_review() {
   [ -f "$review_file" ] || die "review file not found: $review_file"
   case "$verdict" in success|failure) ;; *) die "--verdict must be success or failure" 2 ;; esac
@@ -519,7 +561,9 @@ publish_review() {
   [ -f "$savedv" ] || die "no saved reviewer verdict for ${sha:0:12}"
   got="$(tr -d '[:space:]' <"$savedv")"
   [ "$got" = "$verdict" ] || die "review --verdict $verdict does not match the saved reviewer verdict $got"
-  gh_role pr comment "$n" --repo "$repo" --body-file "$review_file" >/dev/null
+  local body
+  body="$(reviewer_body "$review_file" "$events")"
+  gh_role pr comment "$n" --repo "$repo" --body-file "$body" >/dev/null
   local desc="Revisão independente aprovada"
   [ "$verdict" = success ] || desc="Revisão independente pediu mudanças"
   gh api -X POST "repos/$repo/statuses/$sha" -f state="$verdict" -f context=review/independent \
@@ -957,7 +1001,10 @@ outside_publish() {
   refs="$(outside_refs "$pr")" || exit $?
   sha="${refs%%$'\t'*}"
   require_saved_review "$sha" "$verdict"
-  gh_role pr comment "$pr" --repo "$repo" --body-file "$review_file" >/dev/null
+  local body events
+  events="$(phase_trace_file "$ROOT" 2>/dev/null || true)"
+  body="$(reviewer_body "$review_file" "$events")"
+  gh_role pr comment "$pr" --repo "$repo" --body-file "$body" >/dev/null
   desc="Revisão independente aprovada"
   [ "$verdict" = success ] || desc="Revisão independente pediu mudanças"
   gh api -X POST "repos/$repo/statuses/$sha" -f state="$verdict" -f context=review/independent \
