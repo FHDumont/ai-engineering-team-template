@@ -45,7 +45,7 @@ slots_load_limits() {
 }
 
 # Time limit of a test that waits or sets an alarm: AI_METHOD_TEST_TIMEOUT_SECONDS times
-# the load factor, so a loaded machine never fails a test by time (issue #71). The factor
+# the load factor, so a loaded machine never fails a test by time (issue FHDumont/ai-engineering-team-template#71). The factor
 # is 1 up to AI_METHOD_WARN_LOAD1 and grows with the load above it (load1 / warn, rounded up).
 slots_test_timeout() {
   local load free swap

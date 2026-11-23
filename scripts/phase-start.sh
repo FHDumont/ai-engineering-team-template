@@ -142,7 +142,7 @@ read_base_ci() { # sets ci_json and ci from the check "CI" of the base commit
     jq -r '[.check_runs[]? | select(.name == "CI")] | sort_by(.started_at // "") | last
       | if . == null then "absent" else "\(.status)/\(.conclusion // "none") \(.html_url // "")" end' 2>/dev/null || true)"
   # The job CI is born only after the jobs it depends on: with no check CI yet, a workflow run of
-  # the commit that is still going is the run to wait for (#62).
+  # the commit that is still going is the run to wait for (FHDumont/ai-engineering-team-template#62).
   if [ "$ci" = absent ]; then
     local runs_json
     runs_json="$(gh api "repos/$(repo_slug)/actions/runs?head_sha=$base&per_page=100" 2>&1)" ||
