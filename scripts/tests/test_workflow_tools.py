@@ -744,5 +744,139 @@ cat "$TMP/prred.out"
         self.assertIn("PRRED:1", out)
 
 
+class RunnerToolsTests(unittest.TestCase):
+    def test_cwd_uses_proc_when_lsof_is_missing(self):
+        tmp = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, tmp, True)
+        root = os.path.join(tmp, "proc")
+        os.makedirs(os.path.join(root, "42"))
+        os.symlink("/work/phase", os.path.join(root, "42", "cwd"))
+        bindir = os.path.join(tmp, "bin")
+        os.makedirs(bindir)
+        for cmd in ("readlink", "awk", "sed", "head", "sort", "ls"):
+            src = shutil.which(cmd)
+            if src:
+                os.symlink(src, os.path.join(bindir, cmd))
+        script = "source scripts/lib/procs.sh\nproc_cwd_of 42\nprocs_in_dir /work\n"
+        env = dict(os.environ)
+        env["PATH"] = bindir
+        env["PROCS_PROC_ROOT"] = root
+        r = subprocess.run([shutil.which("bash"), "-c", script], cwd=ROOT, env=env, text=True, capture_output=True)
+        self.assertEqual(r.returncode, 0, r.stderr)
+        lines = [ln for ln in r.stdout.splitlines() if ln]
+        self.assertEqual(lines[0], "/work/phase")
+        self.assertIn("42", lines[1:])
+
+    def test_setup_runner_check_names_what_is_missing(self):
+        tmp = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, tmp, True)
+        bindir = os.path.join(tmp, "bin")
+        os.makedirs(bindir)
+        for cmd in ("bash", "dirname", "basename", "pwd", "cat", "awk", "sed", "tr", "uname", "grep"):
+            src = shutil.which(cmd)
+            if src:
+                os.symlink(src, os.path.join(bindir, cmd))
+        env = dict(os.environ)
+        env["PATH"] = bindir
+        r = subprocess.run([os.path.join(bindir, "bash"), os.path.join(ROOT, "scripts", "setup-runner.sh"), "--check"],
+                           cwd=ROOT, env=env, text=True, capture_output=True)
+        text = r.stdout + r.stderr
+        self.assertNotEqual(r.returncode, 0, text)
+        self.assertIn("PyYAML", text)
+        for cmd in ("yq", "lsof", "curl", "tar", "shasum"):
+            os.symlink("/bin/echo", os.path.join(bindir, cmd))
+        r = subprocess.run([os.path.join(bindir, "bash"), os.path.join(ROOT, "scripts", "setup-runner.sh"), "--check"],
+                           cwd=ROOT, env=env, text=True, capture_output=True)
+        text = r.stdout + r.stderr
+        self.assertEqual(r.returncode, 0, text)
+        self.assertIn(".github/gh-pin", text)
+
+
+def ci_install_step(job):
+    return ci_step(job, "Install pinned gh")
+
+
+class GhPinTests(unittest.TestCase):
+    def setUp(self):
+        self.tmp = os.path.realpath(tempfile.mkdtemp())
+        self.addCleanup(shutil.rmtree, self.tmp, True)
+        self.repo = os.path.join(self.tmp, "repo")
+        os.makedirs(self.repo)
+
+    def test_jobs_install_gh_from_the_base_pin_not_a_local_action(self):
+        wf = cw.load(os.path.join(ROOT, ".github", "workflows", "ci.yml"))
+        runs = []
+        for job in ("changes", "policy"):
+            step = ci_install_step(job)
+            self.assertIn("base/.github/gh-pin", step["run"])
+            self.assertNotIn(".github/actions", step["run"])
+            runs.append(step["run"])
+            uses = [s.get("uses") or "" for s in wf["jobs"][job]["steps"]]
+            self.assertFalse(any(u.startswith("./") for u in uses), job)
+        self.assertEqual(runs[0], runs[1])
+        changes = wf["jobs"]["changes"]["steps"]
+        pin = [s for s in changes if s.get("name") == "Checkout the gh pin from the base"]
+        self.assertEqual(len(pin), 1)
+        self.assertEqual(pin[0]["with"]["ref"], "${{ github.event.pull_request.base.sha || github.sha }}")
+        self.assertEqual(pin[0]["with"]["path"], "base")
+        self.assertFalse(pin[0]["with"].get("persist-credentials", True))
+
+    def run_install(self, extra_env):
+        env = dict(os.environ)
+        env.update(RUNNER_TEMP=self.tmp, GITHUB_PATH=os.path.join(self.tmp, "gh.path"),
+                   RUNNER_OS_NAME="Linux", RUNNER_ARCH_NAME="X64")
+        env.update(extra_env)
+        open(env["GITHUB_PATH"], "w").close()
+        return subprocess.run([shutil.which("bash"), "-eo", "pipefail", "-c", ci_install_step("policy")["run"]],
+                              cwd=self.repo, env=env, text=True, capture_output=True)
+
+    def bindir(self, names):
+        d = os.path.join(self.tmp, "bin-" + names[0])
+        os.makedirs(d, exist_ok=True)
+        for name in names:
+            src = shutil.which(name)
+            if src and not os.path.exists(os.path.join(d, name)):
+                os.symlink(src, os.path.join(d, name))
+        return d
+
+    def test_missing_pin_fails_clearly_without_gh_and_uses_path_gh(self):
+        bare = self.bindir(["awk", "curl", "tar", "shasum"])
+        r = self.run_install({"PATH": bare})
+        self.assertEqual(r.returncode, 1, r.stdout + r.stderr)
+        self.assertIn(".github/gh-pin", r.stdout + r.stderr)
+        self.assertIn("pull request", r.stdout + r.stderr)
+        gh = os.path.join(bare, "gh")
+        open(gh, "w").write("#!/bin/sh\necho 'gh version 9.test'\n")
+        os.chmod(gh, 0o755)
+        r = self.run_install({"PATH": bare})
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        self.assertIn("already on PATH", r.stdout)
+
+    def test_pin_sha256_mismatch_fails_and_a_match_installs(self):
+        bindir = self.bindir(["awk", "curl", "tar", "shasum"])
+        os.makedirs(os.path.join(self.repo, "base", ".github"))
+        payload = os.path.join(self.tmp, "payload")
+        os.makedirs(os.path.join(payload, "gh_2.105.0_linux_amd64", "bin"))
+        open(os.path.join(payload, "gh_2.105.0_linux_amd64", "bin", "gh"), "w").write("#!/bin/sh\n")
+        archive = os.path.join(self.tmp, "gh.tgz")
+        subprocess.run(["tar", "czf", archive, "-C", payload, "gh_2.105.0_linux_amd64"], check=True)
+        digest = subprocess.run(["shasum", "-a", "256", archive], check=True, text=True,
+                                capture_output=True).stdout.split()[0]
+        curl = os.path.join(bindir, "curl")
+        os.remove(curl)
+        open(curl, "w").write("#!/bin/sh\nout=\nwhile [ $# -gt 0 ]; do case \"$1\" in -o) out=\"$2\"; shift 2 ;; *) shift ;; esac; done\ncp '%s' \"$out\"\n" % archive)
+        os.chmod(curl, 0o755)
+        pin = os.path.join(self.repo, "base", ".github", "gh-pin")
+        open(pin, "w").write("2.105.0\nlinux-amd64 %s tar.gz\n" % ("0" * 64))
+        env = {"PATH": bindir + os.pathsep + "/usr/bin:/bin"}
+        r = self.run_install(env)
+        self.assertEqual(r.returncode, 1, r.stdout + r.stderr)
+        self.assertIn("sha256 mismatch", r.stdout + r.stderr)
+        open(pin, "w").write("2.105.0\nlinux-amd64 %s tar.gz\n" % digest)
+        r = self.run_install(env)
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        self.assertIn("gh_2.105.0_linux_amd64/bin", open(os.path.join(self.tmp, "gh.path")).read())
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=0)

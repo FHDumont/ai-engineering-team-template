@@ -50,8 +50,8 @@ case "$hours" in ''|*[!0-9.]*) die "hours must be a number" 2 ;; esac
 [ -n "$mode" ] || { print_help "$0"; exit 2; }
 
 # Directory of a pid, repository root of it (the part before /.worktrees/).
-# A pid that exits between ps and lsof makes lsof exit 1. Skip it; do not fail the script.
-proc_cwd() { lsof -a -d cwd -Fn -p "$1" 2>/dev/null | sed -n 's/^n//p' | head -1 || true; }
+# A pid that exits between ps and the cwd lookup is skipped; do not fail the script.
+proc_cwd() { proc_cwd_of "$1"; }
 repo_of() {
   local d="$1"
   case "$d" in */.worktrees/*) d="${d%%/.worktrees/*}" ;; esac

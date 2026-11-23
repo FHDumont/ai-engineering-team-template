@@ -34,7 +34,19 @@ except Exception:
   ps -o sess= -p "$1" 2>/dev/null | tr -d ' '
 }
 proc_cwd_of() { # proc_cwd_of <pid>
-  lsof -a -d cwd -Fn -p "$1" 2>/dev/null | sed -n 's/^n//p' | head -1 || true
+  if command -v lsof >/dev/null 2>&1; then
+    lsof -a -d cwd -Fn -p "$1" 2>/dev/null | sed -n 's/^n//p' | head -1 || true
+    return 0
+  fi
+  # Linux runners often have no lsof. /proc/<pid>/cwd is the same lookup.
+  # PROCS_PROC_ROOT replaces /proc in tests.
+  local root="${PROCS_PROC_ROOT:-/proc}"
+  if [ -d "$root" ]; then
+    readlink "$root/$1/cwd" 2>/dev/null || true
+    return 0
+  fi
+  echo "warn: no lsof and no $root; cwd of pid $1 is unknown" >&2
+  return 0
 }
 proc_alive() { kill -0 "$1" 2>/dev/null; }
 
@@ -72,9 +84,22 @@ proc_descendants() { # proc_descendants <pid>
 
 # Pids whose current directory is <dir> or inside it.
 procs_in_dir() { # procs_in_dir <absolute dir>
-  lsof -a -d cwd -Fpn 2>/dev/null | awk -v d="${1%/}" '
-    /^p/ { pid = substr($0, 2) }
-    /^n/ { p = substr($0, 2); if (p == d || index(p, d "/") == 1) print pid }' | sort -un
+  local d="${1%/}" root pid p
+  if command -v lsof >/dev/null 2>&1; then
+    lsof -a -d cwd -Fpn 2>/dev/null | awk -v d="$d" '
+      /^p/ { pid = substr($0, 2) }
+      /^n/ { p = substr($0, 2); if (p == d || index(p, d "/") == 1) print pid }' | sort -un
+    return 0
+  fi
+  root="${PROCS_PROC_ROOT:-/proc}"
+  [ -d "$root" ] || return 0
+  for pid in $(cd "$root" && echo [0-9]*); do
+    [ -e "$root/$pid/cwd" ] || [ -L "$root/$pid/cwd" ] || continue
+    p="$(readlink "$root/$pid/cwd" 2>/dev/null || true)"
+    case "$p" in
+      "$d"|"$d"/*) printf '%s\n' "$pid" ;;
+    esac
+  done | sort -un
 }
 
 # TERM, up to 3 seconds of grace, then KILL.
@@ -148,12 +173,24 @@ orphan_cwd_match() { # orphan_cwd_match <cwd>
 # starting is not an orphan yet). Never this process.
 # shellcheck disable=SC2120  # callers pass dirs, or none for the temporary-folder sweep
 procs_orphans() { # procs_orphans [dir...]
-  local rows cwds pid et cwd min="${AI_METHOD_ORPHAN_MIN_AGE:-60}" dirs=""
+  local rows cwds pid et cwd min="${AI_METHOD_ORPHAN_MIN_AGE:-60}" dirs="" root=""
   local d
   for d in "$@"; do dirs="$dirs${dirs:+$'\n'}${d%/}"; done
   rows="$(ps -axo pid=,ppid=,etime=,command= | awk '$2 == 1 && $1 != 1 { print }')"
   [ -n "$rows" ] || return 0
-  cwds="$(lsof -a -d cwd -Fpn -p "$(printf '%s\n' "$rows" | awk '{ printf "%s%s", (n++ ? "," : ""), $1 }')" 2>/dev/null | awk '/^p/ { pid = substr($0, 2) } /^n/ { print pid "\t" substr($0, 2) }')"
+  if command -v lsof >/dev/null 2>&1; then
+    cwds="$(lsof -a -d cwd -Fpn -p "$(printf '%s\n' "$rows" | awk '{ printf "%s%s", (n++ ? "," : ""), $1 }')" 2>/dev/null | awk '/^p/ { pid = substr($0, 2) } /^n/ { print pid "\t" substr($0, 2) }')"
+  else
+    root="${PROCS_PROC_ROOT:-/proc}"
+    cwds=""
+    if [ -d "$root" ]; then
+      cwds="$(printf '%s\n' "$rows" | awk '{ print $1 }' | while read -r pid; do
+        c="$(readlink "$root/$pid/cwd" 2>/dev/null || true)"
+        [ -n "$c" ] || continue
+        printf '%s\t%s\n' "$pid" "$c"
+      done)"
+    fi
+  fi
   # One pass joins the rows with their cwds; the shell only sees the candidates.
   if [ $# -gt 0 ]; then
     awk -v self="$$" -v dirs="$dirs" 'BEGIN { n = split(dirs, D, "\n") }
