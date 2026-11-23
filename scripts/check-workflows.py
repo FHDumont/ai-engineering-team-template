@@ -47,6 +47,8 @@ def recorded_ci_mode(path):
         if os.path.isfile(candidate):
             with open(candidate, encoding="utf-8") as fh:
                 return fh.read().strip() or "push"
+        if os.path.isdir(os.path.join(d, ".git")):
+            break
         parent = os.path.dirname(d)
         if parent == d:
             break

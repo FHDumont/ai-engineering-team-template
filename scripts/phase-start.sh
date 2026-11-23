@@ -31,7 +31,8 @@
 #: with the same tree. Record `pr` in .github/ci-mode (one line; else the repository
 #: variable PROCESS_CI_MODE) to keep CI on pull requests only: a base with no check
 #: is then accepted when the merged PR that contains it had CI green, with a warning
-#: when the tree differs, and a red base stays refused. ci.yml also runs on push to main, so a run of main that is still going is waited
+#: when the tree differs, and a red base stays refused. A private repository with
+#: no record is refused until .github/ci-mode on main says push or pr. ci.yml also runs on push to main, so a run of main that is still going is waited
 #: for (PHASE_START_CI_WAIT seconds, default 900; progress step "waiting for the CI of main"), even before the
 #: job CI exists (the workflow run of the commit counts); with no run there is nothing to wait for. A red
 #: check is not cleared by rerunning that run: it keeps the gate of the commit it checked out. Push a new
@@ -75,20 +76,31 @@ main_root="$(git worktree list --porcelain | sed -n '1s/^worktree //p')"
 cd "$main_root"
 
 # push: CI on main (the public template). pr: recorded in .github/ci-mode, else PROCESS_CI_MODE.
-ci_mode=""
+# A private repository with neither record is refused: push on main spends minutes,
+# and the choice has to be on main before a phase opens.
+ci_mode="" ci_recorded=0
 if [ -f .github/ci-mode ]; then
   ci_mode="$(tr -d '[:space:]' < .github/ci-mode)"
+  ci_recorded=1
 elif [ -n "${PROCESS_CI_MODE:-}" ]; then
   ci_mode="$PROCESS_CI_MODE"
+  ci_recorded=1
 else
   ci_mode="$(gh variable get PROCESS_CI_MODE --repo "$(repo_slug)" 2>/dev/null || true)"
   ci_mode="$(printf '%s' "$ci_mode" | tr -d '[:space:]')"
+  [ -n "$ci_mode" ] && ci_recorded=1
 fi
 [ -n "$ci_mode" ] || ci_mode=push
 case "$ci_mode" in
   push|pr) ;;
   *) die ".github/ci-mode is '$ci_mode' and must be push or pr: no phase opens; nothing was created" ;;
 esac
+if [ "$ci_recorded" = 0 ]; then
+  priv="$(gh api "repos/$(repo_slug)" --jq .private 2>/dev/null || true)"
+  if [ "$priv" = true ]; then
+    die "this private repository has not recorded whether CI runs on push to main. That push spends Actions minutes (about 2 when the tree was already tested, about 5 to 10 when the suite runs). Record the choice in .github/ci-mode on main: push, or pr (pull requests only; a base with no check is accepted when the merged PR had CI green, with a warning if the tree differs). No phase opens until that file is on main; nothing was created"
+  fi
+fi
 
 # Prints the number of the merged PR whose head had CI green and the same tree as commit $1
 # (returns 0), or the reason (returns 1).
@@ -106,6 +118,7 @@ base_pr_vouches() {
         | if . == null then "absent" else "\(.status)/\(.conclusion // "none")" end' 2>/dev/null || true)"
     [ "$ci" = "completed/success" ] || { echo "the CI of its PR #$n is ${ci:-absent}"; return 1; }
     htree="$(gh api "repos/$slug/git/commits/$head" 2>/dev/null | jq -r '.tree.sha // empty' 2>/dev/null || true)"
+    [ -n "$htree" ] || { echo "the tree of its PR #$n was not read"; return 1; }
     [ "$htree" = "$tree" ] || {
       if [ "${2:-}" = pr ]; then echo "$n differ"; return 0; fi
       echo "the tree of its PR #$n differs from the commit of main"; return 1
@@ -172,7 +185,7 @@ case "$ci" in
     else
       die "no check 'CI' on the base commit ${base:0:9} of main and ${pr}: no phase opens; CI on main starts on push to main (ci.yml has no workflow_dispatch). Push a commit to main, or record pr in .github/ci-mode so a merged PR with green CI can open the phase; nothing was created"
     fi ;;
-  *) die "check 'CI' of the base commit ${base:0:9} of main is ${ci%% *} (${ci#* }): no phase opens on a red or unfinished base; rerunning that run keeps the gate of the commit it checked out. Push a new commit on main (an empty commit is enough when there is nothing to generate) so the next run reads the gate of that commit; nothing was created" ;;
+  *) die "check 'CI' of the base commit ${base:0:9} of main is ${ci%% *} (${ci#* }): no phase opens on a red or unfinished base; rerunning that run keeps the gate of the commit it checked out. When that gate is the previous commit's, push a new commit on main (an empty commit is enough when there is nothing to generate) so the next run reads the gate of that commit. A failed test still needs a fix; nothing was created" ;;
 esac
 
 # Everything is checked before anything opens: issue open and spec (new-phase.sh --dry-run), then the pair.
