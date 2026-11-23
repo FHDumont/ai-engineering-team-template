@@ -7,6 +7,8 @@
 #:   close-phase.sh --pre-review --verdict clean|findings [--round N]
 #:   close-phase.sh --check
 #:   close-phase.sh --merge [--owner-ok SHA] [--wait]
+#:   close-phase.sh --pr N --publish-review F --verdict success|failure
+#:   close-phase.sh --pr N --merge --owner-ok SHA
 #:
 #: Do not pipe --check or --merge (the pipe hides the exit code and the cleanup
 #: can stop the reader). Write the output to a file and read its last line:
@@ -78,6 +80,14 @@
 #:   different from the branch's issue is refused (exit 2). --wait waits for the merge and
 #:   runs --cleanup. Never dispatches a deploy: scripts/deploy.sh does, run by
 #:   the main session after the last merge of the group.
+#: --pr N: a pull request whose head branch is not a phase branch (not fix/issue-*).
+#:   It does not use the phase gate and it does not change --merge for a phase
+#:   branch. --publish-review posts review/independent on that pull request's head
+#:   SHA from the saved review of that SHA (.process/reviewer-<sha>.md and the
+#:   matching .verdict). --merge is refused unless --owner-ok is that same SHA,
+#:   the CI check run on it is success, and the saved independent review of that
+#:   SHA has verdict success. A wrong SHA, missing CI and a fix/issue-* head are
+#:   refused. The phase path stays --merge, without --pr.
 #: --prepare, --publish-review, --check and --merge exit 9 in the session that
 #:   opened the phase (phase_opened): it forwards the request to the child
 #:   session and stops.
@@ -121,7 +131,7 @@ gh() {
   return "$rc"
 }
 
-mode="" title="" body_file="" issue="" review_file="" verdict="" round="" owner_ok=0 owner_ok_sha="" wait=0 discard=0
+mode="" title="" body_file="" issue="" review_file="" verdict="" round="" owner_ok=0 owner_ok_sha="" wait=0 discard=0 pr=""
 while [ $# -gt 0 ]; do
   case "$1" in
     -h|--help) print_help "$0"; exit 0 ;;
@@ -142,6 +152,12 @@ while [ $# -gt 0 ]; do
         *) owner_ok_sha="$2"; shift 2 ;;
       esac ;;
     --wait) wait=1; shift ;;
+    --pr)
+      case "${2:-}" in
+        ''|--*) die "--pr needs the number of the pull request" 2 ;;
+        *[!0-9]*) die "--pr needs the number of the pull request" 2 ;;
+        *) pr="$2"; shift 2 ;;
+      esac ;;
     --title) title="$2"; shift 2 ;;
     --body-file) body_file="$2"; shift 2 ;;
     --issue) issue="$2"; shift 2 ;;
@@ -149,11 +165,17 @@ while [ $# -gt 0 ]; do
   esac
 done
 [ -n "$mode" ] || { print_help "$0"; exit 2; }
+if [ -n "$pr" ]; then
+  case "$mode" in
+    review|merge) ;;
+    *) die "--pr is only valid with --publish-review or --merge" 2 ;;
+  esac
+fi
 require_cmd gh jq git python3
 cd "$ROOT"
 
 branch="$(current_branch)"
-if [ "$mode" != cleanup ] && is_main_branch "$branch"; then
+if [ "$mode" != cleanup ] && [ -z "$pr" ] && is_main_branch "$branch"; then
   die "on $branch: close-phase runs on the phase branch"
 fi
 repo="$(repo_slug)"
@@ -166,7 +188,7 @@ fi
 # The session that opened the phase (the manager) never closes it: the child session does.
 case "$mode" in
   prepare|prereview|review|check|merge)
-    if [ "$(phase_opener_state "$issue" "${CLAUDE_CODE_SESSION_ID:-}" "$ROOT")" = opener ]; then
+    if [ -z "$pr" ] && [ "$(phase_opener_state "$issue" "${CLAUDE_CODE_SESSION_ID:-}" "$ROOT")" = opener ]; then
       die "this session opened phase #$issue: forward the request to the child session (send_message) and stop" 9
     fi ;;
 esac
@@ -788,12 +810,110 @@ abort() {
   [ "$board" = 0 ] || die "phase #$n is aborted and cleaned up, but the board was not updated (cause and fix above)"
 }
 
+# Head of a pull request that is not a phase. Prints "<sha>\t<base>".
+# A fix/issue-* head is refused: that branch keeps --merge and the phase gate.
+outside_refs() { # outside_refs <pull request number>
+  local info branch sha base
+  info="$(gh pr view "$1" --repo "$repo" --json headRefName,headRefOid,baseRefName)"
+  branch="$(printf '%s' "$info" | jq -r '.headRefName // empty')"
+  sha="$(printf '%s' "$info" | jq -r '.headRefOid // empty')"
+  base="$(printf '%s' "$info" | jq -r '.baseRefName // "main"')"
+  [ -n "$branch" ] && [ -n "$sha" ] || die "PR #$1 has no head"
+  case "$branch" in
+    fix/issue-*)
+      die "refused: PR #$1 is on phase branch $branch: a phase branch keeps close-phase.sh --merge" 2 ;;
+  esac
+  printf '%s\t%s\n' "$sha" "$base"
+}
+
+# The saved independent review of a SHA, next to the trace. A review file, when
+# this run has one, must be that saved output byte for byte.
+require_saved_review() { # require_saved_review <sha> <verdict>
+  local sha="$1" want="$2" events saved savedv got
+  events="$(phase_trace_file "$ROOT")" || die "cannot locate the trace: review refused"
+  saved="$(dirname "$events")/reviewer-$sha.md"
+  savedv="$(dirname "$events")/reviewer-$sha.verdict"
+  [ -f "$saved" ] || die "no saved reviewer output for ${sha:0:12}: write the close-reviewer output to $saved without rewriting it"
+  [ -f "$savedv" ] || die "no saved reviewer verdict for ${sha:0:12}"
+  got="$(tr -d '[:space:]' <"$savedv")"
+  [ "$got" = "$want" ] || die "saved reviewer verdict $got is not $want for ${sha:0:12}"
+  if [ -n "$review_file" ]; then
+    cmp -s "$saved" "$review_file" || die "review file differs from the saved close-reviewer output"
+  fi
+}
+
+# Conclusion of the CI check run on a SHA: "missing" when there is none.
+ci_conclusion() { # ci_conclusion <sha>
+  gh api "repos/$repo/commits/$1/check-runs" --jq '[.check_runs[] | select(.name == "CI")] | sort_by(.started_at) | last | if . == null then "missing" elif .status != "completed" then .status else .conclusion end'
+}
+
+# Same protection rule as a phase merge. Does not call the phase gate.
+require_base_protection() { # require_base_protection <base> <sha>
+  local base="$1" sha="$2" required c
+  if required="$(gh api "repos/$repo/branches/$base/protection" --jq '.required_status_checks | ([.checks[]?.context] + (.contexts // [])) | unique | .[]' 2>/dev/null)"; then
+    for c in CI review/independent; do
+      printf '%s\n' "$required" | stdin_grep -qxF "$c" ||
+        die "the protection of $base does not require $c: no merge without the gate; fix: scripts/setup-repo.sh --only protection"
+    done
+  else
+    gh variable list --repo "$repo" --json name --jq '.[].name' 2>/dev/null | stdin_grep -qxF PROCESS_BRANCH_MODE ||
+      die "$base is not protected, or its protection cannot be read: no merge without the gate; fix: scripts/setup-repo.sh --only protection"
+    unprotected_gate "$sha"
+  fi
+}
+
+outside_publish() {
+  [ -f "$review_file" ] || die "review file not found: $review_file"
+  case "$verdict" in success|failure) ;; *) die "--verdict must be success or failure" 2 ;; esac
+  "$HERE/check-attribution.sh" --text-file "$review_file" >/dev/null || die "review has AI attribution"
+  local refs sha desc
+  refs="$(outside_refs "$pr")" || exit $?
+  sha="${refs%%$'\t'*}"
+  require_saved_review "$sha" "$verdict"
+  gh pr comment "$pr" --repo "$repo" --body-file "$review_file" >/dev/null
+  desc="Revisão independente aprovada"
+  [ "$verdict" = success ] || desc="Revisão independente pediu mudanças"
+  gh api -X POST "repos/$repo/statuses/$sha" -f state="$verdict" -f context=review/independent \
+    -f description="$desc" >/dev/null
+  echo "published review/independent=$verdict on ${sha:0:12} (PR #$pr)"
+}
+
+# Merge of a non-phase pull request. Always needs --owner-ok of its head, green
+# CI and the saved review of that SHA. Never the phase gate.
+outside_merge() {
+  local refs sha base ci state
+  refs="$(outside_refs "$pr")" || exit $?
+  sha="${refs%%$'\t'*}"
+  base="${refs#*$'\t'}"
+  if [ "$owner_ok" = 0 ]; then
+    echo "refused: PR #$pr needs --owner-ok equal to HEAD $sha"
+    exit 5
+  fi
+  if [ "$owner_ok_sha" != "$sha" ]; then
+    echo "refused: --owner-ok $owner_ok_sha does not match HEAD $sha"
+    exit 5
+  fi
+  require_saved_review "$sha" success
+  state="$(gh api "repos/$repo/commits/$sha/status" --jq '[.statuses[] | select(.context == "review/independent")][0].state // "missing"')"
+  [ "$state" = success ] || die "review/independent is $state on ${sha:0:12}: publish the saved review of this SHA first"
+  ci="$(ci_conclusion "$sha")" || die "cannot read the check runs of ${sha:0:12}: merge blocked" 11
+  [ "$ci" = success ] || die "CI is $ci on ${sha:0:12}: no merge until it is success" 11
+  require_base_protection "$base" "$sha"
+  "$HERE/check-attribution.sh" --pr "$pr" || die "PR #$pr has AI attribution: fix the body or commits first"
+  gh pr comment "$pr" --repo "$repo" --body "<!-- owner-ok sha:$sha -->
+Ok do dono do repo registrado para o merge do PR #$pr fora de fase." >/dev/null
+  if ! gh pr merge "$pr" --repo "$repo" --auto --rebase --delete-branch >/dev/null 2>&1; then
+    gh pr merge "$pr" --repo "$repo" --rebase --delete-branch >/dev/null
+  fi
+  echo "merge requested for PR #$pr (rebase, auto)"
+}
+
 case "$mode" in
   abort) abort ;;
   prepare) prepare ;;
   prereview) pre_review ;;
-  review) publish_review ;;
+  review) if [ -n "$pr" ]; then outside_publish; else publish_review; fi ;;
   check) check_pr ;;
-  merge) merge ;;
+  merge) if [ -n "$pr" ]; then outside_merge; else merge; fi ;;
   cleanup) cleanup ;;
 esac
