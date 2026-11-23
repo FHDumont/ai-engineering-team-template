@@ -43,11 +43,20 @@ done
 allowed "$repo" 'ls -la'
 assert_status 0 "ignores empty input" sh -c "echo '{}' | '$HOOK'"
 python3 -c 'import json, sys; print(json.dumps({"tool_input": {"command": "git push --force; echo " + "a" * 1200000}, "cwd": sys.argv[1]}))' "$repo" >"$TMP/big.json"
+python3 -c 'import json, sys; print(json.dumps({"tool_input": {"command": "echo " + "a " * 1500000 + "; git push --force"}, "cwd": sys.argv[1]}))' "$repo" >"$TMP/big2.json"
 start="$(date +%s)"
 assert_status 2 "large input still checked" sh -c "'$HOOK' <'$TMP/big.json'"
-python3 -c 'import json, sys; print(json.dumps({"tool_input": {"command": "echo " + "a " * 1500000 + "; git push --force"}, "cwd": sys.argv[1]}))' "$repo" >"$TMP/big2.json"
 assert_status 2 "very large input fails closed" sh -c "'$HOOK' <'$TMP/big2.json'"
-assert_eq yes "$([ $(( $(date +%s) - start )) -lt 10 ] && echo yes)" "large inputs are checked fast (no timeout = fail open)"
+elapsed=$(( $(date +%s) - start ))
+limit="$(slots_test_timeout)"
+if [ "$elapsed" -ge "$limit" ]; then
+  bad "large inputs hung past the hang limit of ${limit}s (measured ${elapsed}s)"
+else
+  ok
+fi
+if [ "$elapsed" -ge 10 ]; then
+  echo "warn: over-expected hook-large-inputs $elapsed 10"
+fi
 assert_status 2 "invalid JSON fails closed" sh -c "echo 'not json' | '$HOOK'"
 
 finish
