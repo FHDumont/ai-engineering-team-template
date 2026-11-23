@@ -4,7 +4,7 @@
 source "$(dirname "$0")/lib.sh"
 
 plan="$(cat "$REPO/.claude/skills/plan/SKILL.md")"
-readme="$(cat "$REPO/README.md")"
+readme="$(cat "$REPO/docs/process-design.md")"
 integrate="$(cat "$REPO/.claude/skills/integrate/SKILL.md")"
 assert_contains "$plan" "prova da parada" "plan names the proof at the stop"
 assert_contains "$plan" "do fecho" "plan names the proof at close"
