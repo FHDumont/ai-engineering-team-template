@@ -266,7 +266,7 @@ Todo script tem `--help`, um teste em `scripts/tests/` e saída curta em inglês
 | `scripts/open-parallel.sh` | Worktrees do grupo paralelo e o registro `.worktrees/parallel-active.tsv`; sai 1 com sobra no registro | `phase-start.sh` |
 | `scripts/check-env.sh` | Confere o ambiente da fase: fora da `main`, spec da issue no git, par real da sessão (§3), git hooks instalados, testes rodando | sessão filha, antes da primeira etapa |
 | `scripts/status.sh` | Imprime o bloco de status (§2, regra 4) | todo agente, em toda parada |
-| `scripts/end-check.sh` | Confere o fim sem consertar nada e sai 1 listando cada sobra em linhas `fail:`. Do grupo: branch e worktree extra, registro não vazio, branch remota sem PR aberto, spec de issue fechada, arquivo não rastreado, `ROADMAP.md` diferente do gerado, deploy não conferido. Com `--issue <n>`: só a fase | `status.sh --state pronto`; sessão principal |
+| `scripts/end-check.sh` | Confere o fim sem consertar nada e sai 1 listando cada sobra em linhas `fail:`. Do grupo: branch e worktree no padrão de fase (`issue-<n>`), registro não vazio, branch remota sem PR aberto, spec de issue fechada, mudança não commitada, `ROADMAP.md` diferente do gerado, deploy não conferido. Worktree, branch local e arquivo não rastreado que a fase não criou são `warn:`, não falha: ninguém apaga isso para deixar o check verde. Com `--issue <n>`: só a fase | `status.sh --state pronto`; sessão principal |
 | `scripts/close-phase.sh` | Fecha a fase (§6.1) | sessão filha |
 | `scripts/redo-phase.sh` | Refaz a fase cujo PR conflita com a `main` (§6.1, passo 3) | `close-phase.sh --check` |
 | `scripts/integrate-parallel.sh` | Só espera todas as fases do registro entrarem e faz um build; não faz deploy | sessão principal |
