@@ -179,6 +179,26 @@ assert_eq 1 "$(dispatches)" "dispatches after a change in the app"
 run 0 "deploys when the last deployed SHA is unknown here" FAKE_RUNS="$(success_run 0123456789012345678901234567890123456789)" FAKE_RUN_SHA="$NEW"
 assert_eq 1 "$(dispatches)" "dispatches when the last deploy cannot be compared"
 
+# An excluded doc inside deploy-paths is not a deploy. The code next to it still is.
+printf '# deploy-paths: app/ !app/*.md .github/workflows/deploy-app.yml\non:\n  workflow_dispatch:\n' >"$repo/.github/workflows/deploy-app.yml"
+git -C "$repo" add .github/workflows/deploy-app.yml
+git -C "$repo" commit --quiet -m "ci: exclude docs from deploy paths"
+git -C "$repo" push --quiet origin main
+PATHSHA="$(git -C "$repo" rev-parse HEAD)"
+echo 'readme only' >"$repo/app/README.md"
+git -C "$repo" add app/README.md
+git -C "$repo" commit --quiet -m "docs: readme"
+git -C "$repo" push --quiet origin main
+run 0 "does not deploy a doc excluded from deploy-paths" FAKE_RUNS="$(success_run "$PATHSHA")"
+assert_eq 0 "$(dispatches)" "no dispatch for an excluded doc"
+assert_contains "$(last_output)" "no deploy:" "an excluded doc is no deploy"
+echo v3 >"$repo/app/index.html"
+git -C "$repo" add app/index.html
+git -C "$repo" commit --quiet -m "feat: app v3"
+git -C "$repo" push --quiet origin main
+run 0 "still deploys a code change when docs are excluded" FAKE_RUNS="$(success_run "$PATHSHA")"
+assert_eq 1 "$(dispatches)" "a code change dispatches even with an exclusion"
+
 # A deploy workflow that does not say what it deploys stops the script.
 printf 'on:\n  workflow_dispatch:\n' >"$repo/.github/workflows/deploy-app.yml"
 git -C "$repo" add .github/workflows/deploy-app.yml

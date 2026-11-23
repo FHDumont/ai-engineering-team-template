@@ -110,6 +110,20 @@ jobs:
     def test_deploy_declares_its_paths(self):
         self.assertIn("deploy-paths", self.deploy_problems(self.DEPLOY.replace("# deploy-paths: app/\n", "")))
 
+    def test_deploy_may_skip_a_suite_that_ci_already_ran(self):
+        gated = self.DEPLOY.replace(
+            '        run: scripts/validate.sh\n',
+            '        run: scripts/ci-already-green.sh\n'
+            '      - name: "Lint and tests"\n'
+            '        if: steps.gate.outputs.skip != \'true\'\n'
+            '        run: scripts/validate.sh\n')
+        self.assertEqual(self.deploy_problems(gated), "")
+        real = os.path.join(ROOT, ".github", "workflows", "deploy-example.yml")
+        text = open(real, encoding="utf-8").read()
+        self.assertIn("scripts/ci-already-green.sh", text)
+        self.assertIn("scripts/validate.sh", text)
+        self.assertEqual(cw.check(real), [], "the example deploy workflow")
+
     def test_good(self):
         self.assertEqual(cw.check(self.write("issues-label.yml", GOOD)), [])
 
