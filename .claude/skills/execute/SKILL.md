@@ -14,7 +14,7 @@ description: Sessão filha de uma fase já aberta por scripts/phase-start.sh —
 4. Achados (§4.2): `scripts/open-issue.sh --type finding --size small|medium|large …`.
    - Leve e só em arquivos do PR: corrija num commit no próprio PR. Os outros entram numa única issue guarda-chuva por grupo, com checklist; nunca uma issue por ponto. Grande: avise a gerenciadora por mensagem; ela pergunta ao dono.
 5. Texto de PR, issue ou parecer: monte em `mktemp` ou `.worktrees/issue-<n>/.process/`, nunca em caminho fixo em `/tmp` (outra filha o sobrescreve). Dúvida em passo reversível: siga e liste na seção "Decisões tomadas sem perguntar" do PR; só ação sensível ou irreversível (AGENTS, "Quando perguntar: sempre") para o dono. Nada de refatoração de carona.
-6. A tabela do PR "etapa | modelo/esforço pedido | modelo/esforço usado" é escrita pelo `close-phase.sh --prepare` (do trace, `scripts/trace-view.py --pairs <n>`); não a preencha à mão.
+6. A tabela do PR "etapa | modelo/esforço pedido | modelo/esforço usado" é escrita pelo `close-phase.sh --prepare` (do trace, `scripts/trace-view.py --pairs <n>`): uma linha por etapa da spec; etapa de par diferente sem subagente sai `(diverge)`. Não a preencha à mão.
 7. Ao terminar as etapas, se a fase mudou o estado atual, atualize a sua parte do `docs/STATE.md` (só o estado atual, ≤500 palavras); se houve decisão, crie a ADR (`docs/adr/TEMPLATE.md`) e a linha no índice.
 8. Modo de fim:
    - `end:auto-close`: siga para a skill `close-phase`.

@@ -8,12 +8,14 @@ Reads the JSONL trace (default: .process/events.jsonl in the main checkout)
 and always writes a self-contained HTML tree (default: .process/tree.html).
 With --text it also prints the tree as plain text on stdout (paste it in a PR).
 With --pairs ISSUE it only prints the "requested x used" table of the phase of
-the issue, in Markdown, and writes no HTML: one row for each session that ran
-check-env.sh in the phase (pair asked by the spec x real pair, both from its
-phase_session event) and one row for each subagent of those sessions (pair asked
-in the Agent call x model and effort it ran with). A used value that differs
-from the requested one is marked "(diverge)"; a value the trace does not hold
-is "?". close-phase.sh --prepare writes this table in the PR body.
+the issue, in Markdown, and writes no HTML. When docs/specs has a section for
+the issue, one row per stage of that section (pair the spec asks x the pair of
+the subagent that ran it, or of the phase session when no subagent did). A
+stage whose pair differs from the session and has no subagent is "(diverge)".
+Without a spec section: one row for each session that ran check-env.sh and one
+row for each subagent. A used value that differs from the requested one is
+marked "(diverge)"; a value the trace does not hold is "?". close-phase.sh
+--prepare writes this table in the PR body.
 With --timings [--issue N] it only prints, in Markdown, where the time of each
 phase went (all phases of the trace, or the one of the issue): opening, work
 (steps, minus the waits for the owner), wait for the owner, validate.sh of
@@ -31,6 +33,7 @@ import datetime
 import html
 import json
 import os
+import re
 import subprocess
 import sys
 
@@ -346,6 +349,33 @@ def pair_cell(model, effort):
     return "%s · %s" % (model or "?", effort or "?")
 
 
+def spec_stages(issue, root=None):
+    """(number, model, effort) of each stage in the issue's spec section, in order."""
+    folder = os.path.join(root or os.getcwd(), "docs", "specs")
+    if not os.path.isdir(folder):
+        return []
+    cite = re.compile(r"#%s(?!\d)" % re.escape(str(issue)))
+    pair = re.compile(r"modelo:\s*`?([\w.-]+)`?\s*·\s*esforço:\s*`?([\w+-]+)")
+    found = []
+    for name in sorted(os.listdir(folder)):
+        if not name.endswith(".md"):
+            continue
+        path = os.path.join(folder, name)
+        try:
+            with open(path, encoding="utf-8") as handle:
+                text = handle.read()
+        except OSError:
+            continue
+        for part in re.split(r"(?m)^(?=## )", text):
+            if not part.startswith("## "):
+                continue
+            if not cite.search(part.split("\n", 1)[0]):
+                continue
+            for n, match in enumerate(pair.finditer(part), 1):
+                found.append((str(n), match.group(1), match.group(2)))
+    return found
+
+
 def render_pairs(events, issue):
     """Markdown table requested x used of the phase of the issue (the phase sessions and their subagents)."""
     last = {}
@@ -365,6 +395,37 @@ def render_pairs(events, issue):
             what = " — ".join([child["label"]] + child["notes"][:1])
             rows.append(("subagente: " + what, (child["model"], child["effort"]),
                          (child.get("model_used"), child.get("effort_used"))))
+    stages = spec_stages(issue)
+    if stages:
+        sess_used = (None, None)
+        for ev in last.values():
+            if ev.get("model") or ev.get("effort"):
+                sess_used = (ev.get("model"), ev.get("effort"))
+        children = []
+        for sid in last:
+            node = sessions.get(sid)
+            for child in (node["node"]["children"] if node else []):
+                if child["kind"] == "subagent" and child["model_requested"]:
+                    children.append(child)
+        claimed = set()
+        rows = []
+        for num, model, effort in stages:
+            match = None
+            for i, child in enumerate(children):
+                if i in claimed:
+                    continue
+                if family(child.get("model") or "") == family(model) and (child.get("effort") or "") == effort:
+                    match = child
+                    claimed.add(i)
+                    break
+            if match is not None:
+                used = (match.get("model_used") or match.get("model"),
+                        match.get("effort_used") or match.get("effort"))
+            elif sess_used[0] or sess_used[1]:
+                used = sess_used
+            else:
+                used = (None, None)
+            rows.append((num, (model, effort), used))
     out = ["| etapa | modelo/esforço pedido | modelo/esforço usado |", "|---|---|---|"]
     for what, req, used in rows:
         # A value the trace does not hold ("?") is unknown, not a divergence.

@@ -156,7 +156,36 @@ class TraceViewTests(unittest.TestCase):
         events, _ = tv.load_events([ev_])
         self.assertIn("| sessão da fase | opus · high | claude-sonnet-9 · low (diverge) |",
                       tv.render_pairs(events, "16"))
-        self.assertIn("sem `phase_session` no trace", tv.render_pairs(events, "99"))
+        self.assertIn("sem `phase_session` no trace", tv.render_pairs(events, "99991"))
+
+    def test_spec_stage_without_a_subagent_diverges(self):
+        # A stage whose pair differs from the session, with no subagent, is a row
+        # marked (diverge). Issue #153.
+        lines = [
+            phase("03:00:30", "phase_session", model="claude-sonnet-9", effort="medium",
+                  requested_model="sonnet", requested_effort="medium"),
+        ]
+        with tempfile.TemporaryDirectory() as d:
+            specdir = os.path.join(d, "docs", "specs")
+            os.makedirs(specdir)
+            with open(os.path.join(specdir, "phase.md"), "w", encoding="utf-8") as handle:
+                handle.write("## Fase #16 — t\n"
+                             "1. Um. modelo: sonnet · esforço: medium · motivo: m\n"
+                             "2. Dois. modelo: sonnet · esforço: low · motivo: m\n")
+            path = os.path.join(d, "events.jsonl")
+            with open(path, "w", encoding="utf-8") as handle:
+                handle.write("\n".join(lines) + "\n")
+            out = io.StringIO()
+            old = os.getcwd()
+            os.chdir(d)
+            try:
+                with contextlib.redirect_stdout(out):
+                    self.assertEqual(0, tv.main(["--events", path, "--pairs", "16"]))
+            finally:
+                os.chdir(old)
+        text = out.getvalue()
+        self.assertIn("| 1 | sonnet · medium | claude-sonnet-9 · medium |", text)
+        self.assertIn("| 2 | sonnet · low | claude-sonnet-9 · medium (diverge) |", text)
 
     def test_pairs_cli_prints_only_the_table(self):
         with tempfile.TemporaryDirectory() as d:
