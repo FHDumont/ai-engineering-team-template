@@ -185,11 +185,13 @@ slots_before="$(ls "$AI_METHOD_CACHE/slots/fase" | wc -l | tr -d ' ')"
 assert_status 1 "new-phase fails when check-env refuses" sh -c "cd '$repo' && scripts/new-phase.sh 9"
 assert_contains "$(last_output)" "no bot secret provider" "says why the opening failed"
 assert_contains "$(last_output)" "undone: removed the worktree" "says what it undid"
+assert_eq "" "$(jq -r 'select(.event == "phase_opened" and (.issue | tostring) == "9") | .issue' "$PROCESS_EVENTS_FILE")" "a failed opening records no phase_opened"
 assert_eq "no" "$([ -e "$repo/.worktrees/issue-9" ] && echo yes || echo no)" "no worktree is left"
 assert_eq "" "$(git -C "$repo" branch --list 'fix/issue-9-*')" "no local branch is left"
 assert_eq "" "$(git -C "$repo" worktree list --porcelain | grep 'issue-9' || true)" "git keeps no worktree record"
 assert_eq "$slots_before" "$(ls "$AI_METHOD_CACHE/slots/fase" | wc -l | tr -d ' ')" "the slot went back"
 assert_status 0 "the same opening works again with no cleanup by hand" env BOT_WEBHOOK_BOT_B_URL=https://h.example sh -c "cd '$repo' && scripts/new-phase.sh 9"
+assert_eq 1 "$(jq -s '[.[] | select(.event == "phase_opened" and (.issue | tostring) == "9")] | length' "$PROCESS_EVENTS_FILE")" "the successful opening is the only phase_opened"
 git -C "$repo" worktree remove --force "$repo/.worktrees/issue-9"; git -C "$repo" branch -D fix/issue-9-datas-no-fuso-errado >/dev/null
 # A group that fails in the middle: the phase already opened is undone too, and nothing is registered.
 assert_status 1 "open-parallel undoes the group when the second phase fails" sh -c "cd '$repo' && scripts/open-parallel.sh 8 9"

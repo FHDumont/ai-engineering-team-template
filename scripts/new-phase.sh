@@ -22,6 +22,8 @@
 #: A failure after the branch and the worktree exist (spec not committed, check-env.sh
 #: refusing) undoes them (worktree and local branch), says so
 #: and frees the slot: the same opening works again with no cleanup by hand.
+#: phase_opened is recorded only after that check succeeds, so a failed opening
+#: does not count as a phase start in the trace.
 #: Each step goes to ~/.cache/ai-method/progress/ (scripts/progress.sh), never to the
 #: output; --dry-run records nothing.
 set -euo pipefail
@@ -124,13 +126,6 @@ trap undo_open EXIT
 slots_load_report | grep '^warn:' || true
 progress_step "creating the branch and the worktree"
 git fetch --quiet origin main
-# Marks the session that opened the phase (planning): the close-phase.sh gate only
-# accepts as the child session a session different from this one.
-# Recorded before the worktree exists, so the opening session is known from its first second.
-# The pair of the session that opens the phase goes along: check-env.sh accepts the
-# child session in the pair of the spec or in this one.
-opener_pair="$(session_pair)"
-trace_event phase_opened "issue=$issue" "model=${opener_pair% *}" "effort=${opener_pair#* }"
 # The spec enters git here, as the commit the branch is created on: the session that
 # opens the phase never commits in the worktree (the git hooks refuse it).
 base="$(git rev-parse origin/main)"
@@ -164,6 +159,13 @@ if [ "$check" = 1 ]; then
   progress_step "checking the environment (check-env.sh)"
   (cd "$path" && CHECK_ENV_OPENING=1 "$path/scripts/check-env.sh")
 fi
+# phase_opened is recorded only once the opening has succeeded. A check that
+# refuses undoes the worktree and must not count as a phase start: the trace
+# is append-only, and duration and the gate read the first phase_opened.
+# The pair of the session that opens the phase goes along: check-env.sh accepts the
+# child session in the pair of the spec or in this one.
+opener_pair="$(session_pair)"
+trace_event phase_opened "issue=$issue" "model=${opener_pair% *}" "effort=${opener_pair#* }"
 # The phase is open from here on: a board that refuses the write leaves it open (the
 # message says so), as the owner can fix the board and nothing of the phase is lost.
 made_wt=0
