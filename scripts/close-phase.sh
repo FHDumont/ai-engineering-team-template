@@ -736,7 +736,7 @@ Ok do dono do repo registrado (quadro de escolha) para:$reasons." >/dev/null
 # Last words of the phase: what the owner archives (never deletes) in the app.
 cleanup_message() { # cleanup_message <main checkout> <phase worktree>
   [ "$2" != "$1" ] || return 0
-  echo "Archive this session in the Claude app (menu ... -> Archive) to free its process, about 100-180 MB, and its MCPs. Do not delete it: the history is gone for good. Closing the tab is not enough."
+  echo "Archive this session in the Claude app (menu ... -> Archive) after the owner agreed once, with the spec or in one card at the end of the group. The manager then calls set_remote_control and archive_session; if the app returns a field, repeat once with that field, for both. Do not delete it: the history is gone for good. Closing the tab is not enough."
   local stale
   stale="$("$1/scripts/sessions.sh" --stale 2>/dev/null || true)"
   [ -z "$stale" ] || printf 'Other sessions of this repository, not archived and idle (archive them too):\n%s\n' "$stale"
@@ -768,7 +768,14 @@ cleanup() {
   local f
   git -C "$main_root" diff --name-only --diff-filter=A HEAD FETCH_HEAD | while IFS= read -r f; do
     [ -f "$main_root/$f" ] && [ -z "$(git -C "$main_root" ls-files -- "$f")" ] || continue
-    [ "$(git -C "$main_root" hash-object "$main_root/$f")" = "$(git -C "$main_root" rev-parse "FETCH_HEAD:$f")" ] || continue
+    same=0
+    [ "$(git -C "$main_root" hash-object "$main_root/$f")" = "$(git -C "$main_root" rev-parse "FETCH_HEAD:$f")" ] && same=1
+    # A loose spec may be the copy from before an approved amendment. The merged
+    # file wins so the fast-forward is not blocked. Any other different file stays.
+    case "$f" in
+      docs/specs/*) ;;
+      *) [ "$same" = 1 ] || continue ;;
+    esac
     rm -f "$main_root/$f"
     echo "removed the untracked copy of $f from the main checkout (main brings the same file)"
   done
