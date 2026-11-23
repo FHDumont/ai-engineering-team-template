@@ -633,6 +633,45 @@ esac
             self.assertIn("write token", r.stdout, name)
         self.assertFalse(os.path.exists(marker), "a checker from the pull request ran")
 
+    def test_push_needs_that_an_old_gate_rejects(self):
+        # Update of the method: the previous main still has a gate that requires
+        # policy and tests. The push run uses the gate of github.sha, which
+        # accepts policy skipped when event=push and tests skipped when run_tests=false.
+        wf = cw.load(os.path.join(ROOT, ".github", "workflows", "ci.yml"))
+        ref = next(s for s in wf["jobs"]["ci"]["steps"] if (s.get("with") or {}).get("path") == "base")["with"]["ref"]
+        self.assertEqual(ref, "${{ github.event.pull_request.base.sha || github.sha }}")
+        needs = ('{"changes":{"result":"success","outputs":{"event":"push","code":"false","run_tests":"false","workflows":"false"}},'
+                 '"policy":{"result":"skipped"},"lint":{"result":"skipped"},"tests":{"result":"skipped"},"workflows":{"result":"skipped"}}')
+        old = os.path.join(self.tmp, "old-ci-gate.sh")
+        open(old, "w").write("#!/bin/sh\necho 'fail: policy is skipped'\necho 'fail: tests is skipped'\nexit 1\n")
+        os.chmod(old, 0o755)
+        env = dict(os.environ, NEEDS=needs)
+        old_run = subprocess.run([old], env=env, text=True, capture_output=True)
+        self.assertEqual(old_run.returncode, 1, old_run.stdout)
+        self.assertIn("policy is skipped", old_run.stdout)
+        new_run = subprocess.run([os.path.join(ROOT, "scripts", "ci-gate.sh")], env=env, text=True, capture_output=True)
+        self.assertEqual(new_run.returncode, 0, new_run.stdout + new_run.stderr)
+        self.assertIn("CI passed", new_run.stdout)
+
+    def test_red_base_tells_how_to_leave_it(self):
+        script = r"""
+source scripts/tests/phase_start_common.sh
+spec seven.md 7
+export PHASE_START_CI_WAIT=2 PHASE_START_CI_POLL=1
+set +e
+env FAKE_BASE_CI=red sh -c "cd '$repo' && scripts/phase-start.sh 7 --no-check" >"$TMP/red.out" 2>&1
+rc=$?
+set -e
+printf 'RC:%s\n' "$rc"
+cat "$TMP/red.out"
+"""
+        r = subprocess.run(["bash", "-c", script], cwd=ROOT, text=True, capture_output=True)
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        self.assertIn("RC:1", r.stdout)
+        self.assertIn("nothing was created", r.stdout)
+        self.assertIn("empty commit", r.stdout)
+        self.assertIn("actions/runs/3", r.stdout)
+
 
 if __name__ == "__main__":
     unittest.main(verbosity=0)

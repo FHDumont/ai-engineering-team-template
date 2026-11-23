@@ -30,7 +30,10 @@
 #: the merged PR that holds the commit (gh api commits/<sha>/pulls) had CI green on its head
 #: with the same tree. ci.yml also runs on push to main, so a run of main that is still going is waited
 #: for (PHASE_START_CI_WAIT seconds, default 900; progress step "waiting for the CI of main"), even before the
-#: job CI exists (the workflow run of the commit counts); with no run there is nothing to wait for. The merge gate
+#: job CI exists (the workflow run of the commit counts); with no run there is nothing to wait for. A red
+#: check is not cleared by rerunning that run: it keeps the gate of the commit it checked out. Push a new
+#: commit on main (an empty commit is enough when there is nothing to generate) so the next run reads the
+#: gate of that commit. The merge gate
 #: already requires a green CI on main; the suite runs at the end (close-phase.sh
 #: --prepare) and in CI. The environment is checked by check-env.sh (tools and
 #: declared dependencies, no tests). A failure in the middle of the opening undoes
@@ -141,7 +144,7 @@ case "$ci" in
     else
       die "no check 'CI' on the base commit ${base:0:9} of main and ${pr}: no phase opens; wait for the run of main or start it (gh workflow run), then open again; nothing was created"
     fi ;;
-  *) die "check 'CI' of the base commit ${base:0:9} of main is ${ci%% *} (${ci#* }): no phase opens on a red or unfinished base; fix main or wait for the run, then open again; nothing was created" ;;
+  *) die "check 'CI' of the base commit ${base:0:9} of main is ${ci%% *} (${ci#* }): no phase opens on a red or unfinished base; rerunning that run keeps the gate of the commit it checked out. Push a new commit on main (an empty commit is enough when there is nothing to generate) so the next run reads the gate of that commit; nothing was created" ;;
 esac
 
 # Everything is checked before anything opens: issue open and spec (new-phase.sh --dry-run), then the pair.

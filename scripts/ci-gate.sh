@@ -13,8 +13,11 @@
 #: `code` only waives lint when it is exactly "false": a missing output proves
 #: nothing and requires lint. A required job must succeed in this
 #: run (skipped, cancelled or failed fails the gate). CI only runs on code
-#: events (opened, synchronize, reopened, ready_for_review). The workflow reads
-#: this script from the base commit of the PR. Exits 1 on failure.
+#: events (opened, synchronize, reopened, ready_for_review). On a pull request
+#: the workflow reads this script from the base commit. On push to main it reads
+#: this script from github.sha, the commit that carries the workflow: the previous
+#: main may still have a gate that requires policy and tests and fails the push.
+#: Exits 1 on failure.
 set -euo pipefail
 HERE="$(cd "$(dirname "$0")" && pwd)"
 # shellcheck source=scripts/lib/common.sh
