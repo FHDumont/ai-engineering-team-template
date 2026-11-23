@@ -37,14 +37,20 @@ assert_contains "$(last_output)" "triage" "names the missing weight"
 sed 's/^light.*/light	sonnet	huge/' "$SCRIPTS/lib/weights.tsv" >"$TMP/s/lib/weights.tsv"
 assert_status 1 "an unknown effort is refused" "$TMP/s/weights.sh" --check
 
-# No agent or skill names a model or fixes a pair in its front matter.
-for f in "$REPO"/.claude/agents/*.md "$REPO"/.claude/skills/*/*.md; do
-  name="${f#"$REPO"/}"
-  assert_eq "" "$(grep -nwiE 'opus|sonnet|haiku|fable' "$f" || true)" "$name names no model"
-done
-for f in "$REPO"/.claude/agents/*.md; do
-  assert_eq "" "$(grep -nE '^(model|effort):' "$f" || true)" "${f#"$REPO"/} fixes no pair in the front matter"
-done
+# No method agent or skill names a model or fixes a pair in its front matter.
+# A project agent added beside them is outside the method list and is not scanned.
+while IFS= read -r rel; do
+  case "$rel" in
+    .claude/agents/*.md|.claude/skills/*/SKILL.md|.claude/skills/*/*.md) ;;
+    *) continue ;;
+  esac
+  [ -f "$REPO/$rel" ] || continue
+  assert_eq "" "$(grep -nwiE 'opus|sonnet|haiku|fable' "$REPO/$rel" || true)" "$rel names no model"
+  case "$rel" in
+    .claude/agents/*.md)
+      assert_eq "" "$(grep -nE '^(model|effort):' "$REPO/$rel" || true)" "$rel fixes no pair in the front matter" ;;
+  esac
+done < <(method_paths)
 close="$(cat "$REPO/.claude/skills/close-phase/SKILL.md")"
 assert_contains "$close" "scripts/weights.sh reviewer" "close-phase takes the reviewer pair from the file"
 assert_contains "$(cat "$REPO/.claude/skills/triage/SKILL.md")" "scripts/weights.sh triage" "triage takes its pair from the file"

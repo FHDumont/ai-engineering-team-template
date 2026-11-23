@@ -4,7 +4,11 @@
 set -euo pipefail
 
 TESTS_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-REPO="$(cd "$TESTS_DIR/../.." && pwd)"
+# template/ is one level deeper; its tests still see the repository root.
+case "$TESTS_DIR" in
+  */template) REPO="$(cd "$TESTS_DIR/../../.." && pwd)" ;;
+  *) REPO="$(cd "$TESTS_DIR/../.." && pwd)" ;;
+esac
 # shellcheck disable=SC2034  # used by the tests that load this file
 SCRIPTS="$REPO/scripts"
 TMP="$(cd "$(mktemp -d "${TMPDIR:-/tmp}/tmp.XXXXXXXX")" && pwd -P)"
@@ -35,6 +39,63 @@ trap 'exit 143' TERM
 export PROCESS_EVENTS_FILE="$TMP/events.jsonl"
 # No test depends on the bots of this repository: every one reads the fixture.
 export BOTS_FILE="$TESTS_DIR/fixtures/bots.tsv"
+
+# Paths the suite may scan (#99). Project code outside this list is invisible to it.
+# scripts/tests/template holds checks that exist only in this template and is excluded.
+method_paths() {
+  cat <<'EOF'
+AGENTS.md
+CLAUDE.md
+CONTEXT.md
+.claude/agents/triage.md
+.claude/agents/close-reviewer.md
+.claude/skills/triage/SKILL.md
+.claude/skills/plan/SKILL.md
+.claude/skills/execute/SKILL.md
+.claude/skills/close-phase/SKILL.md
+.claude/skills/integrate/SKILL.md
+.claude/skills/integrate/integration.md
+.claude/skills/ask-bot/SKILL.md
+.claude/skills/setup/SKILL.md
+.claude/hooks
+.claude/commands
+.claude/settings.json
+.cursor
+.githooks
+.github/ISSUE_TEMPLATE
+.github/pull_request_template.md
+.github/labels.tsv
+.github/sensitive-paths
+.github/required-checks
+.github/headless
+.github/workflows/ci.yml
+.github/workflows/issues-label.yml
+docs/process-design.md
+docs/BOTS.md
+docs/STATE.md
+docs/adr
+docs/diagrams
+docs/repo-notes.md
+scripts
+EOF
+}
+# method_existing <repo>: those paths that exist, one per line.
+method_existing() {
+  local root="$1" p
+  while IFS= read -r p; do
+    [ -n "$p" ] && [ -e "$root/$p" ] && printf '%s\n' "$p"
+  done < <(method_paths)
+}
+# method_grep <repo> <git grep options and pattern>: search only the method paths.
+method_grep() {
+  local root="$1" p paths=()
+  shift
+  while IFS= read -r p; do
+    [ -n "$p" ] && paths+=("$p")
+  done < <(method_existing "$root")
+  [ "${#paths[@]}" -gt 0 ] || return 0
+  git -C "$root" grep "$@" -- "${paths[@]}" ':!scripts/tests/template'
+}
 # The time limit of the tests comes from the real machine-limits.env (issue #71): only
 # these two values are read, before the folder is swapped, and nothing is created there.
 for _v in AI_METHOD_TEST_TIMEOUT_SECONDS AI_METHOD_WARN_LOAD1; do

@@ -49,7 +49,7 @@ assert_contains "$integration" "só espera" "integration says integrate-parallel
 # Deploy: one path, scripts/deploy.sh by the main session; no text sends the phase or
 # close-phase.sh --merge to dispatch it.
 for name in .claude/skills/close-phase/SKILL.md .claude/skills/integrate/SKILL.md .claude/skills/integrate/integration.md \
-  docs/process-design.md docs/STATE.md app/README.md; do
+  docs/process-design.md docs/STATE.md; do
   text="$(cat "$REPO/$name")"
   assert_contains "$text" "deploy.sh" "$name names deploy.sh for the deploy"
   assert_not_contains "$text" "dispara na fase solo" "$name has no deploy by the solo phase"
@@ -153,12 +153,23 @@ assert_contains "$hb" "a cada 4 minutos" "the design gives the interval of the h
 was=8
 # ROADMAP.md and CHANGELOG.md are generated from issue titles, not heartbeat text: a title
 # with the old number and minutes (#44 had one) must not fail the suite.
-old_interval_in() { (cd "$1" && git grep -n -I --untracked -E "$was min|$was minutes|[*]/$was|every $was" -- . ':!ROADMAP.md' ':!CHANGELOG.md' || true); }
+old_interval_in() {
+  local root="$1" scope="."
+  # A method checkout is scanned only on method paths. A tiny fixture (no scripts/)
+  # is scanned whole, still skipping the generated files.
+  if [ -e "$root/scripts" ] || [ -e "$root/AGENTS.md" ]; then
+    scope="$(method_existing "$root" | tr '\n' ' ') :!scripts/tests/template"
+  fi
+  # shellcheck disable=SC2086
+  (cd "$root" && git grep -n -I --untracked -E "$was min|$was minutes|[*]/$was|every $was" -- $scope ':!ROADMAP.md' ':!CHANGELOG.md' || true)
+}
 assert_eq "" "$(old_interval_in "$REPO")" "no file keeps the old interval of the heartbeat"
 # An untracked file with the old interval is visible before it is committed (#117).
-printf 'a cada %s minutos\n' "$was" >"$REPO/untracked-interval.md"
-assert_contains "$(old_interval_in "$REPO")" "untracked-interval.md" "an untracked file with the old interval is found"
-rm -f "$REPO/untracked-interval.md"
+printf 'a cada %s minutos\n' "$was" >"$REPO/scripts/untracked-interval.md"
+printf 'a cada %s minutos\n' "$was" >"$REPO/not-method-interval.md"
+assert_contains "$(old_interval_in "$REPO")" "scripts/untracked-interval.md" "an untracked method file with the old interval is found"
+assert_eq "" "$(old_interval_in "$REPO" | grep not-method-interval.md || true)" "a file outside the method is not scanned"
+rm -f "$REPO/scripts/untracked-interval.md" "$REPO/not-method-interval.md"
 gen_repo="$(mktemp -d)"
 git -C "$gen_repo" init -q
 printf -- '- #44 Heartbeat every %s min\n' "$was" >"$gen_repo/ROADMAP.md"
@@ -250,7 +261,6 @@ assert_contains "$setup" "machine-limits.env" "setup shows the machine limits"
 assert_contains "$setup" "# setup: confirmed" "setup asks the machine limits only the first time on a machine"
 assert_contains "$setup" "AI_METHOD_SLOTS_FASE" "setup explains each machine limit"
 assert_contains "$setup" "over-target" "setup says the owner is called again only on over-target"
-assert_contains "$(cat "$REPO/README.md")" "meta de tempo" "the quick start mentions the time target"
 
 # Notes to the headless child (#74) and the cheap pre-review (#75).
 execute="$(cat "$REPO/.claude/skills/execute/SKILL.md")"
