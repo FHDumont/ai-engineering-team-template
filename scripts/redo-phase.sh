@@ -30,6 +30,8 @@ set -euo pipefail
 HERE="$(cd "$(dirname "$0")" && pwd)"
 # shellcheck source=scripts/lib/common.sh
 source "$HERE/lib/common.sh"
+# shellcheck source=scripts/lib/refs.sh
+source "$HERE/lib/refs.sh"
 ROOT="$(cd "$HERE/.." && pwd)"
 
 while [ $# -gt 0 ]; do
@@ -139,14 +141,22 @@ if [ -z "$new_pr" ]; then
   info="$(gh pr view "$old_pr" --repo "$repo" --json title,body,labels)"
   body_file="$(mktemp)"
   echo "$info" | jq -r '.body // ""' >"$body_file"
-  grep -qiE "(close[sd]?|fix(e[sd])?|resolve[sd]?) +#$issue([^0-9]|\$)" "$body_file" || printf '\nCloses #%s\n' "$issue" >>"$body_file"
+  if issue_kept_open "$issue" "$ROOT"; then
+    body_keep_open "$body_file" "$issue" "$ROOT"
+  else
+    grep -qiE "(close[sd]?|fix(e[sd])?|resolve[sd]?) +#$issue([^0-9]|\$)" "$body_file" || printf '\nCloses #%s\n' "$issue" >>"$body_file"
+  fi
   printf '\nRefaz o PR #%s sobre a main atualizada, por cherry-pick.\n' "$old_pr" >>"$body_file"
   args=(pr create --repo "$repo" --base main --head "$new" --title "$(echo "$info" | jq -r .title)" --body-file "$body_file")
   while IFS= read -r l; do [ -z "$l" ] || args+=(--label "$l"); done <<<"$(echo "$info" | jq -r '.labels[].name')"
   gh "${args[@]}" >/dev/null
   new_pr="$(gh pr list --repo "$repo" --head "$new" --state open --json number --jq '.[0].number // empty')"
   [ -n "$new_pr" ] || die "new PR for $new not read back"
-  echo "opened PR #$new_pr (Closes #$issue)"
+  if issue_kept_open "$issue" "$ROOT"; then
+    echo "opened PR #$new_pr (Refs #$issue)"
+  else
+    echo "opened PR #$new_pr (Closes #$issue)"
+  fi
 fi
 
 gh pr close "$old_pr" --repo "$repo" --comment "Refeito sobre a main atualizada no PR #$new_pr (branch \`$new\`, cherry-pick, sem push forçado)." >/dev/null
