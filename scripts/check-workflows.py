@@ -3,6 +3,11 @@
 
 Usage: check-workflows.py [file.yml ...]   (default: .github/workflows/*.yml)
 
+Only the method workflows are checked: ci.yml and the categories deploy,
+issues, release and bot. Any other file in the folder is an application
+workflow (scheduled jobs, image retention, a pull-request scan) and is
+skipped. A scan that must block the merge belongs in ci.yml.
+
 Rules: file name `ci.yml` or `<category>-<purpose>.yml` (categories deploy,
 issues, release, bot); top-level `name` and `run-name`; top-level
 `permissions: {}`; `concurrency` set; every job with `name`, `runs-on` and
@@ -148,12 +153,17 @@ def main(argv):
         return 0
     files = argv[1:] or sorted(glob.glob(".github/workflows/*.yml") + glob.glob(".github/workflows/*.yaml"))
     fail = 0
+    checked = []
     for f in files:
+        if not NAME_RE.match(os.path.basename(f)):
+            print("skip: %s is an application workflow (not checked)" % f)
+            continue
+        checked.append(f)
         for p in check(f):
             print("%s: %s" % (f, p))
             fail = 1
     if not fail:
-        print("ok: %d workflows follow the standard" % len(files))
+        print("ok: %d workflows follow the standard" % len(checked))
     return fail
 
 
