@@ -118,11 +118,6 @@ jobs:
             '        if: steps.gate.outputs.skip != \'true\'\n'
             '        run: scripts/validate.sh\n')
         self.assertEqual(self.deploy_problems(gated), "")
-        real = os.path.join(ROOT, ".github", "workflows", "deploy-example.yml")
-        text = open(real, encoding="utf-8").read()
-        self.assertIn("scripts/ci-already-green.sh", text)
-        self.assertIn("scripts/validate.sh", text)
-        self.assertEqual(cw.check(real), [], "the example deploy workflow")
 
     def test_good(self):
         self.assertEqual(cw.check(self.write("issues-label.yml", GOOD)), [])

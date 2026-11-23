@@ -14,6 +14,9 @@ class ExampleFileTests(unittest.TestCase):
         self.assertIn("workflow_dispatch", on)
         self.assertNotIn("\n  push", "\n" + on)
         self.assertNotIn("pull_request", on)
+        self.assertIn("scripts/ci-already-green.sh", text)
+        self.assertIn("scripts/validate.sh", text)
+        self.assertIn("steps.gate.outputs.skip", text)
 
     def test_app_readme_names_deploy(self):
         text = open(os.path.join(ROOT, "app", "README.md"), encoding="utf-8").read()
