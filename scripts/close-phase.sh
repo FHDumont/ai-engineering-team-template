@@ -660,6 +660,10 @@ merge() {
       echo "refused: PR #$n needs the owner's ok:$reasons"
       [ "$owner_ok" = 0 ] || echo "--owner-ok does not count: needs-owner-ok was not on PR #$n before this run"
       echo "ask the repo owner with a choice question that names this SHA, then rerun with --merge --owner-ok $sha"
+      unread="$(dirname "$(phase_trace_file "$ROOT" 2>/dev/null || true)")/reviewer-$sha.md"
+      if [ -f "$unread" ]; then
+        awk '/^### Não lido/{p=1} p && /^### / && !/^### Não lido/{exit} p' "$unread"
+      fi
       exit 5
     fi
     if [ "$owner_ok_sha" != "$sha" ]; then
