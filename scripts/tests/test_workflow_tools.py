@@ -1098,5 +1098,25 @@ class NoNewFactTests(unittest.TestCase):
             self.assertTrue(token in close or token in ci, token)
 
 
+class ApplicationWorkflowTests(unittest.TestCase):
+    def test_an_application_workflow_is_not_checked(self):
+        # Renovate, image retention and a scheduled scan stay out of the method (#103).
+        d = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, d)
+        os.makedirs(os.path.join(d, ".github", "workflows"))
+        path = os.path.join(d, ".github", "workflows", "renovate.yml")
+        with open(path, "w", encoding="utf-8") as fh:
+            fh.write("on: schedule\n")
+        old = os.getcwd()
+        os.chdir(d)
+        try:
+            rc = cw.main([])
+        finally:
+            os.chdir(old)
+        self.assertEqual(rc, 0)
+        # A method workflow with the same gap still fails.
+        self.assertTrue(cw.check(path))
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=0)

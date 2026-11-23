@@ -562,7 +562,7 @@ São duas ofertas opcionais, feitas uma vez pela skill `setup`, nunca em reposit
 
 ### 9.1 Padrão
 
-- Nome do arquivo: `ci.yml` para o CI único; para os outros, prefixo da categoria (`deploy-`, `issues-`, `release-`, `bot-`) mais a finalidade.
+- Nome do arquivo: `ci.yml` para o CI único; para os outros, prefixo da categoria (`deploy-`, `issues-`, `release-`, `bot-`) mais a finalidade. Workflow da aplicação (agendado, retenção de imagem, scan de pull request) não entra nesses prefixos: o `check-workflows.py` não o confere. Scan que deve barrar o merge vira job do `ci.yml`.
 - `name` legível em inglês, `run-name` que explica a execução, `name` em todo job e passo.
 - Conferido no CI pelo `actionlint` e pelo `scripts/check-workflows.py`.
 
