@@ -282,6 +282,8 @@ Todo script tem `--help`, um teste em `scripts/tests/` e saída curta em inglês
 | `scripts/check-workflows.py` | Padrão dos workflows (§9) além do `actionlint` | CI |
 | `scripts/check-attribution.sh` | Reprova assinatura de IA abrindo uma linha nos commits e no corpo do PR | CI `policy`, `close-phase.sh --merge`, `.githooks/commit-msg` |
 | `scripts/ci-gate.sh` | Decide o resultado do job `CI` a partir dos outros jobs (§9.2) | `ci.yml` |
+| `scripts/ci-already-green.sh` | Diz se o SHA ou a mesma árvore já tem CI verde; o deploy pula a suíte só nesse caso | `deploy-*.yml` |
+| `scripts/rerun-ci.sh` | Repete só o job falho de um run do `ci.yml` no HEAD do PR; recusa outro workflow | agente, no PR |
 | `scripts/archive-adr.sh` | Marca a ADR como substituída no índice e a move para `docs/adr/archive/` | agente que cria a ADR nova |
 | `scripts/search-history.sh` | Busca um termo na ordem da §7.1 e devolve lista curta com links | qualquer agente |
 | `scripts/ask-bot.sh` | Pergunta a um bot e espera a resposta (§5.1) | agentes |
