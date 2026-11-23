@@ -42,6 +42,6 @@ Código novo e o do método, comentários, identificadores, nomes de arquivos, l
 
 - Nunca commitar na `main`; cada fase tem branch e worktree (`scripts/phase-start.sh`).
 - Nunca `git add -A`, `git add .`, `git commit -a`; adicione arquivos pelo nome.
-- Merge só pelo portão (`CI` + `review/independent`) com `scripts/close-phase.sh --merge` (`--rebase`), nunca `--squash` ou `--admin`.
+- Merge só pelo portão (`CI` + `review/independent`) com `scripts/close-phase.sh --merge`, por rebase (o script faz), nunca `--squash` ou `--admin`.
 - Nunca `git push --force` nem `git reset --hard`.
 - Fim do grupo: skill `integrate`, pela principal.
