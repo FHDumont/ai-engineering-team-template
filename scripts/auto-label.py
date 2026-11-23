@@ -56,6 +56,30 @@ def known_labels():
     return names
 
 
+def area_rules():
+    """Sensitive areas and path areas. A repository file replaces the defaults.
+
+    .github/label-areas.tsv (or LABEL_AREAS_FILE), one rule per line:
+    kind, pattern and label, separated by tabs. kind is path or sensitive.
+    A label that is not in .github/labels.tsv is not applied.
+    """
+    path = os.environ.get("LABEL_AREAS_FILE") or os.path.join(ROOT, ".github", "label-areas.tsv")
+    if not os.path.isfile(path):
+        return SENSITIVE, PATH_AREAS
+    sensitive, paths = [], []
+    with open(path, encoding="utf-8") as f:
+        for line in f:
+            line = line.strip()
+            if not line or line.startswith("#"):
+                continue
+            kind, pattern, label = line.split("\t")
+            if kind == "sensitive":
+                sensitive.append((pattern, label))
+            elif kind == "path":
+                paths.append((pattern, label))
+    return sensitive, paths
+
+
 def first_match(rules, text):
     for pattern, label in rules:
         if re.search(pattern, text, re.I):
@@ -84,7 +108,7 @@ def compute(body, labels):
     clean = it.section_text(body)
     add.update(re.findall(r"\b((?:area|group):[a-z0-9-]+)", clean))
     areas_text = text.get("Arquivos ou áreas afetadas", "")
-    for rules in (SENSITIVE, PATH_AREAS):
+    for rules in area_rules():
         for pattern, label in rules:
             if re.search(pattern, areas_text, re.I):
                 add.add(label)

@@ -42,4 +42,12 @@ assert_status 0 "push to main passes with policy skipped and the tests skipped b
 assert_status 0 "push to main passes with the suite run on the sum" gate "$(needs_push true false false success success skipped skipped true)"
 assert_status 1 "push to main still fails when the tests fail" gate "$(needs_push true false false success failure skipped skipped true)"
 assert_status 1 "a PR still requires policy" gate "$(needs false false false skipped skipped skipped skipped false)"
+
+# A repository job listed in the extra-jobs file is required even when run_tests=false (#101).
+extra="$TMP/ci-extra-jobs"
+printf 'app-tests\n' >"$extra"
+waived="$(needs false false false skipped skipped skipped success false | jq -c '. + {"app-tests": {result: "skipped"}}')"
+assert_status 1 "an extra repo job skipped is not waived by run_tests=false" env CI_EXTRA_JOBS_FILE="$extra" NEEDS="$waived" "$GATE"
+green="$(needs false false false skipped skipped skipped success false | jq -c '. + {"app-tests": {result: "success"}}')"
+assert_status 0 "an extra repo job that succeeded passes" env CI_EXTRA_JOBS_FILE="$extra" NEEDS="$green" "$GATE"
 finish

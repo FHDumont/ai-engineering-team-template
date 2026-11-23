@@ -3,6 +3,7 @@
 import importlib.util
 import os
 import sys
+import tempfile
 import unittest
 
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -131,6 +132,27 @@ class AutoLabelTests(unittest.TestCase):
         sections = dict(FULL_FEATURE, **{"Arquivos ou áreas afetadas": "area:nao-existe"})
         r = auto_label.compute(body(**sections), ["type:feature"])
         self.assertNotIn("area:nao-existe", r["add"])
+
+    def test_area_rules_come_from_configuration(self):
+        # A repository maps its own paths without editing auto-label.py (#101).
+        handle = tempfile.NamedTemporaryFile("w", suffix=".tsv", delete=False, encoding="utf-8")
+        handle.write("path\tapps/\tarea:docs\n")
+        handle.write("sensitive\t\\bpagamento\\b\tarea:auth\n")
+        handle.close()
+        previous = os.environ.get("LABEL_AREAS_FILE")
+        os.environ["LABEL_AREAS_FILE"] = handle.name
+        try:
+            sections = dict(FULL_FEATURE, **{"Arquivos ou áreas afetadas": "apps/web e pagamento"})
+            r = auto_label.compute(body(**sections), ["type:feature"])
+            self.assertIn("area:docs", r["add"])
+            self.assertIn("area:auth", r["add"])
+            self.assertNotIn("area:scripts", r["add"])
+        finally:
+            os.unlink(handle.name)
+            if previous is None:
+                os.environ.pop("LABEL_AREAS_FILE", None)
+            else:
+                os.environ["LABEL_AREAS_FILE"] = previous
 
 
 if __name__ == "__main__":

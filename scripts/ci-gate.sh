@@ -11,7 +11,9 @@
 #: a missing output requires the tests). The other jobs follow the outputs:
 #:   lint <- code (everything that is not a doc); workflows <- workflows.
 #: `code` only waives lint when it is exactly "false": a missing output proves
-#: nothing and requires lint. A required job must succeed in this
+#: nothing and requires lint. Each job named in .github/ci-extra-jobs (one id
+#: per line, or CI_EXTRA_JOBS_FILE) must succeed in this run: run_tests=false
+#: does not waive it. A required job must succeed in this
 #: run (skipped, cancelled or failed fails the gate). CI only runs on code
 #: events (opened, synchronize, reopened, ready_for_review). On a pull request
 #: the workflow reads this script from the base commit. On push to main it reads
@@ -43,6 +45,16 @@ required="tests"
 [ "$(output run_tests)" != false ] || required=""
 [ "$(output code)" = false ] || required="lint $required"
 [ "$(output workflows)" = true ] && required="$required workflows"
+
+# Jobs of the repository (.github/ci-extra-jobs, or CI_EXTRA_JOBS_FILE): each
+# one must succeed in this run. run_tests=false does not waive them.
+extra_file="${CI_EXTRA_JOBS_FILE:-.github/ci-extra-jobs}"
+if [ -f "$extra_file" ]; then
+  while read -r job; do
+    case "$job" in ''|'#'*) continue ;; esac
+    required="$required $job"
+  done <"$extra_file"
+fi
 
 for job in $required; do
   check "$job"

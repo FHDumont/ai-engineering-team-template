@@ -248,7 +248,7 @@ No máximo 450 palavras (conferido pelo `check-docs.sh`). Uma linha por bot: slu
 
 ## 6. Scripts
 
-Todo script tem `--help`, um teste em `scripts/tests/` e saída curta em inglês. As regras da pasta estão em `scripts/CLAUDE.md`. A tabela lista todo arquivo de `scripts/`; o `check-docs.sh` confere.
+Todo script tem `--help`, um teste em `scripts/tests/` e saída curta em inglês. As regras da pasta estão em `scripts/CLAUDE.md`. A tabela lista os arquivos de `.github/method-files.txt` que ficam em `scripts/`; o `check-docs.sh` confere. Arquivo da aplicação na mesma pasta não entra no manifesto e não precisa da tabela.
 
 | Script | O que faz | Quem chama |
 |---|---|---|
@@ -333,7 +333,7 @@ Roda só na sessão filha; na sessão que abriu a fase, `--prepare`, `--publish-
 
 **Modelo de ameaça.** Os hooks do agente são salvaguarda contra engano, não barreira. A barreira é a proteção da `main` (`CI` + `review/independent`, vale para admin), os hooks do git e o deny do `.claude/settings.json`. Desvio de um hook por ofuscação deliberada é achado `size:small`.
 
-Os hooks do agente saem 2 quando barram; os do git saem 1. Todo hook tem teste. A tabela lista todo arquivo de `.claude/hooks/` e de `.githooks/`; o `check-docs.sh` confere e falha se um hook citado no `.claude/settings.json` não existe.
+Os hooks do agente saem 2 quando barram; os do git saem 1. Todo hook tem teste. A tabela lista os hooks de `.github/method-files.txt`; o `check-docs.sh` confere e falha se um hook citado no `.claude/settings.json` não existe. Hook da aplicação fora do manifesto não entra na tabela.
 
 | Hook | Evento | O que barra |
 |---|---|---|
@@ -476,6 +476,9 @@ A tabela é a árvore de arquivos do método. Caminho sem `<…>` precisa existi
 | `.github/sensitive-paths` | globs dos caminhos sensíveis (§10.3); o arquivo do repo só acrescenta |
 | `.github/required-checks` | checks extras exigidos na proteção; a atualização não apaga |
 | `.github/headless` | `on` liga a filha headless; a atualização não apaga |
+| `.github/method-files.txt` | arquivos do método que as tabelas de scripts e hooks listam; a aplicação não entra |
+| `.github/label-areas.tsv` | áreas por caminho e áreas sensíveis do `auto-label.py`; a atualização não apaga |
+| `.github/ci-extra-jobs` | jobs do repositório que o `ci-gate.sh` exige verdes; a atualização não apaga |
 | `.github/workflows/ci.yml` | o CI único (§9.2) |
 | `.github/workflows/issues-label.yml` | labels automáticas das issues |
 | `.github/workflows/deploy-<alvo>.yml` | deploy, só quando há app (§9.4) |
@@ -572,7 +575,7 @@ O arquivo é a fonte. Jobs: `changes`, `policy`, `lint`, `tests`, `workflows` e 
 | Gatilhos | `pull_request` (`opened`, `synchronize`, `reopened`, `ready_for_review`) e `push` na `main` (decisão da #59: a soma de PRs mergeados em sequência nunca tinha sido testada). O `push` ignora um commit que só muda `CHANGELOG.md` e `ROADMAP.md` (`paths-ignore`): não abre run. O `phase-start.sh` já aceita base sem check quando o PR mergeado tem a mesma árvore e `CI` verde, e aceita o check `CI` `completed/skipped` só nesse mesmo caso (PR vermelho ou árvore diferente recusa, inclusive no modo `pr`); o `end-check.sh` aceita base sem check quando algum PR mergeado contém o commit; o `close-phase.sh` lê o `CI` do SHA do PR, não o desse push. Na `main` o job `changes` pula `tests`, `lint` e `workflows` quando a árvore do commit é a do head de um PR mergeado cujo resultado mais novo de `CI` é sucesso e o de `Tests` é sucesso ou `skipped` (caso comum de um merge só), e o resumo do run diz `already tested in the PR`; o agregador `CI` não começa (`confirmed`), então os dois jobs mínimos viram um. `tests` também pula em doc inerte; só a soma sem árvore de PR roda a suíte. `policy` só roda em PR, e o `ci-gate.sh` não o exige quando a saída `event` é `push`. A rodada da `main` nunca é cancelada pela seguinte |
 | Um run por rodada | editar título, corpo e labels do PR não gera run. O corpo final é conferido pelo `close-phase.sh --merge` |
 | Filtro de mudanças | o job `changes` decide o que roda, por `git diff` da base ao HEAD. O gatilho de `push` usa `paths-ignore` só para `CHANGELOG.md` e `ROADMAP.md`; qualquer outro arquivo no push abre o run, para o `CI` reportar |
-| Jobs condicionais | filtro por exclusão: doc é arquivo em `docs/` e `.md` (fora os templates de issue); todo o resto é código e roda `lint`. O job `tests` pula (`run_tests=false`) em duas situações, sem perguntar ao dono (decisão da #39): só mudou doc inerte (`docs/` exceto `process-design.md`, `.md` da raiz exceto `AGENTS.md` e `CLAUDE.md`, e os gerados `CHANGELOG.md` e `ROADMAP.md`, que nenhum teste lê), ou o código não mudou desde um commit do PR cujo resultado mais novo de `Tests` é sucesso (olha até 15 commits; só `skipped` olha um commit mais antigo; falha, cancelado, estouro ou pendente fazem rodar, e sucesso antigo não cobre um commit mais novo). Skills, scripts, hooks, workflows e app nunca são inertes. O `ci-gate.sh` exige `tests` salvo com `run_tests` exatamente `false`; `lint` só é dispensado com `code` exatamente `false` |
+| Jobs condicionais | filtro por exclusão: doc é arquivo em `docs/` e `.md` (fora os templates de issue); todo o resto é código e roda `lint`. O job `tests` pula (`run_tests=false`) em duas situações, sem perguntar ao dono (decisão da #39): só mudou doc inerte (`docs/` exceto `process-design.md`, `.md` da raiz exceto `AGENTS.md` e `CLAUDE.md`, e os gerados `CHANGELOG.md` e `ROADMAP.md`, que nenhum teste lê), ou o código não mudou desde um commit do PR cujo resultado mais novo de `Tests` é sucesso (olha até 15 commits; só `skipped` olha um commit mais antigo; falha, cancelado, estouro ou pendente fazem rodar, e sucesso antigo não cobre um commit mais novo). Skills, scripts, hooks, workflows e app nunca são inertes. O `ci-gate.sh` exige `tests` salvo com `run_tests` exatamente `false`; `lint` só é dispensado com `code` exatamente `false`. Cada job de `.github/ci-extra-jobs` tem de terminar `success` neste run: `run_tests=false` não o dispensa, e `skipped` reprova |
 | `policy` | sempre roda: assinatura de IA nos commits e no corpo do PR, `.github/sensitive-paths` → label `needs-owner-ok`, `check-docs.sh` (o da base, sobre os docs do PR) |
 | Verificadores da base | `ci-gate.sh`, `check-attribution.sh`, `check-docs.sh`, `sensitive_paths.py` e `.github/sensitive-paths` são lidos do commit base do PR: o PR não enfraquece a checagem que o julga |
 | Agregador | o job `CI`, com `if: always()` salvo quando `confirmed` é `true`, é o único check exigido além de `review/independent`; falha se um job necessário falhou ou foi pulado sem motivo |
