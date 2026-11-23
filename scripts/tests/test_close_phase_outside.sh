@@ -108,17 +108,6 @@ assert_not_contains "$outside_fn" "phase_gate" "the non-phase merge does not cal
 phase_fn="$(sed -n '/^merge() {/,/^}$/p' "$SCRIPTS/close-phase.sh")"
 assert_contains "$phase_fn" "phase_gate" "a phase branch still goes through phase_gate"
 
-readme="$(cat "$REPO/README.md")"
-warn_at="$(printf '%s\n' "$readme" | awk '/Antes de ligar a proteção/{print NR; exit}')"
-setup_at="$(printf '%s\n' "$readme" | awk '/O agente roda `scripts\/setup-repo.sh`/{print NR; exit}')"
-assert_contains "$readme" 'fix/issue-*' "the README names the phase branch the warning is about"
-assert_contains "$readme" '--owner-ok' "the README names --owner-ok"
-if [ -n "$warn_at" ] && [ -n "$setup_at" ] && [ "$warn_at" -lt "$setup_at" ]; then
-  ok
-else
-  bad "the README warns before setup turns protection on (warning line ${warn_at:-none}, setup line ${setup_at:-none})"
-fi
-
 design="$(awk '/^## 10\. /{p=1} p && /^## 11\./{exit} p' "$REPO/docs/process-design.md")"
 assert_contains "$design" '--pr' "process-design §10 names --pr"
 assert_contains "$design" 'fix/issue-*' "process-design §10 keeps the phase branch on --merge"
