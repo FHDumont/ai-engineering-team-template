@@ -11,6 +11,7 @@ O pedido traz a issue, o PR, o comando dos testes, o número da rodada e, da 2ª
 0. **Pré-revisão** (o pedido diz "pré-revisão"): leia só a issue e o diff local (`git diff origin/main...HEAD`); não rode testes, não consulte CI, não publique nada. Aponte só o que bloquearia (grave ou médio no escopo), no formato abaixo com "Testes: não rodados (pré-revisão)"; a rodada oficial vem depois, inalterada.
 1. Leia a issue: `gh issue view <n>`. Extraia o "Pronto quando" e o escopo.
 2. Rodada 1: leia o diff completo (`gh pr diff <pr>`) e os arquivos que precisar. Rodada N+1: leia só o diff desde a revisão N (`git diff <sha-anterior>..HEAD`) e procure só as regressões que ele causou; não reabra o que já foi aprovado.
+2a. PR que atualiza o método (`.github/method-origin` no repo): rode `scripts/method-diff.sh --template <checkout do template>`. Leia por inteiro cada arquivo `adapted`. Entre os `identical` que não existiam na base, leia os que encerram processo, apagam, mudam permissão ou chamam a rede. O resto dos idênticos pode ficar de fora. A seção "Não lido" lista o que você não leu, com o motivo (idêntico sem esses efeitos, ou só do repo).
 3. Testes: não rode `scripts/validate.sh` de novo no mesmo SHA da CI. Leia o check pela API: `gh api repos/{owner}/{repo}/commits/<sha>/check-runs --jq '.check_runs[] | select(.name=="Tests") | {status,conclusion,html_url}'` (`<sha>` é o HEAD do PR). Check `Tests` em andamento (`queued`, `in_progress`, `waiting`, `pending` ou `requested`): espere ele terminar e leia o resultado; não rode a suíte local enquanto ele roda. E só rode a suíte se o check `Tests` faltar ou falhar (ausente, ou `conclusion` diferente de `success`). Check `success`: anexe a conclusão e o link do run no lugar do resumo. Rode sempre o comando extra que vier no pedido. Quando rodar, anexe o resumo da saída. Rodada N+1 cujo diff desde a rodada N só toca `docs/` ou `*.md` fora de `AGENTS.md` e das skills: não rode a suíte de novo, diga que o diff é só doc e anexe o resumo da rodada anterior.
 4. Confira: cada item do "Pronto quando" tem evidência no diff ou nos testes; regras do `AGENTS.md` (idioma, sem assinatura de IA, git); segurança e áreas sensíveis; testes que provam o que dizem.
 4a. Checklist §2.1: (1) prova do vermelho no PR; (2) suposição não registrada; (3) diff fora do escopo da spec; (4) abstração sem uso atual; (5) remoção sem justificativa.
@@ -36,6 +37,9 @@ Modelo do revisor: <modelo> · esforço: <esforço>
 
 ### Achados leves (não bloqueiam)
 - arquivo:linha — o que é (ou "nenhum")
+
+### Não lido
+- caminho — por que não foi lido (ou "nenhum")
 
 ### Notas (critério sem prova possível na sessão; não bloqueia)
 - item do "Pronto quando" — por que não dá para provar aqui (ou "nenhuma")
