@@ -25,6 +25,20 @@ done
 assert_contains "$adopt" "deploy-example.yml" "the chapter says deploy-example.yml is not copied"
 assert_contains "$adopt" "docs/specs/" "the chapter says docs/specs/ is not copied"
 assert_contains "$adopt" "CHANGELOG.md" "the chapter says CHANGELOG.md is not copied"
+assert_contains "$adopt" "git worktree add" "adoption uses a worktree"
+assert_not_contains "$adopt" "git switch -c" "adoption does not switch the main checkout"
+assert_contains "$adopt" "não apague" "adoption does not wipe an existing glossary"
+assert_contains "$adopt" "CONTEXT.md" "adoption names the glossary"
+assert_contains "$adopt" "compartilhad" "adoption warns that the hook path is shared by every worktree"
+assert_contains "$adopt" ".process/" "adoption warns where the trace is written"
+assert_contains "$adopt" "pendências" "adoption migrates open items from the old process"
+assert_contains "$adopt" "código que já existe" "the language rule does not rewrite existing code"
+assert_contains "$adopt" "script do método" "the owner-runs-scripts rule is about the method"
+assert_contains "$adopt" "repositório privado" "a private repo is told the CI cost before taking ci.yml"
+assert_contains "$adopt" "recusar" "the chapter says what happens when the owner refuses CI on main"
+assert_contains "$adopt" "só nos pull requests" "refusal keeps CI on pull requests"
+assert_contains "$(cat "$REPO/docs/process-design.md")" "código que já existe" "the design does not rewrite existing code"
+assert_contains "$(cat "$REPO/docs/process-design.md")" "script do método" "the design scopes the owner rule to the method"
 
 # Every `code span` that is a path or a script command must exist here.
 check_spans() { # check_spans <text>
