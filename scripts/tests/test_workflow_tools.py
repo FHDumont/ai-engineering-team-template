@@ -580,16 +580,58 @@ esac
         self.assertIn("fail: lint", r.stdout)
 
     def test_base_checkouts(self):
-        # policy and ci check the base commit out at base/, after the PR checkout.
+        # policy checks the base of the PR out at base/. On push, ci checks out
+        # github.sha: github.event.before is the previous main, which has no
+        # verifiers on the adoption push and an old gate on an update.
         wf = cw.load(os.path.join(ROOT, ".github", "workflows", "ci.yml"))
         for job in ("policy", "ci"):
             steps = wf["jobs"][job]["steps"]
             base = [s for s in steps if (s.get("with") or {}).get("path") == "base"]
             self.assertEqual(len(base), 1, job)
             want = "${{ github.event.pull_request.base.sha }}" if job == "policy" else \
-                "${{ github.event.pull_request.base.sha || github.event.before }}"
+                "${{ github.event.pull_request.base.sha || github.sha }}"
             self.assertEqual(base[0]["with"]["ref"], want, job)
+            self.assertNotIn("github.event.before", base[0]["with"]["ref"])
             self.assertFalse(base[0]["with"].get("persist-credentials", True), job)
+
+    def test_first_ci_uses_the_gate_of_this_commit_when_the_base_has_none(self):
+        # Adoption PR: the base commit has no ci-gate.sh. The gate of this commit
+        # still fails a red lint; a missing file must not skip the gate.
+        self.commit({"scripts/ci-gate.sh": open(os.path.join(ROOT, "scripts", "ci-gate.sh")).read(),
+                     "scripts/lib/common.sh": open(os.path.join(ROOT, "scripts", "lib", "common.sh")).read()})
+        os.chmod(os.path.join(self.repo, "scripts", "ci-gate.sh"), 0o755)
+        head = git(self.repo, "rev-parse", "HEAD")
+        needs = ('{"changes": {"result": "success", "outputs": {"code": "true"}}, '
+                 '"policy": {"result": "success"}, "lint": {"result": "failure"}, '
+                 '"tests": {"result": "success"}, "workflows": {"result": "skipped"}}')
+        r = self.run_step("ci", "Aggregate required jobs", head, {"NEEDS": needs})
+        self.assertEqual(r.returncode, 1, r.stdout + r.stderr)
+        self.assertIn("fail: lint", r.stdout)
+        self.assertIn("first CI", r.stdout)
+
+    def test_policy_does_not_run_pr_checkers_when_the_base_has_no_method(self):
+        # The policy job holds pull-requests: write. When the base has no method,
+        # the checkers of the pull request must not run in that job.
+        marker = os.path.join(self.tmp, "pr-checker-ran")
+        head = self.commit({
+            "scripts/check-docs.sh": "#!/bin/sh\necho docs >>%s\nexit 1\n" % marker,
+            "scripts/check-attribution.sh": "#!/bin/sh\necho attr >>%s\nexit 1\n" % marker,
+            "scripts/lib/sensitive_paths.py":
+                "import pathlib,sys\npathlib.Path(%r).write_text('paths')\nsys.exit(1)\n" % marker,
+        })
+        for name, extra in (
+            ("Check docs limits", {}),
+            ("Check AI attribution in commits and PR body", {"PR_BODY": "body\n"}),
+            ("Label sensitive paths with needs-owner-ok", {}),
+        ):
+            env = {}
+            if name.startswith("Label"):
+                env, _log = self.fake_gh()
+            env.update(extra)
+            r = self.run_step("policy", name, head, env)
+            self.assertEqual(r.returncode, 0, name + "\n" + r.stdout + r.stderr)
+            self.assertIn("write token", r.stdout, name)
+        self.assertFalse(os.path.exists(marker), "a checker from the pull request ran")
 
 
 if __name__ == "__main__":

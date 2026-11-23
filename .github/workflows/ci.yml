@@ -11,7 +11,13 @@
 # scripts/check-attribution.sh, scripts/check-docs.sh,
 # scripts/lib/sensitive_paths.py and .github/sensitive-paths) are read from the
 # base commit of the PR, checked out at base/: a PR cannot weaken the check
-# that judges it.
+# that judges it. On push to main the gate is read from github.sha (the commit
+# that carries this workflow). github.event.before is the previous main: the
+# adoption push has no verifiers there, and an update still has the old gate.
+# The first CI, when the base has no method, does not run the pull request's
+# checkers in the policy job (that job holds pull-requests: write). The
+# aggregator falls back to the gate of this commit only when base/scripts/ci-gate.sh
+# is absent.
 name: "CI"
 run-name: "CI · ${{ github.event_name == 'push' && format('main · {0}', github.event.head_commit.message) || format('PR #{0} · {1}', github.event.pull_request.number, github.event.pull_request.title) }}"
 
@@ -170,6 +176,10 @@ jobs:
           HEAD_SHA: ${{ github.event.pull_request.head.sha }}
           PR_BODY: ${{ github.event.pull_request.body }}
         run: |
+          if [ ! -f base/scripts/check-attribution.sh ]; then
+            echo "ok: base has no attribution checker (first CI); the checker of the pull request is not run beside the write token"
+            exit 0
+          fi
           printf '%s\n' "$PR_BODY" >"$RUNNER_TEMP/pr-body.md"
           base="$(git merge-base "$BASE_SHA" "$HEAD_SHA")"
           base/scripts/check-attribution.sh --range "$base..$HEAD_SHA" --text-file "$RUNNER_TEMP/pr-body.md"
@@ -180,6 +190,10 @@ jobs:
           HEAD_SHA: ${{ github.event.pull_request.head.sha }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
         run: |
+          if [ ! -f base/scripts/lib/sensitive_paths.py ]; then
+            echo "ok: base has no sensitive-path checker (first CI); the checker of the pull request is not run beside the write token"
+            exit 0
+          fi
           touched="$(git diff --name-only --no-renames -z "$BASE_SHA...$HEAD_SHA" | python3 base/scripts/lib/sensitive_paths.py base/.github/sensitive-paths)"
           if [ -n "$touched" ]; then
             echo "sensitive paths:"; echo "$touched"
@@ -190,7 +204,12 @@ jobs:
           fi
       # The checker of the base judges the docs of the PR.
       - name: "Check docs limits"
-        run: REPO_ROOT="$PWD" base/scripts/check-docs.sh
+        run: |
+          if [ ! -f base/scripts/check-docs.sh ]; then
+            echo "ok: base has no docs checker (first CI); the checker of the pull request is not run beside the write token"
+            exit 0
+          fi
+          REPO_ROOT="$PWD" base/scripts/check-docs.sh
 
   lint:
     name: "Lint"
@@ -278,14 +297,24 @@ jobs:
     permissions:
       contents: read
     steps:
+      - name: "Checkout"
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
       - name: "Checkout the gate from the base"
         uses: actions/checkout@v4
         with:
-          ref: ${{ github.event.pull_request.base.sha || github.event.before }}
+          ref: ${{ github.event.pull_request.base.sha || github.sha }}
           path: base
           persist-credentials: false
           sparse-checkout: scripts
       - name: "Aggregate required jobs"
         env:
           NEEDS: ${{ toJSON(needs) }}
-        run: base/scripts/ci-gate.sh
+        run: |
+          if [ -f base/scripts/ci-gate.sh ]; then
+            base/scripts/ci-gate.sh
+          else
+            echo "ok: base has no ci-gate.sh (first CI); using the gate of this commit"
+            scripts/ci-gate.sh
+          fi
