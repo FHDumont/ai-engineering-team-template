@@ -3,7 +3,7 @@
 #:
 #: Usage: sessions.sh --list | --stale | --close-idle [--older-than <hours>] [--under <dir>] [--dry-run]
 #:
-#: --list: one line per claude process: repository, kind (app = child of the
+#: --list: one line per claude process (not the app helper Helpers/disclaimer): repository, kind (app = child of the
 #:   Claude.app, headless = "claude -p"), pid, age, CPU %, RAM MB and the MCPs it
 #:   holds (its descendants: count and RAM MB).
 #: --stale: sessions of this repository the app still shows as not archived and
@@ -65,6 +65,8 @@ claude_rows() {
   ps -axo pid=,etime=,pcpu=,rss=,command= | while read -r pid et cpu rss cmd; do
     [ "$pid" != "$$" ] || continue
     printf '%s\n' "$cmd" | stdin_grep -Eq '(^|[ /])claude( |$)' || continue
+    # The app helper (…/Helpers/disclaimer … -- …/claude) is not a session.
+    printf '%s\n' "$cmd" | stdin_grep -q 'Helpers/disclaimer' && continue
     case "$cmd" in *"mcp "*|*"--mcp"*) continue ;; esac
     if proc_in_app "$pid"; then kind=app
     elif printf '%s\n' "$cmd" | stdin_grep -Eq ' (-p|--print)( |$)'; then kind=headless
