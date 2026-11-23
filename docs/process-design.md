@@ -146,7 +146,7 @@ Diagrama das raias: [`docs/diagrams/process-flow.html`](diagrams/process-flow.ht
    - `end:auto-close`: a filha segue direto para o fecho.
    - `end:lab-test`: a filha para antes do fecho com `status.sh --state esperando --need "testar no lab …"`. O dono testa, itera pela sessão principal e diz "fechar fase". "Fechar fase" vale dito em qualquer sessão; quem fecha é a sessão da fase.
 9. **Fecho.** A filha fecha pelo `scripts/close-phase.sh` (§6.1), com a revisão independente (§10.2) e o merge pelo portão (§10).
-10. **Fim do grupo.** Depois do último merge do grupo, solo e paralelo, a sessão principal faz o passo único de fim, uma vez. Os passos e a ordem estão na skill `integrate`: `scripts/gen-docs.sh`, `scripts/deploy.sh`, arquivamento das sessões filhas, remoção do batimento (§4.3), `scripts/end-check.sh`. A spec do grupo sai da `main` aqui: o PR do `gen-docs.sh` remove cada spec de `docs/specs/` cujas issues citadas estão todas fechadas, a que o fecho das fases (§6.1) deixou.
+10. **Fim do grupo.** Depois do último merge do grupo, solo e paralelo, a sessão principal faz o passo único de fim, uma vez. Os passos e a ordem estão na skill `integrate`: meta de tempo e achados leves, depois `scripts/gen-docs.sh`, `scripts/deploy.sh`, arquivamento das sessões filhas, remoção do batimento (§4.3), `scripts/end-check.sh`. Nada que muda o roadmap acontece depois do `gen-docs.sh`. A spec do grupo sai da `main` aqui: o PR do `gen-docs.sh` remove cada spec de `docs/specs/` cujas issues citadas estão todas fechadas, a que o fecho das fases (§6.1) deixou.
 
 Espera acima de ~2 minutos: diga o que espera e onde (o run, o PR).
 
