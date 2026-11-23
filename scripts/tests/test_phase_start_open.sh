@@ -92,6 +92,10 @@ assert_contains "$out" 'No way to read it: replace na sessão "TITULO" with na s
 assert_contains "$out" "A child session not started yet (its card was not clicked): nothing to do for it" "the heartbeat covers the card not clicked yet"
 assert_contains "$out" "Write to the owner only when something changed since the last heartbeat" "the heartbeat writes only on change"
 assert_contains "$out" 'The same state as the last heartbeat (same phases, same states, same "Você precisa"): end the turn with no message to the owner and without the scripts/status.sh block' "the heartbeat is silent when the state is the same"
+assert_contains "$out" "The only accepted reply when nothing changed is an empty turn" "the heartbeat names the minimum reply when nothing changed"
+assert_contains "$out" 'not even "Sem mudança."' "the heartbeat refuses a sentence that only says nothing changed"
+assert_contains "$out" "When every open phase is only waiting for the owner, delete this heartbeat" "the heartbeat is deleted while every phase waits for the owner"
+assert_contains "$out" "When a phase is working again, create this same heartbeat if it is gone" "the heartbeat comes back when a phase works again"
 assert_contains "$out" "every 4 minutes" "gives the interval of the heartbeat"
 assert_contains "$out" 'cron "*/4 * * * *"' "gives the cron of the heartbeat"
 # An end-step action denied by the app: the heartbeat text sends it to a choice
