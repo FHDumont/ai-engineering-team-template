@@ -24,6 +24,8 @@ run-name: "CI · ${{ github.event_name == 'push' && format('main · {0}', github
 on:
   pull_request:
     types: [opened, synchronize, reopened, ready_for_review]
+  # Public template: CI also runs on push to main. A repository that refuses
+  # those minutes records `pr` in .github/ci-mode and deletes this push trigger.
   push:
     branches: [main]
 
@@ -286,6 +288,8 @@ jobs:
       - name: "Run actionlint"
         run: actionlint -color
       - name: "Check workflow standard"
+        env:
+          PROCESS_CI_MODE: ${{ vars.PROCESS_CI_MODE }}
         run: python3 scripts/check-workflows.py
 
   ci:

@@ -28,7 +28,10 @@
 #: nothing, when it is red, absent or still running past the deadline, naming the run (a failure of the
 #: GitHub API reading the check is reported as such, with its error, not as absent). Absent is accepted when
 #: the merged PR that holds the commit (gh api commits/<sha>/pulls) had CI green on its head
-#: with the same tree. ci.yml also runs on push to main, so a run of main that is still going is waited
+#: with the same tree. Record `pr` in .github/ci-mode (one line; else the repository
+#: variable PROCESS_CI_MODE) to keep CI on pull requests only: a base with no check
+#: is then accepted when the merged PR that contains it had CI green, with a warning
+#: when the tree differs, and a red base stays refused. ci.yml also runs on push to main, so a run of main that is still going is waited
 #: for (PHASE_START_CI_WAIT seconds, default 900; progress step "waiting for the CI of main"), even before the
 #: job CI exists (the workflow run of the commit counts); with no run there is nothing to wait for. A red
 #: check is not cleared by rerunning that run: it keeps the gate of the commit it checked out. Push a new
@@ -71,6 +74,22 @@ progress_step "checking the setup of the repo"
 main_root="$(git worktree list --porcelain | sed -n '1s/^worktree //p')"
 cd "$main_root"
 
+# push: CI on main (the public template). pr: recorded in .github/ci-mode, else PROCESS_CI_MODE.
+ci_mode=""
+if [ -f .github/ci-mode ]; then
+  ci_mode="$(tr -d '[:space:]' < .github/ci-mode)"
+elif [ -n "${PROCESS_CI_MODE:-}" ]; then
+  ci_mode="$PROCESS_CI_MODE"
+else
+  ci_mode="$(gh variable get PROCESS_CI_MODE --repo "$(repo_slug)" 2>/dev/null || true)"
+  ci_mode="$(printf '%s' "$ci_mode" | tr -d '[:space:]')"
+fi
+[ -n "$ci_mode" ] || ci_mode=push
+case "$ci_mode" in
+  push|pr) ;;
+  *) die ".github/ci-mode is '$ci_mode' and must be push or pr: no phase opens; nothing was created" ;;
+esac
+
 # Prints the number of the merged PR whose head had CI green and the same tree as commit $1
 # (returns 0), or the reason (returns 1).
 base_pr_vouches() {
@@ -87,7 +106,10 @@ base_pr_vouches() {
         | if . == null then "absent" else "\(.status)/\(.conclusion // "none")" end' 2>/dev/null || true)"
     [ "$ci" = "completed/success" ] || { echo "the CI of its PR #$n is ${ci:-absent}"; return 1; }
     htree="$(gh api "repos/$slug/git/commits/$head" 2>/dev/null | jq -r '.tree.sha // empty' 2>/dev/null || true)"
-    [ "$htree" = "$tree" ] || { echo "the tree of its PR #$n differs from the commit of main"; return 1; }
+    [ "$htree" = "$tree" ] || {
+      if [ "${2:-}" = pr ]; then echo "$n differ"; return 0; fi
+      echo "the tree of its PR #$n differs from the commit of main"; return 1
+    }
     echo "$n"; return 0
   done <<EOF2
 $prs
@@ -137,12 +159,18 @@ esac
 case "$ci" in
   completed/success*) echo "ok: CI of the base commit ${base:0:9} is green" ;;
   ""|absent)
-    # A rebase merge made before ci.yml ran on main leaves a commit with no check:
-    # the base is accepted when the merged PR that holds it had CI green on its head, same tree.
-    if pr="$(base_pr_vouches "$base")"; then
-      echo "ok: no check 'CI' on the base commit ${base:0:9}, but its merged PR #$pr had CI green on the same tree"
+    # A rebase merge made before ci.yml ran on main leaves a commit with no check.
+    # push mode accepts the merged PR only when its head has the same tree.
+    # pr mode accepts that PR when it had CI green, and warns if the tree differs.
+    if pr="$(base_pr_vouches "$base" "$ci_mode")"; then
+      n="${pr%% *}"
+      if [ "$pr" != "$n" ]; then
+        echo "warn: no check 'CI' on the base commit ${base:0:9}; merged PR #$n had CI green, but its tree differs from main (that sum was not tested)"
+      else
+        echo "ok: no check 'CI' on the base commit ${base:0:9}, but its merged PR #$n had CI green on the same tree"
+      fi
     else
-      die "no check 'CI' on the base commit ${base:0:9} of main and ${pr}: no phase opens; wait for the run of main or start it (gh workflow run), then open again; nothing was created"
+      die "no check 'CI' on the base commit ${base:0:9} of main and ${pr}: no phase opens; CI on main starts on push to main (ci.yml has no workflow_dispatch). Push a commit to main, or record pr in .github/ci-mode so a merged PR with green CI can open the phase; nothing was created"
     fi ;;
   *) die "check 'CI' of the base commit ${base:0:9} of main is ${ci%% *} (${ci#* }): no phase opens on a red or unfinished base; rerunning that run keeps the gate of the commit it checked out. Push a new commit on main (an empty commit is enough when there is nothing to generate) so the next run reads the gate of that commit; nothing was created" ;;
 esac

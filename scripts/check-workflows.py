@@ -7,7 +7,8 @@ Rules: file name `ci.yml` or `<category>-<purpose>.yml` (categories deploy,
 issues, release, bot); top-level `name` and `run-name`; top-level
 `permissions: {}`; `concurrency` set; every job with `name`, `runs-on` and
 `timeout-minutes` between 5 and 30; every step with `name`; `ci.yml` runs
-only on `pull_request` and push to `main`. A deploy workflow
+on `pull_request` and push to `main`, or only on `pull_request` when the
+recorded mode is `pr` (a `.github/ci-mode` file, else PROCESS_CI_MODE). A deploy workflow
 (`deploy-*.yml`) runs only on `workflow_dispatch` (never `pull_request`,
 `push` or `schedule`), has a `# deploy-paths:` line (what it deploys, read by
 scripts/deploy.sh) and a job that runs `scripts/validate.sh` which every
@@ -36,6 +37,40 @@ def load(path):
         out = subprocess.run(["yq", "-o=json", ".", path], check=True,
                              text=True, capture_output=True).stdout
         return json.loads(out)
+
+
+def recorded_ci_mode(path):
+    """push (CI on main) or pr (pull requests only). The file wins over the variable."""
+    d = os.path.dirname(os.path.abspath(path))
+    while True:
+        candidate = os.path.join(d, ".github", "ci-mode")
+        if os.path.isfile(candidate):
+            with open(candidate, encoding="utf-8") as fh:
+                return fh.read().strip() or "push"
+        parent = os.path.dirname(d)
+        if parent == d:
+            break
+        d = parent
+    return os.environ.get("PROCESS_CI_MODE", "").strip() or "push"
+
+
+def ci_trigger_problems(path, on, triggers):
+    mode = recorded_ci_mode(path)
+    if mode not in ("push", "pr"):
+        return ["ci mode must be push or pr (got %s)" % mode]
+    if mode == "pr":
+        if triggers != {"pull_request"}:
+            return ["ci.yml in pr-only mode must run only on pull_request, with no push (got %s)"
+                    % ", ".join(sorted(map(str, triggers)))]
+        return []
+    problems = []
+    if triggers != {"pull_request", "push"}:
+        problems.append("ci.yml must run only on pull_request and push to main (got %s)"
+                        % ", ".join(sorted(map(str, triggers))))
+    push = on.get("push") if isinstance(on, dict) else None
+    if (push or {}).get("branches") != ["main"]:
+        problems.append("ci.yml must run on push only to main")
+    return problems
 
 
 def needs_of(job):
@@ -84,10 +119,8 @@ def check(path):
         problems.append("top-level permissions must be {} (grant per job)")
     on = wf.get("on")
     triggers = set(on) if isinstance(on, dict) else set(on if isinstance(on, list) else [on])
-    if base == "ci.yml" and triggers != {"pull_request", "push"}:
-        problems.append("ci.yml must run only on pull_request and push to main (got %s)" % ", ".join(sorted(map(str, triggers))))
-    if base == "ci.yml" and (on.get("push") or {}).get("branches") != ["main"]:
-        problems.append("ci.yml must run on push only to main")
+    if base == "ci.yml":
+        problems.extend(ci_trigger_problems(path, on, triggers))
     if "push" in triggers and not base.startswith(("release-", "ci.yml")):
         problems.append("push trigger only for release- workflows")
     if base.startswith("deploy-"):
