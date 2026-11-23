@@ -9,12 +9,13 @@ git -C "$repo" worktree add --quiet -b feat/issue-55-nospec "$repo/.worktrees/is
 assert_status 1 "check-env refuses a phase branch without a spec" sh -c "cd '$repo/.worktrees/issue-55' && scripts/check-env.sh"
 assert_contains "$(last_output)" "no spec" "check-env says the spec is missing"
 
-# phase_opened is recorded before the worktree exists: it is there even when the worktree fails.
+# A failed opening records no phase_opened (#124). The branch already exists,
+# so the worktree is never created and the event must not count as a start.
 spec eleven.md 11
 git -C "$repo" branch feat/issue-11-listar-issues
 rc=0; (cd "$repo" && scripts/new-phase.sh 11 --no-check) >/dev/null 2>&1 || rc=$?
 assert_eq 1 "$((rc != 0))" "worktree creation fails on an existing branch"
-assert_eq "11" "$(events | jq -r 'select(.event == "phase_opened" and .issue == "11") | .issue')" "phase_opened comes before the worktree"
+assert_eq "" "$(events | jq -r 'select(.event == "phase_opened" and .issue == "11") | .issue')" "a failed opening records no phase_opened"
 rm "$repo/docs/specs/eleven.md"
 
 # A test issue follows the same path, and a spec of the group serves two phases.
