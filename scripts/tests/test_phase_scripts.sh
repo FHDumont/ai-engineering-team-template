@@ -24,6 +24,7 @@ esac
 H
 use_fake_gh "$TMP/handler.sh"
 
+assert_eq "listar-issues-por-area" "$(bash -c 'source "$1/lib/common.sh"; slug_ascii "Listar issues por área"' _ "$SCRIPTS")" "the slug drops the accent without starting Python"
 out="$(cd "$repo" && scripts/new-phase.sh 7 --dry-run)"
 assert_contains "$out" "branch: feat/issue-7-listar-issues-por-area" "branch from type label and title"
 out="$(cd "$repo" && scripts/new-phase.sh 8 --dry-run)"

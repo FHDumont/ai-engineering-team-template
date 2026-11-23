@@ -17,6 +17,14 @@ repo_root() {
   git rev-parse --show-toplevel 2>/dev/null
 }
 
+# Lowercase ASCII slug, hyphens, at most 40 characters. No Python process.
+slug_ascii() {
+  printf '%s' "$1" | tr '[:upper:]' '[:lower:]' |
+    sed -e 's/[áàâã]/a/g; s/[éê]/e/g; s/í/i/g; s/[óôõ]/o/g; s/ú/u/g; s/ç/c/g; s/ü/u/g' |
+    sed -E 's/[^a-z0-9]+/-/g; s/^-+//; s/-+$//' |
+    cut -c1-40 | sed 's/-$//'
+}
+
 # Short error and exit with code 1 (or the given code).
 die() {
   echo "error: $1" >&2

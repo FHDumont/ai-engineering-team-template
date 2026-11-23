@@ -76,11 +76,9 @@ fi
 if [ -z "$slug" ]; then
   slug="$(echo "$info_json" | jq -r .title)"
 fi
-# Slug in lowercase ASCII with hyphens, up to 40 characters.
-slug="$(python3 -c '
-import re, sys, unicodedata
-s = unicodedata.normalize("NFKD", sys.argv[1]).encode("ascii", "ignore").decode().lower()
-print(re.sub(r"[^a-z0-9]+", "-", s).strip("-")[:40].rstrip("-"))' "$slug")"
+# Slug in lowercase ASCII with hyphens, up to 40 characters. Shell, not python3:
+# a Python process here was about 0.3s, paid once per phase and again on the dry run.
+slug="$(slug_ascii "$slug")"
 branch="$type/issue-$issue-$slug"
 path="$main_root/.worktrees/issue-$issue"
 

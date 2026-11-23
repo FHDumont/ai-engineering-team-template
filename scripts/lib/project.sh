@@ -30,10 +30,16 @@ project_fail() { # project_fail <cause> <fix>
 # cause, when the repository variables cannot be read.
 project_board() { # project_board <owner/repo>
   local out
+  if [ "${PROJECT_BOARD_REPO:-}" = "$1" ]; then
+    printf '%s\n' "${PROJECT_BOARD_NUM-}"
+    return 0
+  fi
   if ! out="$(gh variable list --repo "$1" --json name,value --jq '.[] | select(.name == "PROCESS_PROJECT_NUMBER") | .value' 2>&1)"; then
     project_fail "could not read the repository variable PROCESS_PROJECT_NUMBER of $1: $(printf '%s' "$out" | head -1)" "gh auth status (check the login and the repo scope), then run the script again"
     return 1
   fi
+  PROJECT_BOARD_REPO="$1"
+  PROJECT_BOARD_NUM="$out"
   printf '%s\n' "$out"
 }
 
@@ -101,7 +107,12 @@ PROJECT_NEUTRAL_FILTER="is:open"
 # scope already includes reading, and `gh auth status` does not list `read:project` next
 # to it; so `project` is enough. `read:project` alone is not enough to write.
 project_has_scopes() {
-  gh auth status 2>&1 | grep "Token scopes:" | stdin_grep -qF "'project'"
+  [ "${PROJECT_SCOPES_OK:-}" = 1 ] && return 0
+  if gh auth status 2>&1 | grep "Token scopes:" | stdin_grep -qF "'project'"; then
+    PROJECT_SCOPES_OK=1
+    return 0
+  fi
+  return 1
 }
 
 # `id<TAB>filter` of the view by name (empty when it does not exist or the read fails).
