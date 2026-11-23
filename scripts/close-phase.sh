@@ -323,13 +323,22 @@ prepare() {
   body_file="$(body_with_spec "$body_file")"
 
   # One push per round = one CI run. Generated files are not the phase's: gen-docs.sh.
-  local n
+  local n remote_sha=""
   n="$(pr_number)"
   [ -n "$n" ] || [ -n "$title" ] || die "--title is required to open the PR"
-  progress_step "pushing the branch"
-  git push --quiet -u origin "$branch"
-  trace_event phase_push sha="$(git rev-parse HEAD)"
-  echo "pushed $branch (one push for this round)"
+  # A prepare that only edits the PR sends nothing: recording phase_push again
+  # would demand a new review of the same SHA.
+  if git rev-parse --verify --quiet "refs/remotes/origin/${branch}" >/dev/null; then
+    remote_sha="$(git rev-parse "refs/remotes/origin/${branch}")"
+  fi
+  if [ "$remote_sha" = "$(git rev-parse HEAD)" ]; then
+    echo "already on origin: $branch was not pushed again"
+  else
+    progress_step "pushing the branch"
+    git push --quiet -u origin "$branch"
+    trace_event phase_push sha="$(git rev-parse HEAD)"
+    echo "pushed $branch (one push for this round)"
+  fi
 
   progress_step "opening or updating the PR"
   if [ -z "$n" ]; then
