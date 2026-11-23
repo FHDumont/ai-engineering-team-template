@@ -174,15 +174,23 @@ if [ -z "$workflows" ]; then
 fi
 
 rc=0
+# A rollback run on this SHA is not a deploy of it. A workflow marked
+# deploy-manual is started by the owner from the Actions screen, not by this script.
+not_rollback='((.displayTitle // "") | test("rollback"; "i") | not)'
 for path in $workflows; do
   wf="$(basename "$path")"
-  paths="$(git -C "$main_root" show "$sha:$path" | sed -n 's/^# deploy-paths:[[:space:]]*//p' | head -1)"
+  body="$(git -C "$main_root" show "$sha:$path")"
+  if printf '%s\n' "$body" | grep -q '^# deploy-manual:'; then
+    echo "no deploy: $wf is manual and is not dispatched by deploy.sh"
+    continue
+  fi
+  paths="$(printf '%s\n' "$body" | sed -n 's/^# deploy-paths:[[:space:]]*//p' | head -1)"
   [ -n "$paths" ] || die "$wf has no '# deploy-paths:' line: cannot tell what it deploys"
   runs="$(gh run list --repo "$repo" --workflow "$wf" --branch main --event workflow_dispatch --limit 50 \
-    --json databaseId,headSha,status,conclusion,url)"
+    --json databaseId,headSha,status,conclusion,url,displayTitle)"
   [ -n "$runs" ] || runs='[]'
 
-  same="$(echo "$runs" | jq -r --arg s "$sha" '[.[] | select(.headSha == $s and (.status != "completed" or .conclusion == "success"))][0] | select(. != null) | "\(.databaseId)\t\(.status)\t\(.url)"')"
+  same="$(echo "$runs" | jq -r --arg s "$sha" '[.[] | select(.headSha == $s and '"$not_rollback"' and (.status != "completed" or .conclusion == "success"))][0] | select(. != null) | "\(.databaseId)\t\(.status)\t\(.url)"')"
   if [ -n "$same" ]; then
     IFS="$(printf '\t')" read -r id status url <<<"$same"
     if [ "$status" = completed ]; then
@@ -199,7 +207,7 @@ for path in $workflows; do
     continue
   fi
 
-  last="$(echo "$runs" | jq -r '[.[] | select(.conclusion == "success")][0] | select(. != null) | "\(.headSha)\t\(.url)"')"
+  last="$(echo "$runs" | jq -r '[.[] | select(.conclusion == "success" and '"$not_rollback"')][0] | select(. != null) | "\(.headSha)\t\(.url)"')"
   if [ -n "$last" ]; then
     IFS="$(printf '\t')" read -r last_sha last_url <<<"$last"
     # A token that starts with ! is a shell pattern of paths to leave out

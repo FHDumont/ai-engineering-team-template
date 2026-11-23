@@ -6,6 +6,7 @@ repo="$(make_repo)"
 copy_scripts "$repo"
 mkdir -p "$repo/.github/workflows" "$repo/app"
 printf '# deploy-paths: app/ .github/workflows/deploy-app.yml\non:\n  workflow_dispatch:\n' >"$repo/.github/workflows/deploy-app.yml"
+printf '# deploy-manual: the owner starts a rollback from the Actions screen\n# deploy-paths: app/\non:\n  workflow_dispatch:\n' >"$repo/.github/workflows/deploy-rollback.yml"
 echo v1 >"$repo/app/index.html"
 printf '.worktrees/\n.process/\n' >"$repo/.gitignore"
 git -C "$repo" add scripts .github app .gitignore
@@ -154,6 +155,13 @@ run 3 "exits 3 when the run does not finish in time" FAKE_POLLS=99
 run 0 "does not dispatch twice on the same SHA" FAKE_RUNS="$(success_run "$SHA")"
 assert_eq 0 "$(dispatches)" "no second dispatch on a deployed SHA"
 assert_contains "$(last_output)" "already deployed main at ${SHA:0:12}: https://x/actions/runs/70" "points to the run that deployed it"
+run 0 "a rollback run is not the deploy of the SHA" \
+  FAKE_RUNS="$(jq -cn --arg s "$SHA" '[{databaseId: 71, headSha: $s, status: "completed", conclusion: "success", displayTitle: "Rollback to previous", url: "https://x/actions/runs/71"}]')"
+assert_eq 1 "$(dispatches)" "the normal deploy still runs after a rollback"
+assert_not_contains "$(gh_calls)" "deploy-rollback.yml" "a manual workflow is not dispatched"
+run 0 "a rollback success on the SHA is not the deploy" \
+  FAKE_RUNS="$(jq -cn --arg s "$SHA" '[{databaseId: 71, headSha: $s, status: "completed", conclusion: "success", displayTitle: "rollback", url: "https://x/71"}]')"
+assert_eq 1 "$(dispatches)" "a rollback run does not suppress the deploy"
 run 0 "a run still going on the same SHA is waited for, not dispatched again" \
   FAKE_RUNS="$(jq -cn --arg s "$SHA" '[{databaseId: 77, headSha: $s, status: "in_progress", conclusion: "", url: "https://x/actions/runs/77"}]')"
 assert_eq 0 "$(dispatches)" "no dispatch while a run is going on the SHA"
@@ -206,7 +214,7 @@ git -C "$repo" commit --quiet -m "ci: drop deploy paths"
 git -C "$repo" push --quiet origin main
 run 1 "refuses a deploy workflow without deploy-paths"
 assert_eq 0 "$(dispatches)" "no dispatch without deploy-paths"
-git -C "$repo" rm --quiet .github/workflows/deploy-app.yml
+git -C "$repo" rm --quiet .github/workflows/deploy-app.yml .github/workflows/deploy-rollback.yml
 git -C "$repo" commit --quiet -m "ci: no deploy"
 git -C "$repo" push --quiet origin main
 run 0 "nothing to deploy without a deploy workflow"
