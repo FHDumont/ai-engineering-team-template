@@ -73,6 +73,17 @@ assert_status 0 "cleanup with an identical untracked spec in the main checkout" 
 assert_contains "$(last_output)" "removed the untracked copy of docs/specs/nine.md" "says the loose copy left"
 assert_eq "$(git -C "$repo" rev-parse origin/main)" "$(git -C "$repo" rev-parse main)" "main is updated past the loose copy"
 assert_eq "" "$(git -C "$repo" status --porcelain)" "the spec is tracked and clean after the update"
+# An approved amendment changes the spec on the branch while main still has the old loose copy.
+phase 11
+printf '# Spec\n\nold\n' >"$repo/docs/specs/eleven.md"
+mkdir -p "$repo/.worktrees/issue-11/docs/specs"
+printf '# Spec\n\namended\n' >"$repo/.worktrees/issue-11/docs/specs/eleven.md"
+git -C "$repo/.worktrees/issue-11" add docs/specs/eleven.md
+git -C "$repo/.worktrees/issue-11" commit --quiet -m "docs(specs): amend the spec of issue #11"
+git -C "$repo/.worktrees/issue-11" push --quiet origin feat/issue-11-x:main
+: >"$REGISTRY"
+assert_status 0 "cleanup accepts a loose spec that the amendment changed" sh -c "cd '$repo/.worktrees/issue-11' && scripts/close-phase.sh --cleanup"
+assert_eq "amended" "$(sed -n '3p' "$repo/docs/specs/eleven.md")" "main has the amended spec"
 phase 10
 echo other >"$repo/loose.txt"
 echo mine >"$repo/.worktrees/issue-10/loose.txt"
