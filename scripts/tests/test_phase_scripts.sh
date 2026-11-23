@@ -160,8 +160,12 @@ printf '# Spec\n\n## Fase #7\n\nSem bots.\n\n## Fase #8\n\nPergunta ao bot `bot-
 assert_status 0 "check-env ignores bots cited in another phase's section" sh -c "cd '$path' && scripts/check-env.sh"
 printf '# Spec\n\nFase #7: ver .claude/skills/ask-bot/SKILL.md\n' >"$path/docs/specs/a.md"
 assert_status 0 "check-env ignores an ask-bot/ file path" sh -c "cd '$path' && scripts/check-env.sh"
-printf '# Spec\n\n## Fase #7\n\nPergunta ao bot `bot-b`.\n' >"$path/docs/specs/a.md"
+printf '# Spec\n\n## Fase #7\n\nPergunta ao @bot-b.\n' >"$path/docs/specs/a.md"
 assert_status 1 "check-env still fails when the phase's own section cites a bot" sh -c "cd '$path' && scripts/check-env.sh"
+# A name in backticks is not a citation, even when it is a bot slug (#154).
+printf 'acme-site\tAcme Site\t\n' >"$TMP/bots-acme.tsv"
+printf '# Spec\n\n## Fase #7\n\nPublica no Worker `acme-site` (workers.dev).\n' >"$path/docs/specs/a.md"
+assert_status 0 "a backtick name is not a bot citation" env BOTS_FILE="$TMP/bots-acme.tsv" sh -c "cd '$path' && scripts/check-env.sh"
 rm -f "$path/docs/specs/a.md"
 
 out="$(cd "$repo" && scripts/open-parallel.sh 8 9 --dry-run 2>&1 || true)"

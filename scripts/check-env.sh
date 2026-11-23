@@ -32,7 +32,7 @@
 #: spec, whether the step runs in this session (same pair) or in a subagent.
 #: "Spec cites bots": some docs/specs/*.md mentions the branch's issue (#N) and, in its
 #: general header or in the section of that phase, has "ask-bot", a "Bots" section/line,
-#: or a bot slug from .github/bots.tsv in backticks.
+#: or a bot slug from .github/bots.tsv as @slug. A name in backticks is not a citation.
 set -euo pipefail
 HERE="$(cd "$(dirname "$0")" && pwd)"
 # shellcheck source=scripts/lib/common.sh
@@ -219,7 +219,8 @@ spec_cites_bots() {
     text="$(awk -v n="$issue" '
       /^## Fase #[0-9]+/ { sec = ($0 ~ "^## Fase #" n "([^0-9]|$)"); seen = 1; next }
       !seen || sec { print }' "$spec")"
-    if printf '%s\n' "$text" | stdin_grep -q -E "ask-bot([^/]|$)|^#+ .*Bots|\*\*Bots|\`($slugs)\`"; then return 0; fi
+    # Explicit only: ask-bot, a Bots section or line, or @slug. A backtick name is not a citation.
+    if printf '%s\n' "$text" | stdin_grep -q -E "ask-bot([^/]|$)|^#+ .*Bots|\*\*Bots|(^|[^[:alnum:]])Bots([^[:alnum:]]|$)|(^|[^A-Za-z0-9_])@($slugs)([^A-Za-z0-9_-]|$)"; then return 0; fi
   done
   return 1
 }
