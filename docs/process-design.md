@@ -661,6 +661,17 @@ O arquivo é a fonte. Ele precisa ter:
 
 A assinatura de IA é barrada em quatro camadas: configuração, regra no `AGENTS.md`, hook e CI `policy`.
 
+### 10.6 PR que não é de fase
+
+A proteção exige `review/independent` em todo PR. A branch de fase (`fix/issue-*`) continua no `close-phase.sh --merge` da §6.1, com o portão de fase inteiro. Esse caminho não muda.
+
+Um PR cuja branch não é `fix/issue-*` recebe o status e faz merge só por `close-phase.sh --pr <N>`:
+
+- `--publish-review <arquivo> --verdict success|failure` publica `review/independent` no SHA do head desse PR. O arquivo tem de ser o parecer salvo daquele SHA (`.process/reviewer-<sha>.md`) e o veredito tem de ser o de `.process/reviewer-<sha>.verdict`.
+- `--merge --owner-ok <SHA>` só mergeia quando esse SHA é o HEAD do PR, o check run `CI` desse SHA terminou com `success` e o parecer independente salvo desse SHA tem veredito `success`. SHA diferente, CI ausente e head `fix/issue-*` são recusados.
+
+O `scripts/setup-repo.sh` e o README avisam isso antes de a proteção ser ligada.
+
 ---
 
 ## 11. Pacote do método

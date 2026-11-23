@@ -30,6 +30,8 @@ Cada regra tem uma trava que roda sozinha e sai com erro. A tabela é a do desen
 ## Começo rápido
 
 1. Crie o seu repositório com **Use this template** e clone.
+Antes de ligar a proteção da `main`: um PR que não é branch de fase (`fix/issue-*`) só recebe `review/independent` e só faz merge com `scripts/close-phase.sh --pr <N> --merge --owner-ok <SHA do HEAD>`, com o check `CI` verde e o parecer independente salvo daquele SHA. A branch de fase continua em `scripts/close-phase.sh --merge`.
+
 2. Abra o repositório no Claude Code e diga "configurar o repo". O agente roda `scripts/setup-repo.sh` (labels, proteção da `main`, configurações do repo) e faz as perguntas do setup num quadro de escolha, incluindo a meta de tempo (fase abaixo de 45 min e `validate.sh` abaixo de 240 s, por padrão) e, na primeira vez em cada máquina, os limites dela (`~/.config/ai-method/machine-limits.env`). Só aí: depois, o agente só o chama de novo se o fim de um grupo ficar acima da meta. Você não roda script nem mexe em configuração.
    Sem o setup aplicado, o `scripts/phase-start.sh` e o `scripts/open-issue.sh` recusam e dizem "configurar o repo".
 3. Abra a primeira issue por um [template](../../issues/new/choose).
