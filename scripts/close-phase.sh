@@ -119,11 +119,22 @@ source "$HERE/lib/slots.sh"
 source "$HERE/lib/progress.sh"
 # shellcheck source=scripts/lib/notes.sh
 source "$HERE/lib/notes.sh"
+# shellcheck source=scripts/lib/role.sh
+source "$HERE/lib/role.sh"
 ROOT="$(cd "$HERE/.." && pwd)"
 
 # gh prints "hint:" lines (for example "gh event listen") that drown the result
 # and, once captured, corrupt a value read from the command. Drop them. The last
 # line of this script is the result.
+# Comments of the method agent: the app token when the owner configured it,
+# the owner's gh otherwise. ROLE_APP_REQUIRE=1 refuses until the app exists.
+gh_role() {
+  if [ "${ROLE_APP_REQUIRE:-}" = 1 ]; then
+    role_require method || exit $?
+  fi
+  role_exec method -- gh "$@"
+}
+
 gh() {
   local out err rc=0
   out="$(mktemp)"
@@ -508,7 +519,7 @@ publish_review() {
   [ -f "$savedv" ] || die "no saved reviewer verdict for ${sha:0:12}"
   got="$(tr -d '[:space:]' <"$savedv")"
   [ "$got" = "$verdict" ] || die "review --verdict $verdict does not match the saved reviewer verdict $got"
-  gh pr comment "$n" --repo "$repo" --body-file "$review_file" >/dev/null
+  gh_role pr comment "$n" --repo "$repo" --body-file "$review_file" >/dev/null
   local desc="Revisão independente aprovada"
   [ "$verdict" = success ] || desc="Revisão independente pediu mudanças"
   gh api -X POST "repos/$repo/statuses/$sha" -f state="$verdict" -f context=review/independent \
@@ -671,7 +682,7 @@ merge() {
       echo "ask the repo owner with a choice question that names this SHA, then rerun with --merge --owner-ok $sha"
       exit 5
     fi
-    gh pr comment "$n" --repo "$repo" --body "<!-- owner-ok sha:$sha -->
+    gh_role pr comment "$n" --repo "$repo" --body "<!-- owner-ok sha:$sha -->
 Ok do dono do repo registrado (quadro de escolha) para:$reasons." >/dev/null
   fi
 
@@ -865,7 +876,7 @@ abort() {
   slots_end_phase "$here"
   pr="$(pr_number)"
   if [ -n "$pr" ]; then
-    gh pr close "$pr" --repo "$repo" --comment "Fase #$n abortada (\`close-phase.sh --abort\`)." >/dev/null
+    gh_role pr close "$pr" --repo "$repo" --comment "Fase #$n abortada (\`close-phase.sh --abort\`)." >/dev/null
     echo "closed PR #$pr"
   fi
   delete_remote_branch "$here"
@@ -946,7 +957,7 @@ outside_publish() {
   refs="$(outside_refs "$pr")" || exit $?
   sha="${refs%%$'\t'*}"
   require_saved_review "$sha" "$verdict"
-  gh pr comment "$pr" --repo "$repo" --body-file "$review_file" >/dev/null
+  gh_role pr comment "$pr" --repo "$repo" --body-file "$review_file" >/dev/null
   desc="Revisão independente aprovada"
   [ "$verdict" = success ] || desc="Revisão independente pediu mudanças"
   gh api -X POST "repos/$repo/statuses/$sha" -f state="$verdict" -f context=review/independent \
@@ -976,7 +987,7 @@ outside_merge() {
   [ "$ci" = success ] || die "CI is $ci on ${sha:0:12}: no merge until it is success" 11
   require_base_protection "$base" "$sha"
   "$HERE/check-attribution.sh" --pr "$pr" || die "PR #$pr has AI attribution: fix the body or commits first"
-  gh pr comment "$pr" --repo "$repo" --body "<!-- owner-ok sha:$sha -->
+  gh_role pr comment "$pr" --repo "$repo" --body "<!-- owner-ok sha:$sha -->
 Ok do dono do repo registrado para o merge do PR #$pr fora de fase." >/dev/null
   if ! gh pr merge "$pr" --repo "$repo" --auto --rebase --delete-branch >/dev/null 2>&1; then
     gh pr merge "$pr" --repo "$repo" --rebase --delete-branch >/dev/null

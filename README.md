@@ -48,6 +48,7 @@ Antes da primeira fase, troque o que é exemplo: a pasta `app/`, o passo de depl
 - **Runner:** o CI usa runners hospedados pelo GitHub (`ubuntu-latest`) por padrão. Repositório público usa só runners hospedados: o `scripts/setup-runner.sh` recusa registrar runner próprio em repositório público, porque ele rodaria o código de qualquer PR. Em repositório privado, o runner próprio é opcional e a variável `CI_RUNS_ON` aponta para ele.
 - **Modelos:** os pares de modelo e esforço ficam em `scripts/lib/weights.tsv`. O padrão roda num plano que só tem o Sonnet; para usar outros modelos, edite só esse arquivo.
 - **Segredos dos bots (só no caminho B):** o padrão é um `.env` fora do repositório, criado vazio pelo `scripts/init-env.sh`. Detalhes em [docs/BOTS.md](docs/BOTS.md).
+- **GitHub Apps por papel:** o dono cria as Apps; o agente nunca cria App, chave nem segredo. Uma para o agente do método (`metodo-agente`) e uma por bot (`<slug>`). Permissões mínimas: issues e pull requests, escrita. O token de instalação fica no provedor de segredo: `GH_APP_METHOD_TOKEN` ou `GH_APP_BOT_<SLUG>_TOKEN`, no ambiente ou no `.env` que o `scripts/init-env.sh` deixa vazio. Com o token, `ask-bot.sh`, `open-issue.sh` e os comentários do `close-phase.sh` usam a App. Sem o token, usam o `gh` do dono. `ROLE_APP_REQUIRE=1` recusa, com a frase "Refusing until the app exists", até a App existir.
 
 ## Mínimo suportado
 

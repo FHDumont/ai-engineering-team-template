@@ -30,8 +30,11 @@ git -C "$TMP/repo" remote set-url origin "git@github.com:acme/outro.git"
 [ -f "$HOME/.outro/.env" ] && ok || bad "init-env writes to the new path"
 assert_eq "BOT_WEBHOOK_BOT_A_URL=
 BOT_WEBHOOK_BOT_A_SECRET=
+GH_APP_BOT_A_TOKEN=
 BOT_WEBHOOK_BOT_B_URL=
-BOT_WEBHOOK_BOT_B_SECRET=" "$(cat "$HOME/.outro/.env")" "init-env defaults to every bot of the bots file"
+BOT_WEBHOOK_BOT_B_SECRET=
+GH_APP_BOT_B_TOKEN=
+GH_APP_METHOD_TOKEN=" "$(cat "$HOME/.outro/.env")" "init-env defaults to every bot of the bots file"
 assert_eq "0" "$(wc -c <"$HOME/.config/outro/.env" | tr -d ' ')" "init-env leaves the legacy file alone"
 assert_eq "$HOME/.outro/.env" "$(path)" "new path wins when it exists"
 assert_status 2 "init-env with no bot and no bots file is refused" env BOTS_FILE="$TMP/missing.tsv" sh -c "cd '$TMP/repo' && '$SCRIPTS/init-env.sh'"
@@ -47,11 +50,15 @@ assert_eq "$f" "$(cat "$TMP/init.out")" "init-env prints only the path"
 assert_eq "700" "$(stat -c %a "$HOME/.outro" 2>/dev/null || stat -f %Lp "$HOME/.outro")" "folder is 700"
 assert_eq "600" "$(stat -c %a "$f" 2>/dev/null || stat -f %Lp "$f")" "file is 600"
 assert_eq "BOT_WEBHOOK_BOT_B_URL=
-BOT_WEBHOOK_BOT_B_SECRET=" "$(cat "$f")" "keys are empty"
+BOT_WEBHOOK_BOT_B_SECRET=
+GH_APP_BOT_B_TOKEN=
+GH_APP_METHOD_TOKEN=" "$(cat "$f")" "keys are empty"
 printf 'BOT_WEBHOOK_BOT_B_URL=keep\n' >"$f"
 (cd "$TMP/repo" && "$SCRIPTS/init-env.sh" bot-b >/dev/null)
 assert_eq "BOT_WEBHOOK_BOT_B_URL=keep
-BOT_WEBHOOK_BOT_B_SECRET=" "$(cat "$f")" "existing values are kept; only missing keys are added"
+BOT_WEBHOOK_BOT_B_SECRET=
+GH_APP_BOT_B_TOKEN=
+GH_APP_METHOD_TOKEN=" "$(cat "$f")" "existing values are kept; only missing keys are added"
 (cd "$TMP/repo" && PROCESS_ENV_FILE="$TMP/y/o.env" "$SCRIPTS/init-env.sh" >/dev/null)
 assert_eq "600" "$(stat -c %a "$TMP/y/o.env" 2>/dev/null || stat -f %Lp "$TMP/y/o.env")" "override path is created with 600"
 assert_status 2 "invalid slug is refused" "$SCRIPTS/init-env.sh" "Bad Slug"

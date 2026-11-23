@@ -34,6 +34,17 @@ source "$HERE/lib/common.sh"
 source "$HERE/lib/secret.sh"
 # shellcheck source=scripts/lib/author.sh
 source "$HERE/lib/author.sh"
+# shellcheck source=scripts/lib/role.sh
+source "$HERE/lib/role.sh"
+
+# Comment as the method app when its token is set; otherwise as the owner's gh.
+# ROLE_APP_REQUIRE=1 refuses before any post until the owner creates the app.
+gh_method() {
+  if [ "${ROLE_APP_REQUIRE:-}" = 1 ]; then
+    role_require method || exit $?
+  fi
+  role_exec method -- gh "$@"
+}
 
 [ $# -gt 0 ] || { print_help "$0"; exit 2; }
 case "$1" in -h|--help) print_help "$0"; exit 0 ;; esac
@@ -48,8 +59,11 @@ require_secret() {
 # post_comment <issue> <body>: posts, reads back by its id and prints the URL.
 post_comment() {
   local issue="$1" body="$2" repo url cid
+  if [ "${ROLE_APP_REQUIRE:-}" = 1 ]; then
+    role_require method || exit $?
+  fi
   repo="$(repo_slug)"
-  url="$(printf '%s' "$body" | gh issue comment "$issue" --repo "$repo" --body-file - | tail -1)" ||
+  url="$(printf '%s' "$body" | gh_method issue comment "$issue" --repo "$repo" --body-file - | tail -1)" ||
     die "comment not posted on #$issue: gh issue comment failed (the bot was not notified)"
   cid="$(printf '%s\n' "$url" | sed -n -E 's/.*#issuecomment-([0-9]+)$/\1/p')"
   [ -n "$cid" ] || die "comment not posted on #$issue: gh issue comment returned no comment URL (the bot was not notified)"
@@ -122,8 +136,11 @@ else
 
   id="$(date +%Y%m%d%H%M%S)-$$"
   body="$(printf '%s\n\n%s\n\n<!-- ask:%s:%s -->' "$(author_header "$bot" "$id")" "$text" "$bot" "$id")"
+  if [ "${ROLE_APP_REQUIRE:-}" = 1 ]; then
+    role_require method || exit $?
+  fi
   repo="$(repo_slug)"
-  url="$(printf '%s' "$body" | gh issue comment "$issue" --repo "$repo" --body-file - | tail -1)" ||
+  url="$(printf '%s' "$body" | gh_method issue comment "$issue" --repo "$repo" --body-file - | tail -1)" ||
     die "question not posted on #$issue: gh issue comment failed (the bot was not notified)"
   # Exit 0 does not prove the comment exists: read it back by its id, with the marker.
   cid="$(printf '%s\n' "$url" | sed -n -E 's/.*#issuecomment-([0-9]+)$/\1/p')"
