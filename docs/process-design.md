@@ -367,7 +367,7 @@ Os hooks do git são instalados pelo `check-env.sh` (`core.hooksPath=.githooks`)
 8. `git clean` com `-f` ou `--force`;
 9. `git branch -D` (e `--delete --force`);
 10. merge de PR direto: `gh pr merge`, `gh api … pulls/N/merge`, `gh api graphql` com mutation de merge e de proteção; toda escrita em `branches/*/protection`;
-11. deploy fora do `deploy.sh`: `gh workflow run`, `gh run rerun`, `gh api` em `…/dispatches` e `…/rerun`;
+11. deploy fora do `deploy.sh`: `gh workflow run`, `gh run rerun`, `gh api` em `…/dispatches` e `…/rerun`. O `scripts/rerun-ci.sh` repete só o job falho de um run do `ci.yml` no HEAD do PR, com limite de tentativas e oferta de issue; o `gh run rerun` cru, inclusive o de deploy, continua barrado;
 12. os mesmos casos dentro de `bash -c`, `eval`, heredoc entregue a shell, `echo … | bash`, `$(…)`, depois de `env`, `command`, `nice`, `timeout` e `sudo`, em blocos e com caminho absoluto;
 13. falha fechado: comando ilegível ou grande demais (>256 KB ou >400 partes) que cita git ou gh é barrado.
 

@@ -26,6 +26,9 @@
 # Also blocks `git clean` with `-f`/`--force` and `git branch -D` (or
 # `--delete --force`). Also blocks every deploy dispatch outside scripts/deploy.sh:
 # `gh workflow run`, `gh run rerun`, and `gh api` on a …/dispatches or …/rerun endpoint.
+# scripts/rerun-ci.sh is not one of those commands, so the hook does not swallow
+# it. A raw `gh run rerun` stays blocked, including a deploy rerun. Push --force,
+# reset --hard and a push to main are unchanged.
 #
 # Fails closed: a line that cannot be read safely, or a command too large
 # to check quickly (>256 KB or >400 parts), that cites git/gh is
