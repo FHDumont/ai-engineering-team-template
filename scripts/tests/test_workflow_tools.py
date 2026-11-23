@@ -165,6 +165,18 @@ jobs:
         self.assertIn("pr-only mode must run only on pull_request", problems)
         self.assertIn("no push", problems)
 
+    def test_ci_mode_does_not_escape_the_repository(self):
+        d = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, d, True)
+        os.makedirs(os.path.join(d, "outer", ".github"))
+        open(os.path.join(d, "outer", ".github", "ci-mode"), "w").write("pr\n")
+        repo = os.path.join(d, "outer", "repo")
+        os.makedirs(os.path.join(repo, ".github", "workflows"))
+        os.makedirs(os.path.join(repo, ".git"))
+        path = os.path.join(repo, ".github", "workflows", "ci.yml")
+        open(path, "w").write(GOOD.replace("issues:\n    types: [opened]", "pull_request:"))
+        self.assertIn("pull_request and push to main", "\n".join(cw.check(path)))
+
     def test_timeout_bounds(self):
         problems = "\n".join(cw.check(self.write("issues-x.yml", GOOD.replace("timeout-minutes: 5", "timeout-minutes: 60"))))
         self.assertIn("timeout-minutes must be 5-30", problems)
@@ -742,6 +754,58 @@ cat "$TMP/prred.out"
         self.assertIn("nothing was created", out)
         self.assertIn("PUSH:1", out)
         self.assertIn("PRRED:1", out)
+
+    def test_pr_mode_refuses_an_unread_tree_and_private_without_a_record(self):
+        script = r"""
+source scripts/tests/phase_start_common.sh
+spec seven.md 7
+export PHASE_START_CI_WAIT=2 PHASE_START_CI_POLL=1
+mkdir -p "$TMP/wrap"
+cat >"$TMP/wrap/gh" <<EOF
+#!/bin/sh
+case "\$*" in
+  *"--jq .private"*) echo true; exit 0 ;;
+  *"/git/commits/headpr1"*) printf '%s\n' '{"tree":{}}'; exit 0 ;;
+esac
+exec "$TMP/bin/gh" "\$@"
+EOF
+chmod +x "$TMP/wrap/gh"
+run() {
+  local out="$1"; shift
+  set +e
+  env "$@" >"$out" 2>&1
+  local rc=$?
+  set -e
+  printf '%s\n' "$rc"
+}
+mkdir -p "$repo/.github"
+printf 'pr\n' >"$repo/.github/ci-mode"
+unread_rc="$(run "$TMP/unread.out" PATH="$TMP/wrap:$PATH" FAKE_BASE_CI=absent FAKE_BASE_PR=green \
+  sh -c "cd '$repo' && scripts/phase-start.sh 7 --no-check")"
+rm -f "$repo/.github/ci-mode"
+priv_rc="$(run "$TMP/priv.out" PATH="$TMP/wrap:$PATH" FAKE_BASE_CI=green \
+  sh -c "cd '$repo' && scripts/phase-start.sh 7 --no-check")"
+printf 'pr\n' >"$repo/.github/ci-mode"
+ok_rc="$(run "$TMP/ok.out" PATH="$TMP/wrap:$PATH" FAKE_BASE_CI=green CLAUDE_CODE_SESSION_ID=manager \
+  sh -c "cd '$repo' && scripts/phase-start.sh 7 --dry-run")"
+printf 'UNREAD:%s\n' "$unread_rc"
+cat "$TMP/unread.out"
+printf '\nPRIV:%s\n' "$priv_rc"
+cat "$TMP/priv.out"
+printf '\nOK:%s\n' "$ok_rc"
+cat "$TMP/ok.out"
+"""
+        r = subprocess.run(["bash", "-c", script], cwd=ROOT, text=True, capture_output=True)
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        out = r.stdout
+        self.assertIn("UNREAD:1", out)
+        self.assertIn("was not read", out)
+        self.assertIn("PRIV:1", out)
+        self.assertIn("private repository", out)
+        self.assertIn("nothing was created", out)
+        self.assertIn("OK:0", out)
+        ok = out.split("OK:", 1)[1]
+        self.assertNotIn("not recorded", ok)
 
 
 class RunnerToolsTests(unittest.TestCase):
