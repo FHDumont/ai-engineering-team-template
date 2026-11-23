@@ -14,6 +14,10 @@ update="$(section "Atualizar um repositório que já usa o método")"
 assert_contains "$adopt" "1. **Pré-requisitos." "the adoption chapter has numbered steps"
 assert_not_contains "$adopt" "TODO" "the chapter has no placeholder"
 [ -n "$update" ] && ok || bad "the update section is missing"
+assert_contains "$update" "linhas de método do" "the update guide reviews the method lines of STATE"
+assert_contains "$update" "time-targets.tsv" "the update guide asks for the time target when it is missing"
+assert_contains "$update" "machine-limits.env" "the update guide asks for the machine limits when they are missing"
+assert_contains "$update" "divergências locais" "the update guide says where local divergences are recorded"
 
 # Topics the chapter must cover.
 for topic in "gh auth status" "proteção de branch" "branch de adoção" "O que sai" "O que entra" \

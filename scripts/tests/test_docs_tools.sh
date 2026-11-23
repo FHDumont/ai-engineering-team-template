@@ -184,6 +184,15 @@ assert_contains "$(last_output)" "ROADMAP.md" "names the generated file that is 
 printf 'y\n' >"$d/ROADMAP.md"
 assert_status 0 "both generated files present passes" env REPO_ROOT="$d" "$CHECK"
 
+# Facts of the method do not age inside STATE.md (#118).
+d="$(fixture)"
+printf '\no job tests roda em todo PR\n' >>"$d/docs/STATE.md"
+assert_status 1 "fails a STATE that says tests run on every PR" env REPO_ROOT="$d" "$CHECK"
+assert_contains "$(last_output)" "STATE.md repeats a method fact that is no longer true" "names the stale fact"
+d="$(fixture)"
+printf '\nsetup-repo.sh saindo 6 sem proteção\n' >>"$d/docs/STATE.md"
+assert_status 1 "fails a STATE that says setup exits 6 without protection" env REPO_ROOT="$d" "$CHECK"
+
 # The design lists the method manifest, not every file an application drops in scripts/ (#101).
 d="$(fixture)"
 mkdir -p "$d/.github"
