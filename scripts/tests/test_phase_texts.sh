@@ -142,6 +142,8 @@ assert_contains "$integrate" "só esperam o dono" "integrate deletes the heartbe
 assert_contains "$integrate" "volta a trabalhar" "integrate recreates the heartbeat when a phase works again"
 assert_contains "$integrate" 'sem "Sem mudança."' "integrate names the minimum reply when nothing changed"
 assert_contains "$integrate" "Apague o batimento" "integrate deletes the heartbeat in the end step"
+assert_contains "$integrate" "over-expected" "integrate asks once about a performance overrun"
+assert_contains "$integrate" "não pergunte de novo" "integrate does not ask again when the issue is open"
 assert_contains "$integrate" "Nenhum script confere" "integrate says no lock checks the heartbeat"
 hb="$(printf '%s\n' "$design" | grep -F '**batimento**')"
 assert_eq 1 "$(printf '%s\n' "$hb" | grep -c .)" "the design states the heartbeat rule in one place"

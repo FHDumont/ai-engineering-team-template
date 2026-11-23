@@ -26,6 +26,7 @@ assert_contains "$(last_output)" "no check 'CI' on the base commit" "a finished 
 # The wait has a deadline: a run that does not finish refuses, creating nothing.
 assert_status 1 "phase-start refuses when the CI of main does not finish before the deadline" env FAKE_BASE_CI=running sh -c "cd '$repo' && scripts/phase-start.sh 7 --no-check"
 assert_contains "$(last_output)" "did not finish" "says the run did not finish in time"
+assert_contains "$(last_output)" "warn: over-expected ci-wait" "a live run past the expected wait warns and the hang limit still refuses"
 assert_contains "$(last_output)" "nothing was created" "says nothing was created after the wait"
 # No run on the base: there is nothing to wait for, it refuses at once.
 rm -f "$TMP/ci.count"

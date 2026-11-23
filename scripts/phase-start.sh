@@ -158,12 +158,19 @@ read_base_ci
 # poll in seconds, PHASE_START_CI_WAIT (default 900) and PHASE_START_CI_POLL (default 15).
 case "$ci" in
   queued/*|in_progress/*|waiting/*|pending/*|requested/*)
-    wait_max="${PHASE_START_CI_WAIT:-900}" poll="${PHASE_START_CI_POLL:-15}" waited=0
+    wait_max="${PHASE_START_CI_WAIT:-900}" poll="${PHASE_START_CI_POLL:-15}" waited=0 warned=0
+    hang="${PHASE_START_CI_HANG:-$((wait_max * 3))}"
+    [ "$hang" -gt "$wait_max" ] || hang="$wait_max"
     run_url="${ci#* }"
     while :; do
       case "$ci" in queued/*|in_progress/*|waiting/*|pending/*|requested/*) ;; *) break ;; esac
-      [ "$waited" -lt "$wait_max" ] ||
-        die "the run of 'CI' on the base commit ${base:0:9} of main did not finish in ${wait_max}s (${run_url}): no phase opens; wait for it and open again; nothing was created"
+      if [ "$waited" -ge "$hang" ]; then
+        die "the run of 'CI' on the base commit ${base:0:9} of main did not finish in ${hang}s (${run_url}): no phase opens; wait for it and open again; nothing was created"
+      fi
+      if [ "$warned" = 0 ] && [ "$waited" -gt "$wait_max" ]; then
+        warn_over_expected ci-wait "$waited" "$wait_max"
+        warned=1
+      fi
       progress_step "waiting for the CI of main" "$waited" "$wait_max"
       sleep "$poll"; waited=$((waited + poll))
       read_base_ci

@@ -23,6 +23,19 @@ die() {
   exit "${2:-1}"
 }
 
+# A performance deadline warns and does not change the exit code. A hang is a
+# separate, wider limit that still fails. CI gets a warning annotation.
+warn_over_expected() { # warn_over_expected <what> <measured> <expected>
+  [ "${2:-0}" -gt "${3:-0}" ] 2>/dev/null || return 0
+  local line="warn: over-expected $1 $2 $3"
+  printf '%s\n' "$line"
+  [ -z "${CI:-}" ] || printf '::warning::%s\n' "$line"
+  if [ -n "${AI_METHOD_OVER_EXPECTED:-}" ]; then
+    printf '%s\n' "$line" >>"$AI_METHOD_OVER_EXPECTED" 2>/dev/null || true
+  fi
+  return 0
+}
+
 info() {
   echo "$*"
 }
