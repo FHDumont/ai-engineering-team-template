@@ -140,12 +140,20 @@ out="$(cd "$repo" && "$SCRIPTS/status.sh" --state trabalhando --next "esperar as
 assert_contains "$out" "- #5 — Fim coerente — trabalhando" "a card that already became a session is trabalhando"
 assert_not_contains "$out" "clique no cartão" "does not wait for a card click after the session exists"
 # Waiting for the manager is not an owner action, and the close hint is not doubled (#111).
-out="$(cd "$repo/.worktrees/issue-6" && "$SCRIPTS/status.sh" --state gerenciadora --need "gerenciadora: responder a instalação")"
+out="$(cd "$repo/.worktrees/issue-6" && "$SCRIPTS/status.sh" --state gerenciadora --offline --next "seguir" --need "gerenciadora: responder a instalação")"
 assert_contains "$out" "**Estado:** esperando a gerenciadora" "a wait for the manager is its own state"
 assert_not_contains "$out" "fechar fase" "a manager wait does not invite the owner to close"
-assert_not_contains "$out" "**Você precisa:** gerenciadora: responder a instalação; dizer" "the close hint is not glued on a manager wait"
 out="$(cd "$repo" && "$SCRIPTS/status.sh" --state trabalhando --offline --next "esperar as fases")"
 assert_not_contains "$out" "instalação" "the main session does not ask the owner for a manager wait"
-out="$(cd "$repo/.worktrees/issue-6" && "$SCRIPTS/status.sh" --state esperando --need 'dizer "fechar fase" aqui')"
+out="$(cd "$repo/.worktrees/issue-6" && "$SCRIPTS/status.sh" --state esperando --offline --next "parar" --need 'dizer "fechar fase" aqui')"
 assert_eq "$(printf '%s\n' "$out" | grep -c 'fechar fase')" "1" "the close hint is not repeated when the need already says it"
+cat >"$TMP/handler.sh" <<'H'
+case "$*" in
+  *"--json comments"*) echo '{"comments":[]}' ;;
+  "issue view"*) echo "end:lab-test" ;;
+esac
+H
+use_fake_gh "$TMP/handler.sh"
+out="$(cd "$repo/.worktrees/issue-6" && "$SCRIPTS/status.sh" --state esperando --next "parar" --need 'dizer "fechar fase" aqui')"
+assert_eq "$(printf '%s\n' "$out" | grep -c 'fechar fase')" "1" "lab-test does not append the hint when the need already says it"
 finish
