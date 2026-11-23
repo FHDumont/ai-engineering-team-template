@@ -6,8 +6,14 @@
 #: Checks: tools of the method (git, gh, jq, python3, shellcheck: a missing one
 #: is named with the command that installs it), the declared dependencies of the
 #: product (requirements*.txt and package.json files tracked in git: a missing
-#: package or an absent node_modules is named with its folder and the install
-#: command), branch other than main, git hooks installed (core.hooksPath=.githooks;
+#: package or an absent node_modules is named with its folder). A missing product
+#: dependency warns, and nothing is installed, when CHECK_ENV_OPENING=1
+#: (new-phase.sh sets it while opening). The child session, without that
+#: variable, still fails until the environment exists. The message names the
+#: lockfile manager (npm ci, pnpm install --frozen-lockfile, yarn install
+#: --frozen-lockfile) and never suggests pip install into the global Python, nor
+#: npm install when a lockfile exists. A missing tool of the method still blocks.
+#: Also checks: branch other than main, git hooks installed (core.hooksPath=.githooks;
 #: installs it if missing) and a bot secret provider (scripts/lib/secret.sh; it
 #: only checks, prints nothing and never triggers a password manager
 #: authorization) when the phase spec cites bots. It never runs the test suite:
@@ -47,8 +53,39 @@ command -v shellcheck >/dev/null 2>&1 ||
 echo "ok: tools of the method"
 
 # Declared dependencies of the product, read without running anything of it.
+# Opening (CHECK_ENV_OPENING=1) warns and installs nothing. The child session still fails.
+missing_dep() { # missing_dep <detail>
+  if [ "${CHECK_ENV_OPENING:-}" = 1 ]; then
+    echo "warn: missing dependency: $1"
+    return 0
+  fi
+  die "missing dependency: $1"
+}
+# Nearest lockfile from <dir> up to the repo root: pnpm, yarn, then npm.
+# The command never writes a lockfile (npm ci, or a frozen install).
+node_install_hint() { # node_install_hint <relative dir> <repo top>
+  local rel="$1" top="$2" d="" cmd=""
+  if [ "$rel" = . ]; then d="$top"; else d="$top/$rel"; fi
+  while :; do
+    if [ -f "$d/pnpm-lock.yaml" ]; then cmd="pnpm install --frozen-lockfile"; break; fi
+    if [ -f "$d/yarn.lock" ]; then cmd="yarn install --frozen-lockfile"; break; fi
+    if [ -f "$d/package-lock.json" ] || [ -f "$d/npm-shrinkwrap.json" ]; then cmd="npm ci"; break; fi
+    [ "$d" = "$top" ] && break
+    d="$(dirname "$d")"
+  done
+  if [ -z "$cmd" ]; then
+    cmd="npm ci"
+    if [ "$rel" = . ]; then d="$top"; else d="$top/$rel"; fi
+  fi
+  if [ "$d" = "$top" ]; then
+    printf '%s' "$cmd"
+  else
+    printf 'cd %s && %s' "${d#"$top"/}" "$cmd"
+  fi
+}
 check_declared_deps() {
-  local f dir missing
+  local f dir missing top names hint warned=0
+  top="$(git rev-parse --show-toplevel)"
   while IFS= read -r f; do
     [ -f "$f" ] || continue
     dir="$(dirname "$f")"
@@ -59,7 +96,7 @@ for line in open(sys.argv[1], encoding="utf-8"):
     line = line.split("#", 1)[0].strip()
     if not line or line.startswith("-"):
         continue
-    name = re.split(r"[<>=!~;\[ ]", line, 1)[0]
+    name = re.split(r"[<>=!~;\[ ]", line, maxsplit=1)[0]
     if not name:
         continue
     try:
@@ -69,16 +106,22 @@ for line in open(sys.argv[1], encoding="utf-8"):
 PY
 )"
     if [ -n "$missing" ]; then
-      die "missing dependency: $(echo "$missing" | paste -sd' ' -) (folder $dir): pip install -r $f"
+      names="$(echo "$missing" | paste -sd' ' -)"
+      missing_dep "$names (folder $dir): declared in $f"
+      warned=1
     fi
   done <<<"$(git ls-files 'requirements*.txt' '*/requirements*.txt')"
   while IFS= read -r f; do
     [ -f "$f" ] || continue
     dir="$(dirname "$f")"
     jq -e '(.dependencies // {}) + (.devDependencies // {}) | length > 0' "$f" >/dev/null 2>&1 || continue
-    [ -d "$dir/node_modules" ] ||
-      die "missing dependency: node_modules (folder $dir): $([ "$dir" = . ] || echo "cd $dir && ")npm install"
+    if [ ! -d "$dir/node_modules" ]; then
+      hint="$(node_install_hint "$dir" "$top")"
+      missing_dep "node_modules (folder $dir): $hint"
+      warned=1
+    fi
   done <<<"$(git ls-files package.json '*/package.json')"
+  [ "$warned" = 0 ] || return 0
   echo "ok: declared dependencies"
 }
 check_declared_deps
@@ -143,8 +186,9 @@ check_session_pair() {
   done <<<"$asked"
 }
 # Records the session that works on the phase (the child session runs this in the execute skill).
-# The session that opened the phase is not the one that works on it: no phase_session for it.
-if [ "$(phase_opener_state "$phase_issue" "${CLAUDE_CODE_SESSION_ID:-}")" != opener ]; then
+# The session that opened the phase is not the one that works on it: no phase_session for it,
+# including the check new-phase.sh runs while opening (CHECK_ENV_OPENING=1).
+if [ "${CHECK_ENV_OPENING:-}" != 1 ] && [ "$(phase_opener_state "$phase_issue" "${CLAUDE_CODE_SESSION_ID:-}")" != opener ]; then
   check_session_pair
 fi
 

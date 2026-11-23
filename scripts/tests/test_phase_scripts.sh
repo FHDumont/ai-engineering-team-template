@@ -63,17 +63,76 @@ mkdir -p "$path/app"
 printf 'no-such-package-xyz==1.0\n' >"$path/app/requirements.txt"
 git -C "$path" add app/requirements.txt
 assert_status 1 "check-env names a missing python package" sh -c "cd '$path' && scripts/check-env.sh"
-assert_contains "$(last_output)" "missing dependency: no-such-package-xyz (folder app): pip install -r app/requirements.txt" "names package, folder and command"
+assert_contains "$(last_output)" "missing dependency: no-such-package-xyz (folder app): declared in app/requirements.txt" "names package, folder and the requirements file"
+assert_not_contains "$(last_output)" "pip install" "does not suggest pip install into the global Python"
+assert_not_contains "$(last_output)" "DeprecationWarning" "maxsplit is a keyword, so Python 3.13 stays quiet"
 git -C "$path" rm --quiet -f app/requirements.txt
 mkdir -p "$path/app"
 printf '{"dependencies":{"left-pad":"1.0.0"}}\n' >"$path/app/package.json"
-git -C "$path" add app/package.json
+printf '{"lockfileVersion":3}\n' >"$path/app/package-lock.json"
+git -C "$path" add app/package.json app/package-lock.json
 assert_status 1 "check-env names an absent node_modules" sh -c "cd '$path' && scripts/check-env.sh"
-assert_contains "$(last_output)" "folder app): cd app && npm install" "names the folder and the npm command"
+assert_contains "$(last_output)" "folder app): cd app && npm ci" "names the folder and npm ci"
+assert_not_contains "$(last_output)" "npm install" "does not suggest npm install when a lockfile exists"
+rm "$path/app/package-lock.json"
+printf 'lockfileVersion: 9.0\n' >"$path/app/pnpm-lock.yaml"
+git -C "$path" add app/pnpm-lock.yaml
+git -C "$path" rm --quiet -f app/package-lock.json
+assert_status 1 "check-env names pnpm when the lockfile is pnpm" sh -c "cd '$path' && scripts/check-env.sh"
+assert_contains "$(last_output)" "pnpm install --frozen-lockfile" "names the pnpm frozen install"
+assert_not_contains "$(last_output)" "npm ci" "a pnpm lockfile does not suggest npm ci"
+assert_eq "" "$(last_output | grep -E '(^|[^[:alnum:]_-])npm install' || true)" "a pnpm lockfile does not suggest npm install"
+rm "$path/app/pnpm-lock.yaml"
+printf '# yarn lockfile\n' >"$path/app/yarn.lock"
+git -C "$path" add app/yarn.lock
+git -C "$path" rm --quiet -f app/pnpm-lock.yaml
+assert_status 1 "check-env names yarn when the lockfile is yarn" sh -c "cd '$path' && scripts/check-env.sh"
+assert_contains "$(last_output)" "yarn install --frozen-lockfile" "names the yarn frozen install"
 mkdir -p "$path/app/node_modules"
 assert_status 0 "check-env passes once node_modules exists" sh -c "cd '$path' && scripts/check-env.sh"
-git -C "$path" rm --quiet -f app/package.json
+git -C "$path" rm --quiet -f app/package.json app/yarn.lock
 rm -rf "$path/app"
+
+# Opening warns and installs nothing; the child session still fails (#98).
+# The commit lands on a fresh clone: check-env already pointed this repo at
+# .githooks, and that hook refuses a commit on main.
+git clone --quiet "$TMP/remote.git" "$TMP/deps"
+git -C "$TMP/deps" config user.email test@example.org
+git -C "$TMP/deps" config user.name test
+git -C "$TMP/deps" config commit.gpgsign false
+printf 'no-such-package-xyz==1.0\n' >"$TMP/deps/requirements.txt"
+printf '{"dependencies":{"left-pad":"1.0.0"}}\n' >"$TMP/deps/package.json"
+printf '{"lockfileVersion":3}\n' >"$TMP/deps/package-lock.json"
+git -C "$TMP/deps" add requirements.txt package.json package-lock.json
+git -C "$TMP/deps" commit --quiet -m "chore: product dependencies"
+git -C "$TMP/deps" push --quiet origin HEAD:main
+mkdir -p "$TMP/noinstall"
+printf '#!/bin/sh\necho "$0" >>"%s"\n' "$TMP/install.log" >"$TMP/noinstall/pip"
+cp "$TMP/noinstall/pip" "$TMP/noinstall/pip3"
+cp "$TMP/noinstall/pip" "$TMP/noinstall/npm"
+cp "$TMP/noinstall/pip" "$TMP/noinstall/pnpm"
+chmod +x "$TMP/noinstall/pip" "$TMP/noinstall/pip3" "$TMP/noinstall/npm" "$TMP/noinstall/pnpm"
+: >"$TMP/install.log"
+assert_status 0 "new-phase opens when a product dependency is missing" env PATH="$TMP/noinstall:$PATH" sh -c "cd '$repo' && scripts/new-phase.sh 8"
+open_out="$(last_output)"
+assert_contains "$open_out" "warn: missing dependency: no-such-package-xyz (folder .): declared in requirements.txt" "opening warns and names the requirements file"
+assert_contains "$open_out" "warn: missing dependency: node_modules (folder .): npm ci" "opening names npm ci"
+assert_not_contains "$open_out" "pip install" "opening does not suggest pip install"
+assert_not_contains "$open_out" "npm install" "opening does not suggest npm install"
+assert_not_contains "$open_out" "DeprecationWarning" "opening prints no maxsplit warning"
+assert_eq "" "$(cat "$TMP/install.log")" "opening installs nothing"
+wt8="$repo/.worktrees/issue-8"
+assert_status 1 "the child check-env still fails while the product dependency is missing" sh -c "cd '$wt8' && scripts/check-env.sh"
+assert_contains "$(last_output)" "error: missing dependency: no-such-package-xyz (folder .): declared in requirements.txt" "the child still names the missing package"
+assert_not_contains "$(last_output)" "pip install" "the child does not suggest pip install"
+if [ -d "$wt8" ]; then
+  git -C "$repo" worktree remove --force "$wt8"
+  git -C "$repo" branch -D fix/issue-8-datas-no-fuso-errado >/dev/null
+fi
+slots_reap fase
+git -C "$TMP/deps" rm --quiet -f requirements.txt package.json package-lock.json
+git -C "$TMP/deps" commit --quiet -m "chore: drop product dependencies"
+git -C "$TMP/deps" push --quiet origin HEAD:main
 
 # check-env: a spec that cites bots requires a secret provider; a spec without bots does not.
 # Fake security and op: no test touches the real credential store or password manager.
