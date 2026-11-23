@@ -3,8 +3,9 @@
 # is not configured for the method (scripts/setup-repo.sh --check exits 7), it adds to
 # the context that the setup is pending and that the first step is the setup skill.
 # It only warns; the lock is scripts/phase-start.sh. It never blocks or delays a
-# session: without jq, gh, a remote or network, or when the check takes longer
-# than SETUP_CHECK_TIMEOUT seconds (default 5), it says nothing. Always exits 0.
+# session: without jq, gh, a remote or network, it says nothing. When the check
+# takes longer than SETUP_CHECK_TIMEOUT seconds (default 5), it says it could
+# not check. Always exits 0.
 # A check that passed is remembered in .process/setup-ok of the main checkout:
 # later sessions do not read GitHub again (phase-start.sh still checks every time).
 here="$(cd "$(dirname "$0")" && pwd)"
@@ -40,6 +41,7 @@ case "$rc" in
   0) [ -z "$main_root" ] || { mkdir -p "$main_root/.process" 2>/dev/null && : >"$main_root/.process/setup-ok" 2>/dev/null; }
      exit 0 ;;
   7) echo "Setup pending: this repository is not configured for the method. First step, before any other work: load the setup skill (the owner's sentence is \"configurar o repo\"). Until then scripts/phase-start.sh and scripts/open-issue.sh refuse. What scripts/setup-repo.sh --check found:" ;;
+  143|137) echo "could not check: scripts/setup-repo.sh --check exceeded ${SETUP_CHECK_TIMEOUT:-5}s, so this session could not check whether the setup is pending" ;;
   *) exit 0 ;;
 esac
 cat "$out"

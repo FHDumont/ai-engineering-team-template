@@ -23,6 +23,19 @@ out="$("$SETUP")"
 assert_contains "$out" "no changes" "idempotent: conforming repo is left alone"
 assert_not_contains "$(gh_calls)" "-X PUT" "no protection write when conforming"
 assert_not_contains "$(gh_calls)" "label create" "no label write when conforming"
+# --check reads the label list in one pass: a jq per label used to exceed the hook limit (#108).
+real_jq="$(command -v jq)"
+cat >"$TMP/bin/jq" <<E
+#!/bin/bash
+echo x >>"$TMP/jq.count"
+exec "$real_jq" "\$@"
+E
+chmod +x "$TMP/bin/jq"
+: >"$TMP/jq.count"
+assert_status 0 "label check reads the list in one pass" "$SETUP" --check --only labels
+jq_n="$(wc -l <"$TMP/jq.count" | tr -d ' ')"
+[ "$jq_n" -le 8 ] && ok || bad "label check spawned $jq_n jq processes (one pass stays within 8)"
+rm -f "$TMP/bin/jq"
 
 # "New" state: default GitHub labels, settings and no protection.
 cat >"$TMP/fresh.sh" <<'H'

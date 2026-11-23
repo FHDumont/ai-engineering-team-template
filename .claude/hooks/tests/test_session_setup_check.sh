@@ -3,6 +3,9 @@
 # shellcheck source=scripts/tests/lib.sh
 source "$(dirname "$0")/../../../scripts/tests/lib.sh"
 HOOK="$REPO/.claude/hooks/session-setup-check.sh"
+# The cases that need an answer do not race the 5s clock: a loaded machine may
+# take longer than the hook's default, and that is not a failed check (#108).
+export SETUP_CHECK_TIMEOUT=60
 : >"$TMP/none.sh"
 use_fake_gh "$TMP/none.sh"
 
@@ -59,9 +62,10 @@ for c in jq git head sed tr mktemp sleep cat rm mkdir dirname bash env; do ln -s
 assert_status 0 "never blocks (no gh)" env PATH="$TMP/nogh" bash -c "echo '{\"session_id\":\"s-nogh\",\"cwd\":\"$repo\"}' | '$HOOK'"
 assert_eq "" "$(last_output)" "says nothing without gh"
 echo 'sleep 6' >"$TMP/slow.sh"
+rm -f "$repo/.process/setup-ok"
 SECONDS=0
 assert_status 0 "never blocks (slow gh)" env FAKE_GH_HANDLER="$TMP/slow.sh" FAKE_SETUP="" SETUP_CHECK_TIMEOUT=1 "$SHELL" -c "echo '{\"session_id\":\"s-slow\",\"cwd\":\"$repo\"}' | '$HOOK'"
-assert_eq "" "$(last_output)" "says nothing when the check times out"
+assert_contains "$(last_output)" "could not check" "says it could not check when the check times out"
 [ "$SECONDS" -lt 5 ] && ok || bad "the time limit holds (took ${SECONDS}s)"
 assert_status 0 "empty input passes" sh -c "echo '{}' | '$HOOK'"
 

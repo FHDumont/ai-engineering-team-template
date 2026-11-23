@@ -217,52 +217,73 @@ wontfix
 accessibility"
 
 sync_labels() {
-  local current name color desc olds old found
+  # One pass over the label list (#108): a jq per label made --check slower than
+  # the session hook's time limit. Python compares the whole list once.
+  local current plan action a b c d
   current="$(gh label list --repo "$repo" --limit 500 --json name,color,description)"
-  while IFS="$(printf '\t')" read -r name color desc olds; do
-    case "$name" in ''|'#'*) continue ;; esac
-    found="$(echo "$current" | jq -c --arg n "$name" '.[] | select(.name == $n)')"
-    if [ -n "$found" ]; then
-      if [ "$(echo "$found" | jq -r '.color | ascii_downcase')" != "$color" ] ||
-         [ "$(echo "$found" | jq -r .description)" != "$desc" ]; then
-        apply "update label $name" gh label edit "$name" --repo "$repo" --color "$color" --description "$desc"
-      fi
-      continue
-    fi
-    # Renames from an old name, if it exists (keeps the issues labeled).
-    old=""
-    if [ -n "$olds" ]; then
-      for o in $(echo "$olds" | tr ',' ' '); do
-        if echo "$current" | jq -e --arg n "$o" 'any(.[]; .name == $n)' >/dev/null; then old="$o"; break; fi
-      done
-    fi
-    if [ -n "$old" ]; then
-      if label_in_use "$old"; then
-        maybe_apply 1 "rename label $old -> $name (in use)" \
-          gh label edit "$old" --repo "$repo" --name "$name" --color "$color" --description "$desc"
-      else
-        apply "rename label $old -> $name" gh label edit "$old" --repo "$repo" --name "$name" --color "$color" --description "$desc"
-      fi
-      current="$(echo "$current" | jq -c --arg o "$old" 'map(select(.name != $o))')"
-    else
-      apply "create label $name" gh label create "$name" --repo "$repo" --color "$color" --description "$desc"
-    fi
-  done <<<"$(label_rows "$ROOT/.github/labels.tsv")"
-
-  local wanted
-  wanted="$(label_rows "$ROOT/.github/labels.tsv" | cut -f1)"
-  while IFS= read -r name; do
-    [ -n "$name" ] || continue
-    echo "$wanted" | stdin_grep -qxF "$name" && continue
-    if echo "$current" | jq -e --arg n "$name" 'any(.[]; .name == $n)' >/dev/null; then
-      if label_in_use "$name"; then
-        maybe_apply 1 "delete default label $name (in use)" \
-          gh label delete "$name" --repo "$repo" --yes
-      else
-        apply "delete default label $name" gh label delete "$name" --repo "$repo" --yes
-      fi
-    fi
-  done <<<"$DEFAULT_LABELS"
+  plan="$(label_rows "$ROOT/.github/labels.tsv" | python3 -c '
+import json, sys
+current = json.loads(sys.argv[1])
+by = {row["name"]: row for row in current}
+defaults = [n for n in sys.argv[2].split("\n") if n]
+wanted = []
+actions = []
+for line in sys.stdin:
+    line = line.rstrip("\n")
+    if not line or line.startswith("#"):
+        continue
+    parts = line.split("\t")
+    while len(parts) < 4:
+        parts.append("")
+    name, color, desc, olds = parts[0], parts[1], parts[2], parts[3]
+    wanted.append(name)
+    have = by.get(name)
+    if have is not None:
+        if (have.get("color") or "").lower() != color.lower() or (have.get("description") or "") != desc:
+            actions.append(("update", name, color, desc))
+        continue
+    old = ""
+    for candidate in olds.split(","):
+        candidate = candidate.strip()
+        if candidate and candidate in by:
+            old = candidate
+            break
+    if old:
+        actions.append(("rename", old, name, color, desc))
+        by[name] = {"name": name, "color": color, "description": desc}
+        del by[old]
+    else:
+        actions.append(("create", name, color, desc))
+for name in defaults:
+    if name in by and name not in wanted:
+        actions.append(("delete", name))
+for action in actions:
+    sys.stdout.write("\x1e".join(action) + "\n")
+' "$current" "$DEFAULT_LABELS")"
+  while IFS="$(printf '\036')" read -r action a b c d; do
+    [ -n "${action:-}" ] || continue
+    case "$action" in
+      update)
+        apply "update label $a" gh label edit "$a" --repo "$repo" --color "$b" --description "$c" ;;
+      rename)
+        # Renames from an old name, if it exists (keeps the issues labeled).
+        if label_in_use "$a"; then
+          maybe_apply 1 "rename label $a -> $b (in use)" \
+            gh label edit "$a" --repo "$repo" --name "$b" --color "$c" --description "$d"
+        else
+          apply "rename label $a -> $b" gh label edit "$a" --repo "$repo" --name "$b" --color "$c" --description "$d"
+        fi ;;
+      create)
+        apply "create label $a" gh label create "$a" --repo "$repo" --color "$b" --description "$c" ;;
+      delete)
+        if label_in_use "$a"; then
+          maybe_apply 1 "delete default label $a (in use)" \
+            gh label delete "$a" --repo "$repo" --yes
+        else
+          apply "delete default label $a" gh label delete "$a" --repo "$repo" --yes
+        fi ;;
+    esac
+  done <<<"$plan"
 }
 
 sync_settings() {
