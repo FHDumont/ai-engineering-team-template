@@ -80,14 +80,15 @@
 #:   different from the branch's issue is refused (exit 2). --wait waits for the merge and
 #:   runs --cleanup. Never dispatches a deploy: scripts/deploy.sh does, run by
 #:   the main session after the last merge of the group.
-#: --pr N: a pull request whose head branch is not a phase branch (not fix/issue-*).
-#:   It does not use the phase gate and it does not change --merge for a phase
-#:   branch. --publish-review posts review/independent on that pull request's head
-#:   SHA from the saved review of that SHA (.process/reviewer-<sha>.md and the
-#:   matching .verdict). --merge is refused unless --owner-ok is that same SHA,
-#:   the CI check run on it is success, and the saved independent review of that
-#:   SHA has verdict success. A wrong SHA, missing CI and a fix/issue-* head are
-#:   refused. The phase path stays --merge, without --pr.
+#: --pr N: a pull request whose head is not a phase branch. A phase branch is
+#:   <type>/issue-<n>-* with type feat, fix, docs or chore (new-phase.sh),
+#:   including fix/issue-*. --pr does not use the phase gate and it does not
+#:   change --merge for a phase branch. --publish-review posts review/independent
+#:   on that pull request's head SHA from the saved review of that SHA
+#:   (.process/reviewer-<sha>.md and the matching .verdict). --merge is refused
+#:   unless --owner-ok is that same SHA, the CI check run on it is success, and
+#:   the saved independent review of that SHA has verdict success. A wrong SHA,
+#:   missing CI and a phase head are refused. The phase path stays --merge.
 #: --prepare, --publish-review, --check and --merge exit 9 in the session that
 #:   opened the phase (phase_opened): it forwards the request to the child
 #:   session and stops.
@@ -819,8 +820,9 @@ outside_refs() { # outside_refs <pull request number>
   sha="$(printf '%s' "$info" | jq -r '.headRefOid // empty')"
   base="$(printf '%s' "$info" | jq -r '.baseRefName // "main"')"
   [ -n "$branch" ] && [ -n "$sha" ] || die "PR #$1 has no head"
+  # new-phase.sh: <type>/issue-<n>-<slug>, type feat, fix, docs or chore.
   case "$branch" in
-    fix/issue-*)
+    feat/issue-*|fix/issue-*|docs/issue-*|chore/issue-*)
       die "refused: PR #$1 is on phase branch $branch: a phase branch keeps close-phase.sh --merge" 2 ;;
   esac
   printf '%s\t%s\n' "$sha" "$base"

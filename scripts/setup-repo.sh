@@ -11,7 +11,8 @@
 #:    and the `review/independent` status, no "up to date" requirement;
 #:    0 approvals; linear history; enforced for admins; no force-push, no deletion.
 #:    Before that protection is turned on, warns that a pull request whose branch
-#:    is not fix/issue-* receives review/independent and merges only with
+#:    is not a phase branch (feat/issue-*, fix/issue-*, docs/issue-* or
+#:    chore/issue-*) receives review/independent and merges only with
 #:    close-phase.sh --pr, --owner-ok of its HEAD, green CI and the saved review
 #:    of that SHA. A phase branch keeps close-phase.sh --merge.
 #:    It is read back after being applied. Extra required checks live in
@@ -387,7 +388,7 @@ sync_protection() {
     [ "$blocked" = 0 ] || return 0
   fi
   local what="protect $branch (CI + review/independent, 0 approvals, linear, admins included)"
-  echo "warning: before branch protection is turned on: a pull request that is not a phase branch (not fix/issue-*) receives review/independent and merges only with close-phase.sh --pr N --merge --owner-ok equal to its HEAD, with green CI and the saved independent review of that SHA; a phase branch keeps close-phase.sh --merge" >&2
+  echo "warning: before branch protection is turned on: a pull request that is not a phase branch (not feat/issue-*, fix/issue-*, docs/issue-* or chore/issue-*) receives review/independent and merges only with close-phase.sh --pr N --merge --owner-ok equal to its HEAD, with green CI and the saved independent review of that SHA; a phase branch keeps close-phase.sh --merge" >&2
   changes=$((changes + 1))
   if [ "$dry" = 1 ]; then echo "would: $what"; return 0; fi
   if ! raw="$(gh api -X PUT "repos/$repo/branches/$branch/protection" --input - <<<"$body" 2>&1)"; then

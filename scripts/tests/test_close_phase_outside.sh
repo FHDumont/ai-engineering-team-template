@@ -49,12 +49,14 @@ assert_contains "$(gh_calls)" "api -X POST repos/owner/repo/statuses/$OUTSHA -f 
 assert_contains "$(gh_calls)" "pr comment 40" "posts the saved review"
 assert_not_contains "$(git -C "$repo" rev-parse HEAD)" "$OUTSHA" "the checkout head is not the pull request head"
 
-: >"$FAKE_GH_LOG"
-assert_status 2 "refuses to publish a phase branch through --pr" \
-  env FAKE_HEAD_BRANCH=fix/issue-9-x \
-  sh -c "cd '$repo' && '$CLOSE' --pr 40 --publish-review '$repo/.process/reviewer-$OUTSHA.md' --verdict success"
-assert_contains "$(last_output)" "phase branch" "says a phase branch keeps --merge"
-assert_not_contains "$(gh_calls)" "statuses" "no status on a phase branch"
+for phase_branch in feat/issue-9-x fix/issue-9-x docs/issue-9-x chore/issue-9-x; do
+  : >"$FAKE_GH_LOG"
+  assert_status 2 "refuses to publish a phase branch $phase_branch through --pr" \
+    env FAKE_HEAD_BRANCH="$phase_branch" \
+    sh -c "cd '$repo' && '$CLOSE' --pr 40 --publish-review '$repo/.process/reviewer-$OUTSHA.md' --verdict success"
+  assert_contains "$(last_output)" "phase branch" "says a phase branch keeps --merge ($phase_branch)"
+  assert_not_contains "$(gh_calls)" "statuses" "no status on a phase branch ($phase_branch)"
+done
 
 : >"$FAKE_GH_LOG"
 assert_status 5 "refuses a non-phase merge without --owner-ok" \
@@ -75,12 +77,14 @@ assert_status 11 "refuses a non-phase merge when CI is missing" \
 assert_contains "$(last_output)" "CI is missing" "says CI is missing"
 assert_not_contains "$(gh_calls)" "pr merge" "no merge without CI"
 
-: >"$FAKE_GH_LOG"
-assert_status 2 "refuses to merge a phase branch through --pr" \
-  env FAKE_HEAD_BRANCH=fix/issue-9-x \
-  sh -c "cd '$repo' && '$CLOSE' --pr 40 --merge --owner-ok '$OUTSHA'"
-assert_contains "$(last_output)" "phase branch" "a phase branch is not this command"
-assert_not_contains "$(gh_calls)" "pr merge" "the phase gate is not bypassed"
+for phase_branch in feat/issue-9-x fix/issue-9-x docs/issue-9-x chore/issue-9-x; do
+  : >"$FAKE_GH_LOG"
+  assert_status 2 "refuses to merge a phase branch $phase_branch through --pr" \
+    env FAKE_HEAD_BRANCH="$phase_branch" \
+    sh -c "cd '$repo' && '$CLOSE' --pr 40 --merge --owner-ok '$OUTSHA'"
+  assert_contains "$(last_output)" "phase branch" "a phase branch is not this command ($phase_branch)"
+  assert_not_contains "$(gh_calls)" "pr merge" "the phase gate is not bypassed ($phase_branch)"
+done
 
 rm -f "$repo/.process/reviewer-$OUTSHA.md" "$repo/.process/reviewer-$OUTSHA.verdict"
 : >"$FAKE_GH_LOG"
