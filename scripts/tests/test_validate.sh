@@ -133,4 +133,12 @@ wait "$first" || true
 assert_eq 1 "$second" "a waiter on a changed tree does not inherit the previous green"
 assert_contains "$(cat "$TMP/inherit.second")" "failed" "the second run reports the failure of the new tree"
 
+# An empty test list (no test file at all) must not trip bash 3.2 set -u (#110).
+empty="$(make_repo)"
+mkdir -p "$empty/scripts/lib" "$empty/scripts/tests"
+cp "$SCRIPTS/validate.sh" "$empty/scripts/validate.sh"
+cp "$SCRIPTS/lib/common.sh" "$SCRIPTS/lib/slots.sh" "$SCRIPTS/lib/progress.sh" "$SCRIPTS/lib/procs.sh" "$SCRIPTS/lib/machine-limits.env.example" "$empty/scripts/lib/"
+assert_status 0 "an empty test list passes" env -u PROCESS_VALIDATE_RUNNING "$empty/scripts/validate.sh" --tests
+assert_contains "$(last_output)" "tests: 0 passed, 0 failed" "an empty test list reports zero tests"
+
 finish
