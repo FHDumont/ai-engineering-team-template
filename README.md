@@ -116,7 +116,7 @@ As melhorias do template chegam como um PR de atualização, feito pelo agente. 
 
 - `scripts/validate.sh`: lint (shellcheck) e todos os testes.
 - `scripts/check-docs.sh`: limites dos docs e o desenho contra o repositório.
-- Limites da máquina (vagas de validação e de fase, tempo de espera, avisos de carga): `~/.config/ai-method/machine-limits.env`, criado na primeira execução. `scripts/machine-slots.sh --status` mostra quem ocupa as vagas e `--report` compara espera e duração. Mesma tabela de parâmetros no `docs/process-design.md` §6.4. `scripts/sessions.sh --list` mostra as sessões e os MCPs por repo; no fim da fase o `close-phase.sh --cleanup` encerra os processos do worktree, e a sessão do app só o dono arquiva (menu ⋯ → Archive, nunca deletar).
+- Limites da máquina (vagas de validação e de fase, tempo de espera, avisos de carga): `~/.config/ai-method/machine-limits.env`, criado na primeira execução. `scripts/machine-slots.sh --status` mostra quem ocupa as vagas e `--report` compara espera e duração. Mesma tabela de parâmetros no `docs/process-design.md` §6.4. `scripts/sessions.sh --list` mostra as sessões e os MCPs por repo; no fim da fase o `close-phase.sh --cleanup` encerra os processos do worktree, e a sessão do app é arquivada depois de um ok pedido uma vez (no ok da spec ou num quadro no fim do grupo): a gerenciadora chama `set_remote_control` e `archive_session` e, se o app devolver um campo, repete uma vez com esse campo, nas duas; nunca deletar.
 
 | Parâmetro | Padrão | Unidade | Efeito |
 |---|---|---|---|
