@@ -144,7 +144,7 @@ Diagrama das raias: [`docs/diagrams/process-flow.html`](diagrams/process-flow.ht
 7. **Execução.** A sessão filha roda `scripts/check-env.sh` e executa as etapas, um commit por etapa (skill `execute`). Achados seguem a §4.2.
 8. **Modo de fim.**
    - `end:auto-close`: a filha segue direto para o fecho.
-   - `end:lab-test`: a filha para antes do fecho com `status.sh --state esperando --need "testar no lab …"`. O dono testa, itera pela sessão principal e diz "fechar fase". "Fechar fase" vale dito em qualquer sessão; quem fecha é a sessão da fase.
+   - `end:lab-test`: a filha para antes do fecho com `status.sh --state esperando --need "testar no lab …"`. A spec separa a prova da parada, a do fecho e a do pós-merge; o brief não pede na parada prova que só existe depois. Pós-merge pode dizer "issue fica aberta até a prova": o PR usa `Refs` e o quadro só vai a Done com a issue fechada. A `integrate` fecha essa issue, com as provas, antes do `gen-docs.sh`. O dono testa, itera pela sessão principal e diz "fechar fase". "Fechar fase" vale dito em qualquer sessão; quem fecha é a sessão da fase.
 9. **Fecho.** A filha fecha pelo `scripts/close-phase.sh` (§6.1), com a revisão independente (§10.2) e o merge pelo portão (§10).
 10. **Fim do grupo.** Depois do último merge do grupo, solo e paralelo, a sessão principal faz o passo único de fim, uma vez. Os passos e a ordem estão na skill `integrate`: meta de tempo e achados leves, depois `scripts/gen-docs.sh`, `scripts/deploy.sh`, arquivamento das sessões filhas, remoção do batimento (§4.3), `scripts/end-check.sh`. Nada que muda o roadmap acontece depois do `gen-docs.sh`. A spec do grupo sai da `main` aqui: o PR do `gen-docs.sh` remove cada spec de `docs/specs/` cujas issues citadas estão todas fechadas, a que o fecho das fases (§6.1) deixou.
 
@@ -333,7 +333,7 @@ Roda só na sessão filha; na sessão que abriu a fase, `--prepare`, `--publish-
    - `check-attribution.sh --pr N` no corpo final e nos commits.
 
    Passou: `gh pr merge --auto --rebase --delete-branch`. Nunca dispara deploy.
-6. **`--cleanup`** (o `--wait` roda depois do merge): tira a linha da fase de `.worktrees/parallel-active.tsv`, apaga worktree, branch local e branch remota (lida de volta), atualiza a `main` local e move a issue para `Done` no quadro.
+6. **`--cleanup`** (o `--wait` roda depois do merge): tira a linha da fase de `.worktrees/parallel-active.tsv`, apaga worktree, branch local e branch remota (lida de volta), atualiza a `main` local e move a issue para `Done` no quadro só quando ela está fechada.
 7. **`--abort`** desiste da fase sem merge. Lista o que seria perdido (alteração não commitada, arquivo não rastreado, commit sem push, commit enviado que nenhum PR guarda) e sai 10 sem tocar em nada. A filha faz commit e push do que fica. Perda aceita: a filha pede o ok do dono num quadro `Fase #<n> — <título>:` e roda `--abort --discard`, que fecha o PR, apaga a branch remota, o worktree, a branch local e a linha do registro, e devolve a issue a `Todo`.
 
 ### 6.2 Hooks

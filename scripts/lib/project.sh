@@ -59,6 +59,21 @@ project_item_status() { # project_item_status <item id>
     -f i="$1" --jq '.data.node.fieldValueByName.name // ""' 2>/dev/null || true
 }
 
+# Done only when the issue is already closed. An issue kept open for a
+# post-merge proof stays off Done (issue #114).
+project_set_done_if_closed() { # project_set_done_if_closed <issue>
+  local n="$1" repo num state
+  repo="$(repo_slug 2>/dev/null)" || return 0
+  num="$(project_board "$repo")" || return 1
+  [ -n "$num" ] || return 0
+  state="$(gh issue view "$n" --repo "$repo" --json state --jq .state 2>/dev/null || true)"
+  if [ "$state" != "CLOSED" ]; then
+    echo "board: #$n is ${state:-unknown}, not set to Done"
+    return 0
+  fi
+  project_set_status "$n" "Done"
+}
+
 project_set_status() {
   local issue="$1" status="$2" repo num owner item pid fields fid oid what out got
   repo="$(repo_slug 2>/dev/null)" || return 0

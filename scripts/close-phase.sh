@@ -121,6 +121,8 @@ source "$HERE/lib/progress.sh"
 source "$HERE/lib/notes.sh"
 # shellcheck source=scripts/lib/role.sh
 source "$HERE/lib/role.sh"
+# shellcheck source=scripts/lib/refs.sh
+source "$HERE/lib/refs.sh"
 ROOT="$(cd "$HERE/.." && pwd)"
 
 # gh prints "hint:" lines (for example "gh event listen") that drown the result
@@ -334,6 +336,10 @@ prepare() {
   inherit_validation
   body_file="$(body_with_pairs "$body_file")"
   body_file="$(body_with_spec "$body_file")"
+  [ -n "$issue" ] || issue="$(issue_from_branch "$branch")"
+  if [ -n "$issue" ] && issue_kept_open "$issue" "$ROOT"; then
+    body_keep_open "$body_file" "$issue" "$ROOT"
+  fi
 
   # One push per round = one CI run. Generated files are not the phase's: gen-docs.sh.
   local n remote_sha=""
@@ -808,7 +814,7 @@ cleanup() {
     # shellcheck source=scripts/lib/project.sh
     source "$HERE/lib/project.sh"
     # A board write that fails does not stop the cleanup: it fails the script at the end.
-    project_set_status "$(issue_from_branch "$branch")" "Done" || board=1
+    project_set_done_if_closed "$(issue_from_branch "$branch")" || board=1
     # Filter of the "Fase atual" view: cleared, or left with only the group of the phases still active.
     project_refresh_phase_filter "$main_root" "" "$(issue_from_branch "$branch")" || board=1
     registry_drop "$main_root" "$(issue_from_branch "$branch")"
