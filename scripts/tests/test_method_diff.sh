@@ -18,6 +18,7 @@ git -C "$template" rm --quiet scripts/gone.sh
 echo added >"$template/scripts/new.sh"
 git -C "$template" add scripts
 git -C "$template" commit --quiet -m "chore: next"
+dest="$(git -C "$template" rev-parse HEAD)"
 
 repo="$(make_repo)"
 mkdir -p "$repo/scripts" "$repo/.github"
