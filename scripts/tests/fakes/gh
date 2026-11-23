@@ -56,8 +56,9 @@ case "$*" in
     exit 0 ;;
 esac
 # The check "CI" of the base commit (phase-start.sh): FAKE_BASE_CI is green (default), red,
-# running, absent or wait (running on the first FAKE_BASE_CI_RUNNING reads, then green: the
-# run of main that finishes while phase-start.sh waits for it).
+# running, absent, skipped (completed/skipped: the same tree was already tested) or wait
+# (running on the first FAKE_BASE_CI_RUNNING reads, then green: the run of main that finishes
+# while phase-start.sh waits for it).
 case "$*" in
   "api repos/$GH_REPO/commits/"*"/check-runs?per_page=100")
     ci_mode="${FAKE_BASE_CI:-green}"
@@ -78,6 +79,7 @@ case "$*" in
       running) echo '{"check_runs":[{"name":"CI","status":"in_progress","conclusion":null,"started_at":"2026-01-02T00:00:00Z","html_url":"https://github.com/owner/repo/actions/runs/4"}]}' ;;
       notyet) echo '{"check_runs":[{"name":"Tests","status":"in_progress","conclusion":null,"started_at":"2026-01-02T00:00:00Z"}]}' ;;
       absent) echo '{"check_runs":[{"name":"lint","status":"completed","conclusion":"success"}]}' ;;
+      skipped) echo '{"check_runs":[{"name":"CI","status":"completed","conclusion":"skipped","started_at":"2026-01-02T00:00:00Z","html_url":"https://github.com/owner/repo/actions/runs/7"}]}' ;;
     esac
     exit 0 ;;
 esac

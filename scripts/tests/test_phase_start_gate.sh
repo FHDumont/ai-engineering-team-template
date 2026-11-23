@@ -52,4 +52,26 @@ for pr in none red tree open; do
   assert_contains "$(last_output)" "nothing was created" "says nothing was created (PR $pr)"
   assert_eq "" "$(ls "$repo/.worktrees" 2>/dev/null || true)" "no worktree (PR $pr)"
 done
+# A completed/skipped check is not an absent one. GitHub skips CI on main when the same
+# tree was already green on the merged PR. Accept that voucher only when the trees match.
+# A red PR, or a different tree, still refuses — including when ci-mode is pr.
+assert_status 0 "phase-start accepts a skipped CI whose merged PR is green on the same tree" env FAKE_BASE_CI=skipped FAKE_BASE_PR=green CLAUDE_CODE_SESSION_ID=manager sh -c "cd '$repo' && scripts/phase-start.sh 7 --dry-run"
+assert_contains "$(last_output)" "skipped" "says the check is skipped"
+assert_contains "$(last_output)" "PR #30" "names the PR that vouches for the skipped check"
+assert_contains "$(last_output)" "same tree" "says the trees match"
+assert_not_contains "$(last_output)" "no check 'CI'" "a skipped check is not reported as absent"
+git -C "$repo" worktree list | grep -q issue-7 && git -C "$repo" worktree remove --force "$repo/.worktrees/issue-7" || true
+for pr in none red tree open; do
+  assert_status 1 "phase-start refuses a skipped CI when the PR is $pr" env FAKE_BASE_CI=skipped FAKE_BASE_PR=$pr sh -c "cd '$repo' && scripts/phase-start.sh 7 --no-check"
+  assert_contains "$(last_output)" "nothing was created" "says nothing was created (skipped, PR $pr)"
+  assert_contains "$(last_output)" "skipped" "names the skipped check (PR $pr)"
+  assert_eq "" "$(ls "$repo/.worktrees" 2>/dev/null || true)" "no worktree (skipped, PR $pr)"
+done
+mkdir -p "$repo/.github"
+printf 'pr\n' >"$repo/.github/ci-mode"
+assert_status 1 "phase-start refuses a skipped CI whose tree differs even in pr mode" env FAKE_BASE_CI=skipped FAKE_BASE_PR=tree sh -c "cd '$repo' && scripts/phase-start.sh 7 --no-check"
+assert_contains "$(last_output)" "nothing was created" "says nothing was created (skipped, different tree, pr mode)"
+assert_not_contains "$(last_output)" "warn:" "a different tree is not a warning when the check was skipped"
+rm -f "$repo/.github/ci-mode"
+assert_eq "" "$(ls "$repo/.worktrees" 2>/dev/null || true)" "no worktree when the skipped tree differs"
 finish

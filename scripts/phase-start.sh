@@ -171,6 +171,15 @@ case "$ci" in
 esac
 case "$ci" in
   completed/success*) echo "ok: CI of the base commit ${base:0:9} is green" ;;
+  completed/skipped*)
+    # Skipped is not an absent check. GitHub skips CI on main when the same tree
+    # was already green on the merged PR. Accept that voucher only when the trees
+    # match: a red PR, or a different tree, still refuses, even in pr mode.
+    if pr="$(base_pr_vouches "$base")"; then
+      echo "ok: check 'CI' of the base commit ${base:0:9} is skipped, but its merged PR #$pr had CI green on the same tree"
+    else
+      die "check 'CI' of the base commit ${base:0:9} of main is skipped and ${pr}: no phase opens; a skipped check is accepted only when the merged PR of that commit had CI green on the same tree; nothing was created"
+    fi ;;
   ""|absent)
     # A rebase merge made before ci.yml ran on main leaves a commit with no check.
     # push mode accepts the merged PR only when its head has the same tree.
