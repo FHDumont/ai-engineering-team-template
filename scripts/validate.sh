@@ -157,6 +157,9 @@ for f in sys.argv[1:]:
     done
     n_total=${#list[@]}
     passed=0 failed=0
+    # bash 3.2 with set -u rejects "${list[@]}" when the list is empty (#110).
+    # Skip the runner entirely; there is no test file to hand to xargs.
+    if [ "$n_total" -gt 0 ]; then
     # Each test runs in the background, up to AI_METHOD_TEST_JOBS at once, with its own
     # temporary folder (tests/lib.sh makes one per run); output and exit code go to
     # files and are reported afterwards, in the fixed order of the list. Each finished
@@ -190,6 +193,7 @@ for f in sys.argv[1:]:
         echo "$out" | missing_dep_hint
       fi
     done
+    fi
     echo "tests: $passed passed, $failed failed"
   fi
   exit "$fail"
