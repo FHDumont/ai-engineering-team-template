@@ -180,4 +180,27 @@ assert_status 0 "validate.sh records wait and duration" validate "$V" --tests
 assert_contains "$(cat "$H")" "$(printf 'validate\t')" "validate.sh wrote a history line"
 assert_eq "2" "$(wc -l <"$H" | tr -d ' ')" "header plus one line"
 
+# A phase slot is freed when the phase ends, not when the next one opens.
+# The duration the report compares with the target leaves out the wait for the owner.
+rm -rf "$SLOTS/fase"; mkdir -p "$SLOTS/fase/1"
+mkdir -p "$TMP/phase-wt"
+start=$(( $(date +%s) - 100 ))
+me="$(basename "$repo")"
+printf '%s\t141\t1\t%s\t%s\t0\n' "$me" "$start" "$TMP/phase-wt" >"$SLOTS/fase/1/info"
+t0="$(date -u -v-40S +%Y-%m-%dT%H:%M:%SZ 2>/dev/null || date -u -d '40 seconds ago' +%Y-%m-%dT%H:%M:%SZ)"
+t1="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+jq -cn --arg t "$t0" '{ts:$t, event:"phase_status", issue:"141", state:"esperando"}' >>"$PROCESS_EVENTS_FILE"
+jq -cn --arg t "$t1" '{ts:$t, event:"phase_status", issue:"141", state:"trabalhando"}' >>"$PROCESS_EVENTS_FILE"
+rm -f "$H"
+assert_status 0 "ending the phase frees its slot without opening another" slots_end_phase "$TMP/phase-wt"
+assert_eq "" "$(ls "$SLOTS/fase" 2>/dev/null || true)" "the phase slot is gone"
+assert_contains "$(cat "$H")" "$(printf 'fase\t%s\t141\t' "$me")" "the history has the phase that just ended"
+dur="$(awk -F'\t' '$2=="fase" {print $6}' "$H" 2>/dev/null || true)"
+if [ -n "$dur" ] && [ "$dur" -ge 50 ] && [ "$dur" -le 80 ]; then ok; else bad "duration leaves out the 40s wait for the owner (got ${dur:-none}, wall was ~100s)"; fi
+mkdir -p "$repo/.github"
+printf 'phase\t1.5\tmin\n' >"$repo/.github/time-targets.tsv"
+assert_status 0 "--report reads the phase that ended" "$repo/scripts/machine-slots.sh" --report
+assert_not_contains "$(last_output)" "over-target: phase" "60s without the owner wait is inside a 90s target"
+rm -f "$repo/.github/time-targets.tsv"
+
 finish

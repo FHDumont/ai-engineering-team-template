@@ -6,7 +6,8 @@
 #   slots/<class>/<n>/info   one directory per slot (mkdir is the lock); the info file
 #                            has tab-separated: repo, issue, pid, start, worktree, wait
 #   locks/                   one lock per worktree for validate.sh
-#   history.tsv              wait and duration of every validation and phase
+#   history.tsv              wait and duration of every validation and phase.
+#                            A phase duration is wall time minus the wait for the owner.
 # Limits: ~/.config/ai-method/machine-limits.env (AI_METHOD_CONFIG overrides the folder).
 
 SLOTS_LIB_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -97,6 +98,61 @@ slots_is_stale() { # slots_is_stale <slot dir> <class>
   esac
 }
 
+# Trace the phase status is written to. Tests set PROCESS_EVENTS_FILE; otherwise
+# events_file (common.sh) is the main checkout.
+slots_trace_file() {
+  if [ -n "${PROCESS_EVENTS_FILE:-}" ]; then
+    printf '%s\n' "$PROCESS_EVENTS_FILE"
+    return 0
+  fi
+  command -v events_file >/dev/null 2>&1 || return 1
+  events_file
+}
+
+# Seconds spent waiting for the owner: phase_status "esperando" until the next
+# event of that issue. Same intervals as trace-view.py --timings. 0 when unread.
+slots_owner_wait() { # slots_owner_wait <issue>
+  local f out
+  f="$(slots_trace_file 2>/dev/null || true)"
+  [ -n "$f" ] && [ -f "$f" ] || { echo 0; return 0; }
+  out="$(jq -Rrs --arg i "$1" '
+    [ split("\n")[] | fromjson? | select((.issue | tostring) == $i and (.ts | type) == "string") ]
+    | sort_by(.ts) | . as $e
+    | reduce range(0; length - 1) as $k (0;
+        if ($e[$k].event == "phase_status" and ($e[$k].state | tostring | startswith("esperando")))
+        then . + (($e[$k + 1].ts | fromdateiso8601) - ($e[$k].ts | fromdateiso8601))
+        else . end)
+    | round
+  ' "$f" 2>/dev/null)" || out=0
+  case "${out:-0}" in ''|*[!0-9-]*) echo 0 ;; *) echo "$out" ;; esac
+}
+
+# Wall seconds since the slot was taken, minus the wait for the owner. Never negative.
+slots_phase_duration() { # slots_phase_duration <start epoch> <issue>
+  local dur own
+  own="$(slots_owner_wait "$2")"
+  dur=$(( $(now_epoch) - ${1:-$(now_epoch)} - own ))
+  [ "$dur" -ge 0 ] || dur=0
+  echo "$dur"
+}
+
+# Frees the phase slot of this worktree and records its duration now.
+# Called when the phase ends (close-phase.sh --cleanup and --abort), so the
+# history does not wait for the next phase to open.
+slots_end_phase() { # slots_end_phase <worktree>
+  local d repo issue pid start wt wait want have
+  want="$(cd "$1" 2>/dev/null && pwd -P || printf '%s' "$1")"
+  for d in "$(slots_home)/slots/fase"/*/; do
+    d="${d%/}"
+    [ -f "$d/info" ] || continue
+    IFS="$(printf '\t')" read -r repo issue pid start wt wait <"$d/info" || true
+    have="$(cd "$wt" 2>/dev/null && pwd -P || printf '%s' "$wt")"
+    [ "$have" = "$want" ] || continue
+    history_add fase "$repo" "$issue" "${wait:-0}" "$(slots_phase_duration "$start" "$issue")"
+    rm -rf "$d"
+  done
+}
+
 # Frees the slots of a class whose holder is gone. A phase slot records its duration.
 slots_reap() { # slots_reap <class>
   local d repo issue pid start wt wait
@@ -106,7 +162,7 @@ slots_reap() { # slots_reap <class>
     slots_is_stale "$d" "$1" || continue
     if [ "$1" = fase ]; then
       IFS="$(printf '\t')" read -r repo issue pid start wt wait <"$d/info" || true
-      history_add fase "$repo" "$issue" "${wait:-0}" "$(( $(now_epoch) - ${start:-0} ))"
+      history_add fase "$repo" "$issue" "${wait:-0}" "$(slots_phase_duration "$start" "$issue")"
     fi
     rm -rf "$d"
   done

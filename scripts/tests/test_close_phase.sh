@@ -115,4 +115,14 @@ assert_contains "$(last_output)" "issues/5#c" "names the note found on the secon
 assert_not_contains "$(gh_calls)" "pr merge" "no merge when a note arrives before gh pr merge"
 rm -f "$TMP/comments_later.json"
 
+# #141: ending the phase frees its slot and records the duration. No later phase opens.
+rm -rf "$AI_METHOD_CACHE/slots/fase"
+mkdir -p "$AI_METHOD_CACHE/slots/fase/1"
+start=$(( $(date +%s) - 30 ))
+printf '%s\t5\t1\t%s\t%s\t0\n' "$(basename "$repo")" "$start" "$repo" >"$AI_METHOD_CACHE/slots/fase/1/info"
+handler "type:feature" success
+assert_status 0 "--abort frees the phase slot without opening another phase" sh -c "cd '$repo' && '$CLOSE' --abort --discard"
+assert_eq "" "$(ls "$AI_METHOD_CACHE/slots/fase" 2>/dev/null || true)" "the slot is gone after --abort"
+assert_contains "$(cat "$AI_METHOD_CACHE/history.tsv" 2>/dev/null || true)" "$(printf 'fase\t%s\t5\t' "$(basename "$repo")")" "the history has the phase --abort just ended"
+
 finish

@@ -10,7 +10,9 @@
 #: --report [--days N]: median and p90 of wait and duration per class and per
 #:           repository from ~/.cache/ai-method/history.tsv (default 7 days), to
 #:           compare before and after a change.
-#:           Also compares the median of this repository with its time targets
+#:           A phase duration in the history is wall time minus the wait for the
+#:           owner, recorded when the phase ends. Also compares the median of
+#:           this repository with its time targets
 #:           (.github/time-targets.tsv: measure, value, unit; the method default
 #:           applies when the file or a line is missing) and prints one
 #:           "over-target: ..." line per measure above its target.

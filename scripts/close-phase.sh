@@ -113,6 +113,8 @@ set -euo pipefail
 HERE="$(cd "$(dirname "$0")" && pwd)"
 # shellcheck source=scripts/lib/common.sh
 source "$HERE/lib/common.sh"
+# shellcheck source=scripts/lib/slots.sh
+source "$HERE/lib/slots.sh"
 # shellcheck source=scripts/lib/progress.sh
 source "$HERE/lib/progress.sh"
 # shellcheck source=scripts/lib/notes.sh
@@ -767,6 +769,9 @@ cleanup() {
     echo "removed the untracked copy of $f from the main checkout (main brings the same file)"
   done
   git -C "$main_root" pull --quiet --ff-only origin main
+  # The phase slot ends with the phase. Recording it here, before the worktree
+  # goes away, keeps the duration at the real end and out of the next opening.
+  slots_end_phase "$here"
   if [ "$here" != "$main_root" ]; then
     # shellcheck source=scripts/lib/procs.sh
     source "$HERE/lib/procs.sh"
@@ -845,6 +850,8 @@ abort() {
     echo "discarded with phase #$n ($branch):"
     echo "$losses"
   fi
+  # Same record as --cleanup: the slot is free at the end, not at the next opening.
+  slots_end_phase "$here"
   pr="$(pr_number)"
   if [ -n "$pr" ]; then
     gh pr close "$pr" --repo "$repo" --comment "Fase #$n abortada (\`close-phase.sh --abort\`)." >/dev/null
