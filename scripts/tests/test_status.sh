@@ -156,4 +156,10 @@ H
 use_fake_gh "$TMP/handler.sh"
 out="$(cd "$repo/.worktrees/issue-6" && "$SCRIPTS/status.sh" --state esperando --next "parar" --need 'dizer "fechar fase" aqui')"
 assert_eq "$(printf '%s\n' "$out" | grep -c 'fechar fase')" "1" "lab-test does not append the hint when the need already says it"
+# The session that opened the phase does not record phase_status from the worktree (#125).
+mkdir -p "$repo/.process"
+jq -cn '{event: "phase_opened", session_id: "mgr", issue: "6"}' >"$repo/.process/events.jsonl"
+assert_status 2 "the opener does not record the phase from its worktree" \
+  env CLAUDE_CODE_SESSION_ID=mgr bash -c "cd '$repo/.worktrees/issue-6' && '$SCRIPTS/status.sh' --state trabalhando --offline"
+assert_contains "$(last_output)" "from the main checkout" "says where the opener runs status"
 finish
