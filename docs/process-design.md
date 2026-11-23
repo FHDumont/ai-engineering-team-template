@@ -86,7 +86,7 @@ Baseados nas observações de Andrej Karpathy ([andrej-karpathy-skills](https://
 
 - **Sempre perguntar** (quadro de escolha): ação destrutiva e irreversível, gasto, dependência nova, mudança de arquitetura e de schema, segredos e credenciais, e todo item da lista da §10.3.
 - **Nunca perguntar** em passo rotineiro e reversível de uma spec aprovada: setup do método, labels, issue de achado, branch e PR.
-- **Dúvida num passo reversível:** siga e liste a decisão na seção "Decisões tomadas sem perguntar" do PR, que o dono lê no fim; a fase só para para o dono nos itens "sempre perguntar" acima. O grilling do `plan` junta as perguntas num quadro só.
+- **Dúvida num passo reversível:** siga e liste a decisão na seção "Decisões tomadas sem perguntar" do PR, que o dono lê no fim; a fase só para para o dono nos itens "sempre perguntar" acima. O grilling do `plan` junta as perguntas num quadro só (no máximo 4; acima disso, quadros seguidos no mesmo turno).
 
 ### 2.3 Regras de git
 
