@@ -161,7 +161,11 @@ if [ "$end" = "end:lab-test" ] && [ "$state" = "esperando você" ]; then
   fi
 fi
 # A phase session leaves its state in the trace: the main session reads it.
+# The session that opened the phase does not write in the child's name.
 if [ -n "$issue" ]; then
+  if [ "$(phase_opener_state "$issue" "${CLAUDE_CODE_SESSION_ID:-}")" = opener ]; then
+    die "the session that opened phase #$issue does not record phase_status from its worktree; run scripts/status.sh from the main checkout with git -C and an absolute path" 2
+  fi
   trace_event phase_status "issue=$issue" "state=$state" "need=$(printf '%s' "$need" | tr '\n' ' ')"
 fi
 [ -n "$need" ] || need="nada"
