@@ -180,7 +180,7 @@ not_rollback='((.displayTitle // "") | test("rollback"; "i") | not)'
 for path in $workflows; do
   wf="$(basename "$path")"
   body="$(git -C "$main_root" show "$sha:$path")"
-  if printf '%s\n' "$body" | grep -q '^# deploy-manual:'; then
+  if printf '%s\n' "$body" | stdin_grep -q '^# deploy-manual:'; then
     echo "no deploy: $wf is manual and is not dispatched by deploy.sh"
     continue
   fi

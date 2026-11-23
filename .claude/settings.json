@@ -26,6 +26,7 @@
       "Bash(scripts/label-issue.sh *)",
       "Bash(scripts/machine-slots.sh *)",
       "Bash(scripts/measure-session.py *)",
+      "Bash(scripts/method-diff.sh *)",
       "Bash(scripts/new-phase.sh *)",
       "Bash(scripts/notify-bot.sh *)",
       "Bash(scripts/open-issue.sh *)",

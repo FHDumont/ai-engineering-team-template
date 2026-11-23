@@ -31,7 +31,7 @@ cp "$template/.github/method-files.txt" "$repo/.github/method-files.txt"
 git -C "$repo" add .github scripts
 git -C "$repo" commit --quiet -m "chore: adopted"
 
-out="$(cd "$repo" && "$DIFF" --template "$template")"
+out="$(cd "$repo" && "$DIFF" --template "$template" --to "$dest")"
 assert_contains "$out" "identical scripts/keep.sh" "an unchanged method file is identical"
 assert_contains "$out" "adapted scripts/changed.sh" "a local edit is adapted"
 assert_contains "$out" "missing scripts/new.sh" "a file added in the template is missing"
@@ -39,7 +39,7 @@ assert_contains "$out" "removed scripts/gone.sh" "a file the template dropped is
 assert_contains "$out" "repo-only scripts/app-only.sh" "a repository file is kept apart"
 assert_not_contains "$out" "removed scripts/app-only.sh" "a repository file is not removed"
 
-cd "$repo" && "$DIFF" --template "$template" --remove >/dev/null
+cd "$repo" && "$DIFF" --template "$template" --to "$dest" --remove >/dev/null
 assert_eq "no" "$([ -e "$repo/scripts/gone.sh" ] && echo yes || echo no)" "an unchanged dropped file is removed"
 assert_eq "yes" "$([ -f "$repo/scripts/app-only.sh" ] && echo yes)" "a repository file stays"
 
@@ -51,7 +51,7 @@ git -C "$template" checkout --quiet "$origin" -- scripts/gone.sh
 printf '%s\n' "$origin" >"$repo/.github/method-origin"
 # The file was removed above. Put a diverged copy back and ask again.
 echo local-edit >"$repo/scripts/gone.sh"
-out="$(cd "$repo" && "$DIFF" --template "$template" --remove)"
+out="$(cd "$repo" && "$DIFF" --template "$template" --to "$dest" --remove)"
 assert_contains "$out" "kept scripts/gone.sh" "a diverged removal is not deleted"
 assert_eq "yes" "$([ -f "$repo/scripts/gone.sh" ] && echo yes)" "the diverged file is still there"
 
