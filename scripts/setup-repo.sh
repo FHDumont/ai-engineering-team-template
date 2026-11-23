@@ -233,7 +233,7 @@ wontfix
 accessibility"
 
 sync_labels() {
-  # One pass over the label list (#108): a jq per label made --check slower than
+  # One pass over the label list (FHDumont/ai-engineering-team-template#108): a jq per label made --check slower than
   # the session hook's time limit. Python compares the whole list once.
   local current plan action a b c d
   current="$(gh label list --repo "$repo" --limit 500 --json name,color,description)"

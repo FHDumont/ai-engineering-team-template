@@ -705,7 +705,7 @@ Ok do dono do repo registrado (quadro de escolha) para:$reasons." >/dev/null
   # CI does not run on a PR edit: check the final body and the commits here.
   "$HERE/check-attribution.sh" --pr "$n" || die "PR #$n has AI attribution: fix the body or commits first"
 
-  # A note posted while this run was waiting still holds the merge (#122).
+  # A note posted while this run was waiting still holds the merge (FHDumont/ai-engineering-team-template#122).
   refuse_pending_notes
 
   if ! gh pr merge "$n" --repo "$repo" --auto --rebase --delete-branch >/dev/null 2>&1; then

@@ -149,7 +149,7 @@ jobs:
           # The tests job (the slow one) runs unless the PR changes nothing that
           # tests read. Inert: docs/ (except the design), the .md at the root
           # (except AGENTS.md and CLAUDE.md), and the generated CHANGELOG.md and
-          # ROADMAP.md (no test reads their content, #137). Skills, hooks, scripts, workflows and app are never inert.
+          # ROADMAP.md (no test reads their content, FHDumont/ai-engineering-team-template#137). Skills, hooks, scripts, workflows and app are never inert.
           needs_tests() { # needs_tests <files>: true when any file is not inert
             if echo "$1" | grep -vE '^$' | grep -vE '^(docs/|[^/]+\.md$)' | stdin_grep -q .; then echo true
             elif echo "$1" | grep -E '^(docs/process-design\.md|AGENTS\.md|CLAUDE\.md)$' | stdin_grep -q .; then echo true
