@@ -146,6 +146,25 @@ jobs:
         problems = "\n".join(cw.check(self.write("ci.yml", GOOD.replace("issues:\n    types: [opened]", "pull_request:"))))
         self.assertIn("ci.yml must run only on pull_request and push to main", problems)
 
+    def test_recorded_pr_only_mode(self):
+        # .github/ci-mode = pr records CI on pull requests only. Push is refused.
+        # Without that record, pull_request alone stays invalid (public default).
+        d = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, d, True)
+        os.makedirs(os.path.join(d, ".github", "workflows"))
+        mode = os.path.join(d, ".github", "ci-mode")
+        path = os.path.join(d, ".github", "workflows", "ci.yml")
+        only_pr = GOOD.replace("issues:\n    types: [opened]", "pull_request:")
+        both = GOOD.replace("issues:\n    types: [opened]", "pull_request:\n  push:\n    branches: [main]")
+        open(path, "w").write(only_pr)
+        self.assertIn("pull_request and push to main", "\n".join(cw.check(path)))
+        open(mode, "w").write("pr\n")
+        self.assertEqual(cw.check(path), [], "pr-only ci.yml")
+        open(path, "w").write(both)
+        problems = "\n".join(cw.check(path))
+        self.assertIn("pr-only mode must run only on pull_request", problems)
+        self.assertIn("no push", problems)
+
     def test_timeout_bounds(self):
         problems = "\n".join(cw.check(self.write("issues-x.yml", GOOD.replace("timeout-minutes: 5", "timeout-minutes: 60"))))
         self.assertIn("timeout-minutes must be 5-30", problems)
@@ -671,6 +690,58 @@ cat "$TMP/red.out"
         self.assertIn("nothing was created", r.stdout)
         self.assertIn("empty commit", r.stdout)
         self.assertIn("actions/runs/3", r.stdout)
+
+    def test_pr_only_mode_accepts_a_different_tree_and_refuses_red(self):
+        script = r"""
+source scripts/tests/phase_start_common.sh
+spec seven.md 7
+mkdir -p "$repo/.github"
+printf 'pr\n' >"$repo/.github/ci-mode"
+export PHASE_START_CI_WAIT=2 PHASE_START_CI_POLL=1
+run() { # run <outfile> <env...> -- <cmd>
+  local out="$1"; shift
+  set +e
+  env "$@" >"$out" 2>&1
+  local rc=$?
+  set -e
+  printf '%s\n' "$rc"
+}
+tree_rc="$(run "$TMP/tree.out" FAKE_BASE_CI=absent FAKE_BASE_PR=tree CLAUDE_CODE_SESSION_ID=manager \
+  sh -c "cd '$repo' && scripts/phase-start.sh 7 --dry-run")"
+red_rc="$(run "$TMP/red.out" FAKE_BASE_CI=red sh -c "cd '$repo' && scripts/phase-start.sh 7 --no-check")"
+abs_rc="$(run "$TMP/abs.out" FAKE_BASE_CI=absent FAKE_BASE_PR=none \
+  sh -c "cd '$repo' && scripts/phase-start.sh 7 --no-check")"
+rm -f "$repo/.github/ci-mode"
+push_rc="$(run "$TMP/push.out" FAKE_BASE_CI=absent FAKE_BASE_PR=tree \
+  sh -c "cd '$repo' && scripts/phase-start.sh 7 --no-check")"
+prred_rc="$(run "$TMP/prred.out" FAKE_BASE_CI=absent FAKE_BASE_PR=red \
+  sh -c "cd '$repo' && mkdir -p .github && printf 'pr\n' >.github/ci-mode && scripts/phase-start.sh 7 --no-check")"
+printf 'TREE:%s\n' "$tree_rc"
+cat "$TMP/tree.out"
+printf '\nRED:%s\n' "$red_rc"
+cat "$TMP/red.out"
+printf '\nABS:%s\n' "$abs_rc"
+cat "$TMP/abs.out"
+printf '\nPUSH:%s\n' "$push_rc"
+cat "$TMP/push.out"
+printf '\nPRRED:%s\n' "$prred_rc"
+cat "$TMP/prred.out"
+"""
+        r = subprocess.run(["bash", "-c", script], cwd=ROOT, text=True, capture_output=True)
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        out = r.stdout
+        self.assertIn("TREE:0", out)
+        self.assertIn("differs", out)
+        self.assertIn("PR #30", out)
+        tree = out.split("RED:", 1)[0]
+        self.assertNotIn("same tree", tree)
+        self.assertIn("RED:1", out)
+        self.assertIn("no phase opens", out)
+        self.assertIn("ABS:1", out)
+        self.assertNotIn("gh workflow run", out)
+        self.assertIn("nothing was created", out)
+        self.assertIn("PUSH:1", out)
+        self.assertIn("PRRED:1", out)
 
 
 if __name__ == "__main__":
