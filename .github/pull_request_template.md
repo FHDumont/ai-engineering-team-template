@@ -12,9 +12,13 @@ Closes #
 
 <!-- Issues de achado abertas ou resolvidas nesta fase (size:*), ou "nenhum". -->
 
-## Suposições
+## Decisões do dono que mudaram o escopo
 
-<!-- Toda suposição feita sem perguntar, ou "nenhuma". -->
+<!-- Decisão do dono (quadro, label approved ou comentário) que mudou o escopo, com a fonte, ou "nenhuma". -->
+
+## Decisões tomadas sem perguntar
+
+<!-- Dúvida em passo reversível que a fase decidiu sem perguntar, ou "nenhuma". -->
 
 ## Revisão independente
 

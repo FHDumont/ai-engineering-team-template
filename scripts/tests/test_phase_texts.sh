@@ -291,4 +291,10 @@ assert_contains "$reviewer" "Pré-revisão" "close-reviewer knows the pre-review
 assert_contains "$design" "Pré-revisão" "the design describes the pre-review"
 assert_contains "$design" "Recado à filha" "the design describes the note to the child"
 
+# The PR template has the section the rules name, separate from an owner decision (issue #156).
+template="$(cat "$REPO/.github/pull_request_template.md")"
+assert_contains "$template" "## Decisões tomadas sem perguntar" "the PR template has the section for decisions taken without asking"
+assert_contains "$template" "## Decisões do dono que mudaram o escopo" "the PR template separates an owner decision that changed the scope"
+assert_not_contains "$template" "## Suposições" "the PR template no longer calls that section Suposições"
+
 finish
