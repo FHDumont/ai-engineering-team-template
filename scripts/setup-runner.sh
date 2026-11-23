@@ -6,6 +6,10 @@
 #:
 #: --dry-run   prints the steps a registration would take; runs nothing, no
 #:             network, no gh.
+#: --check     verifies the runner has what CI needs: yq or PyYAML, curl, tar,
+#:             sha256sum or shasum, and lsof or /proc (cwd lookup). gh may be
+#:             absent: CI installs the pinned release from the base commit's
+#:             .github/gh-pin and fails the job when that pin is missing.
 #: --register  downloads the runner package for this OS/architecture, asks
 #:             GitHub for a registration token (never printed or stored),
 #:             verifies the package SHA-256 against the release notes,
@@ -24,11 +28,12 @@ HERE="$(cd "$(dirname "$0")" && pwd)"
 # shellcheck source=scripts/lib/common.sh
 source "$HERE/lib/common.sh"
 
-dry=0 reg=0 dir="" name="" label=""
+dry=0 reg=0 chk=0 dir="" name="" label=""
 while [ $# -gt 0 ]; do
   case "$1" in
     -h|--help) print_help "$0"; exit 0 ;;
     --dry-run) dry=1; shift ;;
+    --check) chk=1; shift ;;
     --register) reg=1; shift ;;
     --dir) [ $# -ge 2 ] || die "missing value for --dir" 2; dir="$2"; shift 2 ;;
     --name) [ $# -ge 2 ] || die "missing value for --name" 2; name="$2"; shift 2 ;;
@@ -37,7 +42,28 @@ while [ $# -gt 0 ]; do
   esac
 done
 
-[ "$dry" = 1 ] || [ "$reg" = 1 ] || die "pass --dry-run to see the steps or --register to register the runner" 1
+[ $((dry + reg + chk)) -eq 1 ] || die "pass --dry-run to see the steps, --check to verify the runner, or --register to register the runner" 1
+
+if [ "$chk" = 1 ]; then
+  if ! command -v yq >/dev/null 2>&1 && ! python3 -c 'import yaml' >/dev/null 2>&1; then
+    die "the runner needs yq or PyYAML (python3 -c 'import yaml'); check-workflows.py reads workflow YAML with one of them"
+  fi
+  if ! command -v lsof >/dev/null 2>&1 && [ ! -d /proc ]; then
+    die "the runner needs lsof, or /proc so cwd lookup can run without lsof"
+  fi
+  command -v lsof >/dev/null 2>&1 || echo "ok: lsof is absent; cwd lookup uses /proc"
+  command -v curl >/dev/null 2>&1 || die "the runner needs curl to download the pinned gh"
+  command -v tar >/dev/null 2>&1 || die "the runner needs tar"
+  if ! command -v sha256sum >/dev/null 2>&1 && ! command -v shasum >/dev/null 2>&1; then
+    die "the runner needs sha256sum or shasum to verify the pinned gh"
+  fi
+  if command -v gh >/dev/null 2>&1; then
+    echo "ok: gh is on PATH; CI still installs the pinned release from the base commit when .github/gh-pin is there"
+  else
+    echo "ok: gh is not installed; CI installs the pinned release from the base commit's .github/gh-pin and fails the job when that pin is missing"
+  fi
+  exit 0
+fi
 
 if [ "$dry" = 1 ]; then
 cat <<'S'
