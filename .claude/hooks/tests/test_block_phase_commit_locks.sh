@@ -23,6 +23,15 @@ allowed mgr "$main/other" 'git commit -m "feat: x"'
 allowed mgr "$TMP" "cd $(basename "$main")/other && git -C . commit -m x"
 allowed mgr "$main/.worktrees/issue-8" 'git commit -m "feat: x"'
 allowed mgr "$wt" 'git status'
+allowed mgr "$wt" 'git hash-object README.md'
+allowed mgr "$wt" 'git diff-index HEAD'
+allowed mgr "$wt" 'git check-attr -a README.md'
+allowed mgr "$wt" 'git worktree list'
+allowed mgr "$wt" 'git config --get core.hooksPath'
+blocked mgr "$wt" 'git hash-object -w README.md'
+assert_contains "$(last_output)" "hash-object" "the refusal names the git subcommand"
+blocked mgr "$wt" 'git worktree add ../elsewhere'
+blocked mgr "$wt" 'git config user.name someone'
 allowed mgr "$main" "git -C $wt log --oneline -3"
 allowed mgr "$main" "git -C $wt diff origin/main...HEAD"
 allowed mgr "$wt" 'git branch --show-current'

@@ -88,8 +88,8 @@ COLLECT = [] if sys.argv[1:2] == ["--git-writes"] else None
 # Git subcommands that never write history, the index or the work tree.
 READ_ONLY = {"status", "log", "diff", "show", "rev-parse", "rev-list", "ls-files", "ls-tree",
              "cat-file", "blame", "grep", "describe", "for-each-ref", "show-ref", "merge-base",
-             "diff-tree", "shortlog", "name-rev", "check-ignore", "ls-remote", "fetch",
-             "version", "help"}
+             "diff-tree", "diff-index", "check-attr", "shortlog", "name-rev", "check-ignore",
+             "ls-remote", "fetch", "version", "help"}
 READ_ONLY_BRANCH_ARGS = {"--show-current", "-a", "--all", "-r", "--remotes", "-v", "-vv", "--list", "-l"}
 # Variables the phase locks read: no command sets or unsets them.
 LOCK_VARS = r"(CLAUDE_CODE_SESSION_ID|PROCESS_EVENTS_FILE)"
@@ -404,10 +404,22 @@ def check_git(args, state, env):
     if i >= len(args):
         return
     sub, rest = args[i], args[i + 1:]
-    if COLLECT is not None and sub not in READ_ONLY \
-            and not (sub == "branch" and set(rest) <= READ_ONLY_BRANCH_ARGS):
+    def git_read(sub, rest):
+        if sub in READ_ONLY:
+            return True
+        if sub == "branch" and set(rest) <= READ_ONLY_BRANCH_ARGS:
+            return True
+        if sub == "hash-object" and "-w" not in rest and "--write" not in rest:
+            return True
+        if sub == "worktree" and rest[:1] == ["list"]:
+            return True
+        if sub == "config" and any(a in ("--get", "--get-all", "--get-regexp", "--list") for a in rest):
+            return True
+        return False
+
+    if COLLECT is not None and not git_read(sub, rest):
         for place in [target] + [resolve(target, p) for p in places]:
-            COLLECT.append("write\t" + os.path.normpath(place))
+            COLLECT.append("write\t" + os.path.normpath(place) + "\t" + sub)
 
     if sub in ("switch", "checkout"):
         if "--" in rest:

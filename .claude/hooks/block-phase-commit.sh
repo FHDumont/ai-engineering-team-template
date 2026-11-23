@@ -47,14 +47,14 @@ fi
 
 unreadable=0
 printf '%s\n' "$findings" | stdin_grep -qx unreadable && unreadable=1
-while IFS= read -r dir; do
+while IFS='	' read -r dir sub; do
   [ -n "$dir" ] || continue
   phase="$(phase_of_path "$dir")"
   [ -n "$phase" ] || continue
   issue="${phase%%	*}"
   case "$(phase_opener_state "$issue" "$sid" "${phase#*	}")" in
     other) ;;
-    opener) deny "this session opened phase #$issue and must not write to its worktree; the child session executes it (process-design §4.3)" ;;
+    opener) deny "git ${sub:-write}: this session opened phase #$issue and must not write to its worktree; the child session executes it (process-design §4.3)" ;;
     *) deny "cannot tell which session opened phase #$issue (session id, .process/events.jsonl of the main checkout and its phase_opened event are required): no git write in its worktree" ;;
   esac
 done <<EOF
