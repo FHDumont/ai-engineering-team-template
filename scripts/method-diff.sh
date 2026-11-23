@@ -79,7 +79,7 @@ paths="$(printf '%s\n%s\n' "$from_list" "$to_list")"
 while read -r f; do
   [ -n "$f" ] || continue
   top="${f%%/*}"
-  printf '%s\n' "$dirs" | grep -qx "$top" || continue
+  printf '%s\n' "$dirs" | stdin_grep -qx "$top" || continue
   paths="$paths
 $f"
 done < <(git -C "$root" ls-files)
