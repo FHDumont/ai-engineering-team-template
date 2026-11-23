@@ -4,8 +4,9 @@
 #: Usage: init-env.sh [<bot-slug>...]   (default: every bot of .github/bots.tsv)
 #:
 #: Creates ~/.<repo-slug>/ with chmod 700 and the .env with chmod 600 (or the
-#: path in PROCESS_ENV_FILE), with empty BOT_WEBHOOK_<SLUG>_URL= and
-#: BOT_WEBHOOK_<SLUG>_SECRET=. Never reads or writes values and never
+#: path in PROCESS_ENV_FILE), with empty BOT_WEBHOOK_<SLUG>_URL=,
+#: BOT_WEBHOOK_<SLUG>_SECRET=, GH_APP_BOT_<SLUG>_TOKEN= and one
+#: GH_APP_METHOD_TOKEN=. Never reads or writes values and never
 #: overwrites an existing .env: it only appends the missing keys. The repo
 #: owner pastes the values in an editor. Prints only the file path.
 set -euo pipefail
@@ -14,6 +15,8 @@ HERE="$(cd "$(dirname "$0")" && pwd)"
 source "$HERE/lib/common.sh"
 # shellcheck source=scripts/lib/secret.sh
 source "$HERE/lib/secret.sh"
+# shellcheck source=scripts/lib/role.sh
+source "$HERE/lib/role.sh"
 case "${1:-}" in -h|--help) print_help "$0"; exit 0 ;; esac
 
 slugs=("$@")
@@ -35,5 +38,9 @@ for s in "${slugs[@]}"; do
     var="$(bot_webhook_var "$s" "$field")"
     grep -qE "^(export )?$var=" "$file" || printf '%s=\n' "$var" >>"$file"
   done
+  var="$(role_token_var "$s")"
+  grep -qE "^(export )?$var=" "$file" || printf '%s=\n' "$var" >>"$file"
 done
+var="$(role_token_var method)"
+grep -qE "^(export )?$var=" "$file" || printf '%s=\n' "$var" >>"$file"
 printf '%s\n' "$file"

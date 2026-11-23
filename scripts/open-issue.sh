@@ -20,6 +20,8 @@ set -euo pipefail
 HERE="$(cd "$(dirname "$0")" && pwd)"
 # shellcheck source=scripts/lib/common.sh
 source "$HERE/lib/common.sh"
+# shellcheck source=scripts/lib/role.sh
+source "$HERE/lib/role.sh"
 ROOT="$(cd "$HERE/.." && pwd)"
 
 type="" title="" dry=0
@@ -90,7 +92,10 @@ for l in $labels; do
 done
 args=(issue create --repo "$repo" --title "$title" --body-file "$tmp/body.md")
 for l in $labels; do args+=(--label "$l"); done
-if ! url="$(gh "${args[@]}")"; then
+if [ "${ROLE_APP_REQUIRE:-}" = 1 ]; then
+  role_require method || exit $?
+fi
+if ! url="$(role_exec method -- gh "${args[@]}")"; then
   # Labels of the method missing: the repository was never set up; same message as phase-start.sh.
   "$HERE/setup-repo.sh" --check --only labels >/dev/null
   die "issue not created: gh issue create failed"

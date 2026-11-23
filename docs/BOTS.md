@@ -21,8 +21,10 @@ O `scripts/lib/secret.sh` procura a URL e o segredo de cada bot nesta ordem (sem
 
 **`.env` (padrão):** fica em `~/.<nome-do-repo>/.env` (pasta 700, arquivo 600; `PROCESS_ENV_FILE` troca o caminho). O agente cria o arquivo só com as chaves vazias (`scripts/init-env.sh <slug>...`); o dono do repo o abre e cola os valores. O script recusa permissão aberta, e o arquivo fica fora do git.
 
-**Gerenciador de senhas (opcional):** o código aceita uma conta de serviço lida pelo CLI `op`. Crie uma conta de serviço só de leitura no cofre dos webhooks, com um item por bot (campos `url` e `secret`), e ponha a referência `op://<cofre>/<item>` de cada bot em `.github/bots.tsv`. O token da conta de serviço fica no cofre de credenciais do sistema operacional (no macOS, um item de senha genérica com serviço `op-service-account` e conta `$USER`), nunca em arquivo do repo. O agente só chama o `op` pelos scripts. Cofre do sistema trancado numa sessão remota: destranque-o e rode de novo.
+**Gerenciador de senhas (opcional):** o código aceita uma conta de serviço lida pelo CLI `op`. Crie uma conta só de leitura no cofre dos webhooks, um item por bot (campos `url` e `secret`), e ponha `op://<cofre>/<item>` em `.github/bots.tsv`. O token da conta fica no cofre do sistema, nunca no repo. O agente só chama o `op` pelos scripts.
 
 ## Identidade
 
-Todo comentário de agente ou bot abre com `**De:** bot <nome> · **Para:** <papel> · **Pedido:** <ask_id> · **Responde a:** <link>` (a resposta do bot também; o papel é identificação, não assinatura de IA); sem o cabeçalho, é do dono. Pedido a bot só pelo `ask-bot.sh`. Toda resposta de bot começa com `**<Nome> (bot do time)**`, sem emoji nem assinatura de IA. Uma GitHub App por bot (`<slug>[bot]`, só `issues: write` e `pull requests: read`) é opcional e não vem criada.
+Todo comentário de agente ou bot abre com `**De:** bot <nome> · **Para:** <papel> · **Pedido:** <ask_id> · **Responde a:** <link>` (a resposta também; o papel não é assinatura de IA); sem o cabeçalho, é do dono. Pedido a bot só pelo `ask-bot.sh`. Toda resposta começa com `**<Nome> (bot do time)**`, sem emoji nem assinatura de IA.
+
+O dono cria a GitHub App do bot (`<slug>[bot]`, issues e pull requests em escrita). O token de instalação é `GH_APP_BOT_<SLUG>_TOKEN` no ambiente ou no `.env`. Com ele, o bot comenta como a App. Sem ele, o comentário do método usa o `gh` do dono. `ROLE_APP_REQUIRE=1` recusa até a App existir. Nada é criado na conta pelo agente.
