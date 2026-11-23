@@ -12,8 +12,11 @@
 #: - "## Regras-base": five numbered rules, four columns, an exit code in each,
 #:   every lock path exists, and none of the words that leave a second path
 #:   (pode, podem, ou, exceção, se falhar);
-#: - "## 6. Scripts": lists exactly the files of scripts/;
-#: - "### 6.2 Hooks": lists exactly the files of .claude/hooks/ and .githooks/;
+#: - "## 6. Scripts": lists exactly the method scripts. With
+#:   .github/method-files.txt, that file is the list (one path per line);
+#:   a script of the repository that is not in it is not required. Without
+#:   the file, the list is every file directly in scripts/;
+#: - "### 6.2 Hooks": the same, for .claude/hooks/ and .githooks/;
 #: - "## 7. Arquivos": every path without a placeholder (<...> or *) exists.
 #:   CHANGELOG.md and ROADMAP.md may both be absent until the first group; if
 #:   either exists, both must.
@@ -129,9 +132,24 @@ if [ -f "$design" ]; then
   loose="$(section '## Regras-base' | grep -niE '(^|[^[:alnum:]])(pode|podem|ou|exceção|se falhar)([^[:alnum:]]|$)' || true)"
   [ -z "$loose" ] || problem "$design: the base rules leave a second path (pode, ou, exceção, se falhar): $(echo "$loose" | head -3 | cut -c1-80 | paste -sd';' -)"
 
-  same_files scripts "$(section '## 6. Scripts' | first_column | grep '^scripts/' || true)" "$(files_of scripts)"
+  # The method manifest, when the repository has one, is the list the design
+  # must match. A file of the application in the same folder stays out of it.
+  manifest=.github/method-files.txt
+  if [ -f "$manifest" ]; then
+    method_list="$(grep -vE '^[[:space:]]*(#|$)' "$manifest" || true)"
+    while read -r p; do
+      [ -n "$p" ] || continue
+      [ -e "$p" ] || problem "$manifest lists $p, which does not exist"
+    done <<<"$method_list"
+    method_scripts="$(printf '%s\n' "$method_list" | grep '^scripts/' || true)"
+    method_hooks="$(printf '%s\n' "$method_list" | grep -E '^(\.claude/hooks|\.githooks)/' || true)"
+  else
+    method_scripts="$(files_of scripts)"
+    method_hooks="$(files_of .claude/hooks; files_of .githooks)"
+  fi
+  same_files scripts "$(section '## 6. Scripts' | first_column | grep '^scripts/' || true)" "$method_scripts"
   same_files hooks "$(section '### 6.2 Hooks' | first_column | grep -E '^(\.claude/hooks|\.githooks)/' || true)" \
-    "$(files_of .claude/hooks; files_of .githooks)"
+    "$method_hooks"
   # CHANGELOG.md and ROADMAP.md are generated at the end of the first group.
   # Both may be absent until then. Once either exists, both are required.
   generated_missing=""

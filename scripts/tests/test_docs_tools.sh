@@ -184,4 +184,14 @@ assert_contains "$(last_output)" "ROADMAP.md" "names the generated file that is 
 printf 'y\n' >"$d/ROADMAP.md"
 assert_status 0 "both generated files present passes" env REPO_ROOT="$d" "$CHECK"
 
+# The design lists the method manifest, not every file an application drops in scripts/ (#101).
+d="$(fixture)"
+mkdir -p "$d/.github"
+printf 'scripts/gate.sh\n.claude/hooks/block-x.sh\n.githooks/pre-commit\n' >"$d/.github/method-files.txt"
+: >"$d/scripts/app-only.sh"
+assert_status 0 "an application script outside the method manifest passes" env REPO_ROOT="$d" "$CHECK"
+printf 'scripts/gate.sh\nscripts/missing-method.sh\n.claude/hooks/block-x.sh\n.githooks/pre-commit\n' >"$d/.github/method-files.txt"
+assert_status 1 "a manifest entry that is not on disk fails" env REPO_ROOT="$d" "$CHECK"
+assert_contains "$(last_output)" "method-files.txt lists scripts/missing-method.sh, which does not exist" "names the missing manifest entry"
+
 finish

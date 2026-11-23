@@ -1,0 +1,9 @@
+# kind, pattern, label. Replaces the defaults of scripts/auto-label.py.
+path	(^|\s|`)scripts/	area:scripts
+path	(^|\s|`)\.github/	area:ci
+path	(^|\s|`)docs/	area:docs
+path	(^|\s|`)\.claude/	area:process
+sensitive	\b(auth|login|autentica\w*|oauth|sso)\b	area:auth
+sensitive	\b(billing|cobran\w*|pagamento\w*|payment\w*)\b	area:billing
+sensitive	\b(migration\w*|migra[çc][ãa]o|migra[çc][õo]es)\b	area:migration
+sensitive	\b(credentials?|credencia\w*|segredos?|secrets?)\b|\.env\b	area:credentials

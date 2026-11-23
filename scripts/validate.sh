@@ -8,7 +8,9 @@
 #:         main branch (AI_METHOD_LINT_BASE) and the untracked ones; the full
 #:         validation stays in close-phase.sh --prepare and in the CI.
 #: --tests: runs scripts/tests/test_*.sh, scripts/tests/test_*.py and
-#:          .claude/hooks/tests/test_*.sh. App tests join here once there is an app.
+#:          .claude/hooks/tests/test_*.sh. When .github/validate-repo.sh exists,
+#:          it runs after those tests and its exit code counts: that is where
+#:          the repository puts its own checks, without editing this file.
 #: --full: forces everything: the whole lint, never the incremental one. The CI
 #:         (CI=true in the environment) and a run without options are always full.
 #:
@@ -197,6 +199,10 @@ for f in sys.argv[1:]:
     done
     fi
     echo "tests: $passed passed, $failed failed"
+    if [ -f .github/validate-repo.sh ]; then
+      echo "repo: .github/validate-repo.sh"
+      bash .github/validate-repo.sh || fail=1
+    fi
   fi
   exit "$fail"
 }

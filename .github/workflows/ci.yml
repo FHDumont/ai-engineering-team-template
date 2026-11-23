@@ -426,6 +426,9 @@ jobs:
 
   ci:
     name: "CI"
+    # A job of the repository is one name per line in .github/ci-extra-jobs
+    # (kept on update) and is added to this needs list. ci-gate.sh requires
+    # that job to succeed; run_tests=false does not waive it.
     needs: [changes, policy, lint, tests, workflows]
     # A push that only confirms a tree the PR already tested does not start this job.
     if: always() && needs.changes.outputs.confirmed != 'true'

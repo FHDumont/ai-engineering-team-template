@@ -1,0 +1,3 @@
+# Jobs of the repository that ci-gate.sh requires to succeed.
+# One job id per line. run_tests=false does not waive them.
+# Add each name to the needs list of the ci job.

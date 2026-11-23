@@ -143,4 +143,13 @@ cp "$SCRIPTS/lib/common.sh" "$SCRIPTS/lib/slots.sh" "$SCRIPTS/lib/progress.sh" "
 assert_status 0 "an empty test list passes" env -u PROCESS_VALIDATE_RUNNING "$empty/scripts/validate.sh" --tests
 assert_contains "$(last_output)" "tests: 0 passed, 0 failed" "an empty test list reports zero tests"
 
+# The repository's own checks live in an optional script, not an edit of validate.sh (#101).
+repo_check="$(make_repo)"
+mkdir -p "$repo_check/scripts/lib" "$repo_check/scripts/tests" "$repo_check/.github"
+cp "$SCRIPTS/validate.sh" "$repo_check/scripts/validate.sh"
+cp "$SCRIPTS/lib/common.sh" "$SCRIPTS/lib/slots.sh" "$SCRIPTS/lib/progress.sh" "$SCRIPTS/lib/procs.sh" "$SCRIPTS/lib/machine-limits.env.example" "$repo_check/scripts/lib/"
+printf '#!/usr/bin/env bash\necho repo-check-ran\nexit 1\n' >"$repo_check/.github/validate-repo.sh"
+assert_status 1 "a failing repository validate script fails the suite" env -u PROCESS_VALIDATE_RUNNING "$repo_check/scripts/validate.sh" --tests
+assert_contains "$(last_output)" "repo-check-ran" "the repository script actually ran"
+
 finish
