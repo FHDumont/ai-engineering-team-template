@@ -210,8 +210,8 @@ last_validate_sha() {
 }
 
 # True when the diff from $1 to $2 changes a path the suite reads. The inert set is
-# the one in ci.yml (needs_tests): docs/ and a root .md, except the design, AGENTS.md,
-# CLAUDE.md, CHANGELOG.md and ROADMAP.md. A diff that cannot be read counts as read.
+# the one in ci.yml (needs_tests): docs/ and a root .md, except the design, AGENTS.md
+# and CLAUDE.md. CHANGELOG.md and ROADMAP.md are inert. A diff that cannot be read counts as read.
 suite_reads_diff() { # suite_reads_diff <from> <to>
   local files
   files="$(git diff --name-only --no-renames -z "$1" "$2" 2>/dev/null | tr '\0' '\n' || echo "?")"
@@ -219,7 +219,7 @@ suite_reads_diff() { # suite_reads_diff <from> <to>
   if printf '%s\n' "$files" | grep -vE '^$' | grep -vE '^(docs/|[^/]+\.md$)' | stdin_grep -q .; then
     return 0
   fi
-  if printf '%s\n' "$files" | grep -E '^(docs/process-design\.md|AGENTS\.md|CLAUDE\.md|CHANGELOG\.md|ROADMAP\.md)$' | stdin_grep -q .; then
+  if printf '%s\n' "$files" | grep -E '^(docs/process-design\.md|AGENTS\.md|CLAUDE\.md)$' | stdin_grep -q .; then
     return 0
   fi
   return 1

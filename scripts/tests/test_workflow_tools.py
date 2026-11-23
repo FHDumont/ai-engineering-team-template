@@ -297,23 +297,57 @@ class CiStepsTests(unittest.TestCase):
         self.assertEqual((out["code"], out["docs_only"], out["app"]), ("false", "true", "false"))
 
     def test_tests_skip_only_for_inert_docs(self):
-        # Generated docs, specs and the docs/ pages skip the tests job; what the tests
-        # read (AGENTS.md, CLAUDE.md, the design, skills, scripts) never does.
+        # Generated docs, specs, CHANGELOG.md, ROADMAP.md and the docs/ pages skip the
+        # tests job; what the tests read (AGENTS.md, CLAUDE.md, the design, skills, scripts) never does.
         out = self.detect({"docs/x.md": "x\n", "docs/specs/s.md": "x\n", "README.md": "x\n"})
         self.assertEqual((out["code"], out["run_tests"]), ("false", "false"))
-        # ROADMAP.md and CHANGELOG.md are generated from issue titles and PRs and a test reads
-        # them (#54): a PR that only changes them still runs the tests.
         for rel in ("AGENTS.md", "CLAUDE.md", "docs/process-design.md", ".claude/skills/plan/SKILL.md",
                     "scripts/x.sh", "app/README.md"):
             self.assertEqual(self.detect({rel: "x\n"})["run_tests"], "true", rel)
 
     def test_generated_docs_run_the_tests(self):
-        # The #44 case: the ROADMAP.md carried an issue title the text tests refuse, and the PR
-        # that only changed it skipped the tests. Each file alone, in a fresh PR.
+        # #54 made these two run the suite because a text test read issue titles out of
+        # them. That test now excludes the files (#137), so each file alone is inert.
         for rel in ("ROADMAP.md", "CHANGELOG.md"):
             self.setUp()
             out = self.detect({rel: "x\n"})
-            self.assertEqual((out["code"], out["run_tests"]), ("false", "true"), rel)
+            self.assertEqual((out["code"], out["run_tests"]), ("false", "false"), rel)
+
+    def test_generated_docs_do_not_run_the_tests(self):
+        # #137: no test reads the generated files, so a PR of only those two does not
+        # run the suite. Policy still runs, because it is a pull request.
+        for rel in ("ROADMAP.md", "CHANGELOG.md"):
+            self.setUp()
+            out = self.detect({rel: "x\n"})
+            self.assertEqual((out["code"], out["run_tests"]), ("false", "false"), rel)
+        wf = cw.load(os.path.join(ROOT, ".github", "workflows", "ci.yml"))
+        self.assertEqual(wf["jobs"]["policy"]["if"], "github.event_name == 'pull_request'")
+        self.assertNotIn("paths-ignore", wf["on"]["pull_request"])
+
+    def test_suite_does_not_depend_on_generated_doc_content(self):
+        # #137: reading CHANGELOG.md or ROADMAP.md of this checkout would bring #54 back.
+        # A fixture written in a temporary repo does not count.
+        bad = []
+        for base in (os.path.join(ROOT, "scripts", "tests"),
+                     os.path.join(ROOT, ".claude", "hooks", "tests")):
+            if not os.path.isdir(base):
+                continue
+            for dirpath, _, names in os.walk(base):
+                for name in names:
+                    if not name.endswith((".sh", ".py")):
+                        continue
+                    path = os.path.join(dirpath, name)
+                    with open(path, encoding="utf-8") as fh:
+                        text = fh.read()
+                    needles = (
+                        "open(os.path.join(ROOT, " + '"CHANGELOG.md")',
+                        "open(os.path.join(ROOT, " + '"ROADMAP.md")',
+                        "$REPO/" + "CHANGELOG.md",
+                        "$REPO/" + "ROADMAP.md",
+                    )
+                    if any(n in text for n in needles):
+                        bad.append(os.path.relpath(path, ROOT))
+        self.assertEqual(bad, [])
 
     def test_tests_skip_when_code_already_tested(self):
         # A docs-only push on top of a commit whose Tests passed does not run the suite again.
@@ -437,9 +471,11 @@ case "$*" in
 esac
 """ % (head, pr_tree, 1 if ci == "success" else 0, 1 if tests == "failure" else 0))
         os.chmod(gh, 0o755)
-        env = {"PATH": fake + os.pathsep + os.environ["PATH"], "EVENT_NAME": "push"}
+        env = {"PATH": fake + os.pathsep + os.environ["PATH"], "EVENT_NAME": "push",
+               "GITHUB_STEP_SUMMARY": os.path.join(self.tmp, "summary.md")}
         r = self.run_step("changes", "Detect changed paths", head, env)
         self.assertEqual(r.returncode, 0, r.stderr)
+        self.last_push_stdout = r.stdout
         return dict(l.split("=", 1) for l in open(os.path.join(self.tmp, "output")).read().split())
 
     def test_push_main_skips_when_the_tree_is_the_head_of_a_merged_pr(self):
@@ -461,9 +497,28 @@ esac
         out = self.push_main({"docs/x.md": "x\n"}, pr_head_tree_of=self.base)
         self.assertEqual((out["run_tests"], out["code"]), ("false", "false"))
 
+    def test_push_of_only_generated_docs_does_not_start(self):
+        # #137: a push to main that changes only CHANGELOG.md and ROADMAP.md starts
+        # no run. paths-ignore is enough; the pull_request trigger is untouched.
+        wf = cw.load(os.path.join(ROOT, ".github", "workflows", "ci.yml"))
+        self.assertEqual(sorted(wf["on"]["push"].get("paths-ignore", [])),
+                         ["CHANGELOG.md", "ROADMAP.md"])
+        self.assertEqual(wf["on"]["push"]["branches"], ["main"])
+
+    def test_already_tested_push_is_one_job(self):
+        # The two minimum jobs (Changes and CI) become one, and the run says why.
+        wf = cw.load(os.path.join(ROOT, ".github", "workflows", "ci.yml"))
+        self.assertIn("confirmed", wf["jobs"]["changes"]["outputs"])
+        self.assertIn("needs.changes.outputs.confirmed", wf["jobs"]["ci"]["if"])
+        out = self.push_main({"scripts/x.sh": "x\n"})
+        self.assertEqual(out.get("confirmed"), "true")
+        self.assertIn("already tested in the PR", self.last_push_stdout)
+        summary = os.path.join(self.tmp, "summary.md")
+        self.assertIn("already tested in the PR", open(summary).read())
+
     def test_ci_runs_on_push_to_main_without_policy(self):
         wf = cw.load(os.path.join(ROOT, ".github", "workflows", "ci.yml"))
-        self.assertEqual(wf["on"]["push"], {"branches": ["main"]})
+        self.assertEqual(wf["on"]["push"]["branches"], ["main"])
         self.assertEqual(wf["jobs"]["policy"]["if"], "github.event_name == 'pull_request'")
         # A run of main is never cancelled by the next one: phase-start.sh waits for it.
         self.assertIn("github.event_name == 'pull_request'", wf["concurrency"]["cancel-in-progress"])

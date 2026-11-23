@@ -28,6 +28,13 @@ on:
   # those minutes records `pr` in .github/ci-mode and deletes this push trigger.
   push:
     branches: [main]
+    # Only CHANGELOG.md and ROADMAP.md: no run. phase-start.sh already accepts a
+    # base with no CI check when the merged PR has the same tree and green CI.
+    # end-check.sh accepts a base with no check when a merged PR holds the commit.
+    # close-phase.sh reads the CI of the PR head, not of this push.
+    paths-ignore:
+      - CHANGELOG.md
+      - ROADMAP.md
 
 permissions: {}
 
@@ -53,6 +60,7 @@ jobs:
       docs_only: ${{ steps.detect.outputs.docs_only }}
       event: ${{ steps.detect.outputs.event }}
       run_tests: ${{ steps.detect.outputs.run_tests }}
+      confirmed: ${{ steps.detect.outputs.confirmed }}
     steps:
       - name: "Checkout"
         uses: actions/checkout@v4
@@ -139,12 +147,12 @@ jobs:
           templates="$(echo "$files" | grep -E '^\.github/ISSUE_TEMPLATE/' || true)"
           if [ -z "$nondocs" ] && [ -z "$templates" ]; then code=false; else code=true; fi
           # The tests job (the slow one) runs unless the PR changes nothing that
-          # tests read. Inert: docs/ (except the design) and the .md at the root
-          # (except AGENTS.md, CLAUDE.md, CHANGELOG.md and ROADMAP.md, which tests
-          # read: the generated files carry issue titles, #54). Skills, hooks, scripts, workflows and app are never inert.
+          # tests read. Inert: docs/ (except the design), the .md at the root
+          # (except AGENTS.md and CLAUDE.md), and the generated CHANGELOG.md and
+          # ROADMAP.md (no test reads their content, #137). Skills, hooks, scripts, workflows and app are never inert.
           needs_tests() { # needs_tests <files>: true when any file is not inert
             if echo "$1" | grep -vE '^$' | grep -vE '^(docs/|[^/]+\.md$)' | stdin_grep -q .; then echo true
-            elif echo "$1" | grep -E '^(docs/process-design\.md|AGENTS\.md|CLAUDE\.md|CHANGELOG\.md|ROADMAP\.md)$' | stdin_grep -q .; then echo true
+            elif echo "$1" | grep -E '^(docs/process-design\.md|AGENTS\.md|CLAUDE\.md)$' | stdin_grep -q .; then echo true
             else echo false; fi
           }
           run_tests="$(needs_tests "$files")"
@@ -185,6 +193,8 @@ jobs:
           # whose Tests did not fail (success, or skipped by the rules above): everything was
           # already verified on that very tree, so lint, workflows and tests run for nothing.
           # Only the sum of PRs merged in a row (a tree no PR ever had) is tested here.
+          # confirmed=true: this run only repeats that proof, so the CI job does not start.
+          confirmed=false
           if [ "${EVENT_NAME:-pull_request}" = push ] && [ "$run_tests$code$workflows" != falsefalsefalse ]; then
             tree="$(git rev-parse "$HEAD_SHA^{tree}")"
             for ph in $(gh api "repos/$GITHUB_REPOSITORY/commits/$HEAD_SHA/pulls" --jq '.[] | select(.merged_at != null) | .head.sha' 2>/dev/null || true); do
@@ -193,7 +203,12 @@ jobs:
               bad="$(gh api "repos/$GITHUB_REPOSITORY/commits/$ph/check-runs?per_page=100" --jq '[.check_runs[] | select(.name == "Tests" and (.conclusion == "failure" or .conclusion == "cancelled"))] | length' 2>/dev/null || echo 1)"
               if [ "${ok:-0}" -gt 0 ] && [ "${bad:-1}" = 0 ]; then
                 run_tests=false code=false workflows=false
+                confirmed=true
+                echo "already tested in the PR"
                 echo "same tree as the head $ph of a merged PR with green CI: nothing to run"
+                if [ -n "${GITHUB_STEP_SUMMARY:-}" ]; then
+                  printf '%s\n' "already tested in the PR" >>"$GITHUB_STEP_SUMMARY"
+                fi
                 break
               fi
             done
@@ -202,6 +217,7 @@ jobs:
             echo "code=$code"
             echo "workflows=$workflows"
             echo "run_tests=$run_tests"
+            echo "confirmed=$confirmed"
             echo "app=$(has '^(app/|\.github/workflows/deploy-example\.yml)')"
             echo "event=${EVENT_NAME:-pull_request}"
             if [ "$code" = true ]; then echo "docs_only=false"; else echo "docs_only=true"; fi
@@ -408,7 +424,8 @@ jobs:
   ci:
     name: "CI"
     needs: [changes, policy, lint, tests, workflows]
-    if: always()
+    # A push that only confirms a tree the PR already tested does not start this job.
+    if: always() && needs.changes.outputs.confirmed != 'true'
     runs-on: ${{ fromJSON(vars.CI_RUNS_ON || '"ubuntu-latest"') }}
     timeout-minutes: 5
     permissions:
