@@ -575,6 +575,15 @@ O arquivo é a fonte. Jobs: `changes`, `policy`, `lint`, `tests`, `workflows` e 
 | Permissões mínimas | `permissions: {}` no topo, liberadas por job |
 | Sem trabalho repetido | o shellcheck roda uma vez, dentro do `validate.sh` |
 
+Execução sem fato novo é defeito, mesmo verde. A detecção fica nos scripts que já decidem pular, com o prefixo `no-new-fact:` (não há alvo novo de produção):
+
+| Cenário | Detecção |
+|---|---|
+| `--prepare` cujo commit não muda o que a suíte lê | `no-new-fact: nothing the suite reads` em `scripts/close-phase.sh` |
+| `--prepare` sem push | `no-new-fact: already on origin` em `scripts/close-phase.sh` |
+| push cuja árvore o PR já testou | `no-new-fact: already tested in the PR` em `.github/workflows/ci.yml` |
+| job de `Tests` reaproveitado | `no-new-fact: tests already passed` em `.github/workflows/ci.yml` |
+
 O `issues-label.yml` roda em `opened` e em `edited` só quando o corpo mudou, com `contents: read` e `issues: write`.
 
 ### 9.3 Runner próprio

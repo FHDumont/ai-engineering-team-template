@@ -178,7 +178,7 @@ jobs:
                 success)
                   if git merge-base --is-ancestor "$BASE_SHA" "$c" 2>/dev/null; then
                     run_tests=false
-                    echo "tests already passed on $c, code unchanged since, commit contains the base"
+                    echo "no-new-fact: tests already passed on $c, code unchanged since, commit contains the base"
                     break
                   fi
                   echo "Tests success on $c does not contain the current base: running"
@@ -207,7 +207,7 @@ jobs:
               if [ "$ci_conc" = success ] && { [ "$tests_conc" = success ] || [ "$tests_conc" = skipped ]; }; then
                 run_tests=false code=false workflows=false
                 confirmed=true
-                echo "already tested in the PR"
+                echo "no-new-fact: already tested in the PR"
                 echo "same tree as the head $ph of a merged PR with green CI: nothing to run"
                 if [ -n "${GITHUB_STEP_SUMMARY:-}" ]; then
                   printf '%s\n' "already tested in the PR" >>"$GITHUB_STEP_SUMMARY"
