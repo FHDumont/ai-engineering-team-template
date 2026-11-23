@@ -6,7 +6,9 @@
 #: Branch: <type>/issue-<n>-<slug>, from an updated origin/main.
 #: Worktree: .worktrees/issue-<n> (ignored by git). Without --type, the type
 #: comes from the issue's type:* label; without --slug, from its title. Then runs
-#: check-env.sh inside the worktree. Sets the issue to In Progress and the
+#: check-env.sh inside the worktree with CHECK_ENV_OPENING=1: a missing product
+#: dependency warns and nothing is installed; a missing tool of the method still
+#: refuses. Sets the issue to In Progress and the
 #: Project's "Fase atual" view filter to the group (group:* label) of the active
 #: phases. Prints the worktree path on the last line.
 #: Refuses an issue that is not open and an issue without a spec: some
@@ -160,7 +162,7 @@ if [ ${#added[@]} -gt 0 ]; then
 fi
 if [ "$check" = 1 ]; then
   progress_step "checking the environment (check-env.sh)"
-  (cd "$path" && "$path/scripts/check-env.sh")
+  (cd "$path" && CHECK_ENV_OPENING=1 "$path/scripts/check-env.sh")
 fi
 # The phase is open from here on: a board that refuses the write leaves it open (the
 # message says so), as the owner can fix the board and nothing of the phase is lost.
