@@ -424,6 +424,77 @@ if [ -n "$jq_expr" ]; then printf '%%s\\n' "$body" | jq -r "$jq_expr"; else prin
         out = dict(l.split("=", 1) for l in open(os.path.join(self.tmp, "output")).read().split())
         self.assertEqual(out["run_tests"], "true")
 
+    def write_gh_runs(self, mapping):
+        """Fake gh: sha to a list of Tests check runs (raw JSON; the step runs jq)."""
+        fake = os.path.join(self.tmp, "binruns")
+        os.makedirs(fake, exist_ok=True)
+        gh = os.path.join(fake, "gh")
+        clauses = []
+        for sha, runs in mapping.items():
+            if runs == "apierr":
+                clauses.append('  *"commits/%s/check-runs"*) echo "api failed" >&2; exit 1 ;;' % sha)
+            else:
+                body = json.dumps({"check_runs": runs})
+                clauses.append('  *"commits/%s/check-runs"*) body=%s ;;' % (sha, json.dumps(body)))
+        open(gh, "w").write("""#!/bin/sh
+body='{"check_runs":[]}'
+case "$*" in
+%s
+  *) body='{"check_runs":[]}' ;;
+esac
+printf '%%s\\n' "$body"
+""" % "\n".join(clauses))
+        os.chmod(gh, 0o755)
+        return {"PATH": fake + os.pathsep + os.environ["PATH"]}
+
+    def test_newer_pending_run_is_not_hidden_by_an_older_success(self):
+        # The newest run on the newer commit is still pending (no started_at). An older
+        # success on that same commit must not cover it.
+        a = self.commit({"scripts/x.sh": "x\n"})
+        b = self.commit({"docs/a.md": "a\n"})
+        c = self.commit({"docs/b.md": "b\n"})
+        env = self.write_gh_runs({
+            a: [{"name": "Tests", "id": 1, "status": "completed", "conclusion": "success",
+                 "started_at": "2020-01-01T00:00:00Z", "app": {"slug": "github-actions"}}],
+            b: [
+                {"name": "Tests", "id": 1, "status": "completed", "conclusion": "success",
+                 "started_at": "2020-01-02T00:00:00Z", "app": {"slug": "github-actions"}},
+                {"name": "Tests", "id": 2, "status": "in_progress", "conclusion": None,
+                 "started_at": None, "app": {"slug": "github-actions"}},
+            ],
+        })
+        r = self.run_step("changes", "Detect changed paths", c, env)
+        self.assertEqual(r.returncode, 0, r.stderr)
+        out = dict(l.split("=", 1) for l in open(os.path.join(self.tmp, "output")).read().split())
+        self.assertEqual(out["run_tests"], "true")
+
+    def test_skipped_on_the_newer_commit_reads_the_older_success(self):
+        # Only skipped may look at an older commit. A skipped Tests there, with a
+        # success on the older commit and no code change, does not run again.
+        a = self.commit({"scripts/x.sh": "x\n"})
+        b = self.commit({"docs/a.md": "a\n"})
+        c = self.commit({"docs/b.md": "b\n"})
+        env = self.write_gh_conclusions({a: "success", b: "skipped"})
+        r = self.run_step("changes", "Detect changed paths", c, env)
+        self.assertEqual(r.returncode, 0, r.stderr)
+        out = dict(l.split("=", 1) for l in open(os.path.join(self.tmp, "output")).read().split())
+        self.assertEqual(out["run_tests"], "false")
+
+    def test_other_app_success_does_not_cover_the_commit(self):
+        a = self.commit({"scripts/x.sh": "x\n"})
+        b = self.commit({"docs/a.md": "a\n"})
+        c = self.commit({"docs/b.md": "b\n"})
+        env = self.write_gh_runs({
+            a: [{"name": "Tests", "id": 1, "status": "completed", "conclusion": "success",
+                 "started_at": "2020-01-01T00:00:00Z", "app": {"slug": "github-actions"}}],
+            b: [{"name": "Tests", "id": 2, "status": "completed", "conclusion": "success",
+                 "started_at": "2020-01-02T00:00:00Z", "app": {"slug": "other"}}],
+        })
+        r = self.run_step("changes", "Detect changed paths", c, env)
+        self.assertEqual(r.returncode, 0, r.stderr)
+        out = dict(l.split("=", 1) for l in open(os.path.join(self.tmp, "output")).read().split())
+        self.assertEqual(out["run_tests"], "true")
+
     def test_tests_run_on_cancelled_pending_or_api_error(self):
         a = self.commit({"scripts/x.sh": "x\n"})
         b = self.commit({"docs/a.md": "a\n"})
@@ -461,15 +532,30 @@ if [ -n "$jq_expr" ]; then printf '%%s\\n' "$body" | jq -r "$jq_expr"; else prin
         os.makedirs(fake, exist_ok=True)
         pr_tree = git(self.repo, "rev-parse", (pr_head_tree_of or head) + "^{tree}")
         gh = os.path.join(fake, "gh")
+        def run(name, conclusion, run_id):
+            pending = conclusion == "pending"
+            return {"name": name, "id": run_id,
+                    "status": "in_progress" if pending else "completed",
+                    "conclusion": None if pending else conclusion,
+                    "started_at": "2020-01-01T00:00:00Z",
+                    "app": {"slug": "github-actions"}}
+        body = json.dumps({"check_runs": [run("CI", ci, 1), run("Tests", tests, 2)]})
         open(gh, "w").write("""#!/bin/sh
+body=%s
 case "$*" in
-  *"/commits/%s/pulls"*) echo prhead ;;
-  *"/git/commits/prhead"*) echo %s ;;
-  *"/commits/prhead/check-runs"*)
-    case "$*" in *'.name == "CI"'*) echo %d ;; *) echo %d ;; esac ;;
-  *) echo 0 ;;
+  *"/commits/%s/pulls"*) echo prhead; exit 0 ;;
+  *"/git/commits/prhead"*) echo %s; exit 0 ;;
+  *"/commits/prhead/check-runs"*) ;;
+  *) echo 0; exit 0 ;;
 esac
-""" % (head, pr_tree, 1 if ci == "success" else 0, 1 if tests == "failure" else 0))
+jq_expr=""
+prev=""
+for a in "$@"; do
+  [ "$prev" = --jq ] && jq_expr="$a"
+  prev="$a"
+done
+if [ -n "$jq_expr" ]; then printf '%%s\\n' "$body" | jq -r "$jq_expr"; else printf '%%s\\n' "$body"; fi
+""" % (json.dumps(body), head, pr_tree))
         os.chmod(gh, 0o755)
         env = {"PATH": fake + os.pathsep + os.environ["PATH"], "EVENT_NAME": "push",
                "GITHUB_STEP_SUMMARY": os.path.join(self.tmp, "summary.md")}
@@ -492,6 +578,10 @@ esac
     def test_push_main_runs_when_the_pr_had_no_green_ci_or_failed_tests(self):
         self.assertEqual(self.push_main({"scripts/x.sh": "x\n"}, ci="failure")["run_tests"], "true")
         self.assertEqual(self.push_main({"scripts/y.sh": "y\n"}, tests="failure")["run_tests"], "true")
+
+    def test_push_main_uses_the_newest_tests_result(self):
+        # An older success must not hide a newer timeout on the same PR head.
+        self.assertEqual(self.push_main({"scripts/z.sh": "z\n"}, tests="timed_out")["run_tests"], "true")
 
     def test_push_main_skips_inert_docs(self):
         out = self.push_main({"docs/x.md": "x\n"}, pr_head_tree_of=self.base)

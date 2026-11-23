@@ -156,8 +156,11 @@ jobs:
             else echo false; fi
           }
           run_tests="$(needs_tests "$files")"
-          # Code unchanged since a commit of this PR whose Tests already passed:
-          # the suite would run again on the same code. Looks back 15 commits.
+          # Code unchanged since a commit of this PR whose newest Tests result is a
+          # success. Looks back 15 commits. Only skipped looks further; a failure,
+          # cancellation, timeout or pending result on a newer commit runs again.
+          # The newest run is the highest id (a queued run may have no started_at).
+          # A check of the same name from another app does not count.
           if [ "$run_tests" = true ]; then
             for c in $(git rev-list --max-count=15 "$BASE_SHA..$HEAD_SHA" | tail -n +2); do
               delta="$(git diff --name-only --no-renames -z "$c" "$HEAD_SHA" 2>/dev/null | tr '\0' '\n' || echo "?")"
@@ -166,7 +169,7 @@ jobs:
                 echo "Tests check unread on $c: running"
                 break
               }
-              conc="$(printf '%s' "$raw" | jq -r '[.check_runs[]? | select(.name == "Tests")] | sort_by(.started_at // "") | last
+              conc="$(printf '%s' "$raw" | jq -r '[.check_runs[]? | select(.name == "Tests" and ((.app.slug // "github-actions") == "github-actions"))] | sort_by((.id // 0), (.started_at // "")) | last
                 | if . == null then "missing"
                   elif (.status // "completed") != "completed" then (.status // "pending")
                   else (.conclusion // "missing") end' 2>/dev/null || echo apierr)"
@@ -199,9 +202,9 @@ jobs:
             tree="$(git rev-parse "$HEAD_SHA^{tree}")"
             for ph in $(gh api "repos/$GITHUB_REPOSITORY/commits/$HEAD_SHA/pulls" --jq '.[] | select(.merged_at != null) | .head.sha' 2>/dev/null || true); do
               [ "$(gh api "repos/$GITHUB_REPOSITORY/git/commits/$ph" --jq .tree.sha 2>/dev/null || true)" = "$tree" ] || continue
-              ok="$(gh api "repos/$GITHUB_REPOSITORY/commits/$ph/check-runs?per_page=100" --jq '[.check_runs[] | select(.name == "CI" and .conclusion == "success")] | length' 2>/dev/null || echo 0)"
-              bad="$(gh api "repos/$GITHUB_REPOSITORY/commits/$ph/check-runs?per_page=100" --jq '[.check_runs[] | select(.name == "Tests" and (.conclusion == "failure" or .conclusion == "cancelled"))] | length' 2>/dev/null || echo 1)"
-              if [ "${ok:-0}" -gt 0 ] && [ "${bad:-1}" = 0 ]; then
+              ci_conc="$(gh api "repos/$GITHUB_REPOSITORY/commits/$ph/check-runs?per_page=100" --jq '[.check_runs[]? | select(.name == "CI" and ((.app.slug // "github-actions") == "github-actions"))] | sort_by((.id // 0), (.started_at // "")) | last | if . == null then "missing" elif (.status // "completed") != "completed" then "pending" else (.conclusion // "missing") end' 2>/dev/null || echo apierr)"
+              tests_conc="$(gh api "repos/$GITHUB_REPOSITORY/commits/$ph/check-runs?per_page=100" --jq '[.check_runs[]? | select(.name == "Tests" and ((.app.slug // "github-actions") == "github-actions"))] | sort_by((.id // 0), (.started_at // "")) | last | if . == null then "missing" elif (.status // "completed") != "completed" then "pending" else (.conclusion // "missing") end' 2>/dev/null || echo apierr)"
+              if [ "$ci_conc" = success ] && { [ "$tests_conc" = success ] || [ "$tests_conc" = skipped ]; }; then
                 run_tests=false code=false workflows=false
                 confirmed=true
                 echo "already tested in the PR"
