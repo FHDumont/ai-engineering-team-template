@@ -69,4 +69,47 @@ assert_status 0 "merges without a session id when HEAD was pushed and pre-review
   env -u CLAUDE_CODE_SESSION_ID sh -c "cd '$repo' && '$CLOSE' --merge"
 assert_contains "$(gh_calls)" "pr merge 12" "merges without a session id"
 
+# #131: a second --prepare that sends nothing must not record phase_push, or the
+# review of that same SHA is refused. A later prepare that does push still asks
+# for a new round.
+git -C "$repo" switch --quiet feat/issue-5-x
+echo more >>"$repo/feature.txt"
+git -C "$repo" add feature.txt
+git -C "$repo" commit --quiet -m "fix: another"
+export PROCESS_EVENTS_FILE="$TRACE"
+: >"$TRACE"
+printf 'Resumo\n\nCloses #5\n' >"$TMP/body131.md"
+cat >"$TMP/handler.sh" <<H
+case "\$*" in
+  "pr list"*"--state open"*) echo 12 ;;
+  "issue view 5"*"labels"*) printf 'type:feature\n' ;;
+  "pr view 12"*"headRefOid --jq"*) git -C "$repo" rev-parse HEAD ;;
+  "pr view 12 --repo owner/repo --json title,body") echo '{"title":"feat: x","body":""}' ;;
+  "issue list"*) printf '' ;;
+esac
+H
+use_fake_gh "$TMP/handler.sh"
+: >"$PUSH_LOG"
+assert_status 0 "prepare pushes the commit the review will judge" \
+  sh -c "cd '$repo' && '$CLOSE' --prepare --title 'feat: x' --body-file '$TMP/body131.md'"
+head131="$(git -C "$repo" rev-parse HEAD)"
+round_ev
+printf 'Revisão: aprovado.\n' >"$TMP/review131.md"
+cp "$TMP/review131.md" "$repo/.process/reviewer-$head131.md"
+printf 'success\n' >"$repo/.process/reviewer-$head131.verdict"
+assert_status 0 "prepare again when the SHA is already on origin" \
+  sh -c "cd '$repo' && '$CLOSE' --prepare --body-file '$TMP/body131.md'"
+assert_eq "1" "$(jq -s --arg s "$head131" '[.[] | select(.event == "phase_push" and .sha == $s)] | length' "$TRACE")" "a prepare that does not push records no new phase_push"
+assert_eq "1" "$(pushes)" "a prepare that does not push does not call git push"
+assert_status 0 "publish survives a prepare that did not push" \
+  sh -c "cd '$repo' && '$CLOSE' --publish-review '$TMP/review131.md' --verdict success --round 1"
+echo later >>"$repo/feature.txt"
+git -C "$repo" add feature.txt
+git -C "$repo" commit --quiet -m "fix: after the review"
+assert_status 0 "prepare pushes the commit made after the review" \
+  sh -c "cd '$repo' && '$CLOSE' --prepare --body-file '$TMP/body131.md'"
+assert_status 1 "a real push after the review still asks for a new round" \
+  sh -c "cd '$repo' && '$CLOSE' --publish-review '$TMP/review131.md' --verdict success --round 1"
+assert_contains "$(last_output)" "no close-reviewer round after the last push" "says the round has to follow the push"
+
 finish
