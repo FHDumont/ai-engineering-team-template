@@ -18,7 +18,7 @@
 #: .github/method-origin (or the first commit), for a repository that does
 #: not have the file yet. --notice prints the update checklist with only the items
 #: that apply to the interval (settings.json, ci-mode, missing files and labels,
-#: removed files, the old STATE sentence, the gate label by the origin verifier,
+#: removed files, adapted files (merge by hand), the old STATE sentence, the gate label by the origin verifier,
 #: and the check-docs.sh of the origin).
 set -euo pipefail
 HERE="$(cd "$(dirname "$0")" && pwd)"
@@ -166,7 +166,7 @@ if [ "$notice" = 0 ]; then cat "$report"; exit 0; fi
 items() { grep "^$1 " "$report" | cut -d' ' -f2- || true; }
 echo "Itens da atualização $from → $to (gerado por scripts/method-diff.sh --notice):"
 echo
-for c in missing missing-label removed; do
+for c in missing missing-label removed adapted; do
   for f in $(items "$c"); do echo "- [ ] \`$c\`: \`$f\`"; done
 done
 sb="$(blob_at "$template" "$to" .claude/settings.json)"
