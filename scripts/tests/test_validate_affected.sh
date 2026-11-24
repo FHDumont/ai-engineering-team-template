@@ -10,7 +10,7 @@ cp "$SCRIPTS/validate.sh" "$repo/scripts/validate.sh"
 cp "$SCRIPTS/lib/common.sh" "$SCRIPTS/lib/slots.sh" "$SCRIPTS/lib/progress.sh" "$SCRIPTS/lib/procs.sh" "$SCRIPTS/lib/machine-limits.env.example" "$repo/scripts/lib/"
 RAN="$TMP/ran.log"
 # Each test appends its own name to the log; alpha reads foo.sh, beta reads bar.sh,
-# gamma_gate is a gate test, delta reads wrapper.sh, which calls foo.sh.
+# gamma_gate is a gate test, delta reads wrapper.sh, which sources the library lib/util.sh.
 for t in alpha:foo.sh beta:bar.sh gamma_gate:gate.sh delta:wrapper.sh; do
   name="${t%%:*}"; target="${t#*:}"
   cat >"$repo/scripts/tests/test_$name.sh" <<P
@@ -22,7 +22,9 @@ done
 printf '#!/usr/bin/env bash\necho foo\n' >"$repo/scripts/foo.sh"
 printf '#!/usr/bin/env bash\necho bar\n' >"$repo/scripts/bar.sh"
 printf '#!/usr/bin/env bash\necho gate\n' >"$repo/scripts/gate.sh"
-printf '#!/usr/bin/env bash\n./foo.sh\n' >"$repo/scripts/wrapper.sh"
+printf '#!/usr/bin/env bash\nsource lib/util.sh\n' >"$repo/scripts/wrapper.sh"
+mkdir -p "$repo/scripts/lib"
+echo 'x=1' >"$repo/scripts/lib/util.sh"
 printf '#!/usr/bin/env bash\necho lonely\n' >"$repo/scripts/lonely.sh"
 git -C "$repo" add scripts
 git -C "$repo" commit --quiet -m "chore: scripts"
@@ -37,8 +39,14 @@ run() { # run <args...>: validate.sh --tests; the names of the tests that ran, s
 # A diff of one script: its test, the tests of the scripts that call it, and the gate tests.
 echo "# edit" >>"$repo/scripts/foo.sh"
 git -C "$repo" commit --quiet -am "fix: foo"
-assert_eq "alpha delta gamma_gate " "$(run --tests)" "a diff of foo.sh runs its test, its caller's test and the gate tests"
+assert_eq "alpha gamma_gate " "$(run --tests)" "a diff of foo.sh runs its test and the gate tests"
 assert_contains "$(cat "$TMP/v.out")" "affected" "the output says the run is partial"
+
+# A shared library also runs the tests of the scripts that load it.
+echo "# edit" >>"$repo/scripts/lib/util.sh"
+git -C "$repo" commit --quiet -am "fix: util"
+assert_eq "alpha delta gamma_gate " "$(run --tests)" "a diff of a lib runs the tests of the scripts that load it"
+git -C "$repo" reset --quiet --hard HEAD~1
 
 # --full runs everything, so does the CI.
 assert_eq "alpha beta delta gamma_gate " "$(run --tests --full)" "--full runs every test"
@@ -62,7 +70,7 @@ mkdir -p "$repo/docs/specs"
 echo spec >"$repo/docs/specs/s.md"
 git -C "$repo" add docs
 git -C "$repo" commit --quiet -m "docs(specs): add"
-assert_eq "alpha delta gamma_gate " "$(run --tests)" "a spec under docs/ does not widen the selection"
+assert_eq "alpha gamma_gate " "$(run --tests)" "a spec under docs/ does not widen the selection"
 
 # A partial green run is recorded for --prepare (scope=affected), a full one as full.
 assert_status 0 "the partial run is green" env -u CI -u PROCESS_VALIDATE_RUNNING bash -c 'cd "$1" && scripts/validate.sh --lint --tests' _ "$repo"
