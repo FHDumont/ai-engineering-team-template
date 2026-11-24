@@ -857,19 +857,19 @@ if [ -n "$jq_expr" ]; then printf '%%s\\n' "$body" | jq -r "$jq_expr"; else prin
         self.assertIn("fail: lint", r.stdout)
 
     def test_base_checkouts(self):
-        # policy checks the base of the PR out at base/. On push, ci checks out
-        # github.sha: github.event.before is the previous main, which has no
-        # verifiers on the adoption push and an old gate on an update.
+        # policy reads the base of the PR at base/. On push, ci reads github.sha:
+        # github.event.before is the previous main, which has no verifiers on the
+        # adoption push and an old gate on an update.
         wf = cw.load(os.path.join(ROOT, ".github", "workflows", "ci.yml"))
         for job in ("policy", "ci"):
             steps = wf["jobs"][job]["steps"]
-            base = [s for s in steps if (s.get("with") or {}).get("path") == "base"]
+            base = [s for s in steps if "git archive" in (s.get("run") or "")]
             self.assertEqual(len(base), 1, job)
             want = "${{ github.event.pull_request.base.sha }}" if job == "policy" else \
                 "${{ github.event.pull_request.base.sha || github.sha }}"
-            self.assertEqual(base[0]["with"]["ref"], want, job)
-            self.assertNotIn("github.event.before", base[0]["with"]["ref"])
-            self.assertFalse(base[0]["with"].get("persist-credentials", True), job)
+            self.assertEqual(base[0]["env"]["BASE_SHA"], want, job)
+            self.assertNotIn("github.event.before", base[0]["env"]["BASE_SHA"])
+            self.assertNotIn("${{", base[0]["run"], job)
 
     def test_first_ci_uses_the_gate_of_this_commit_when_the_base_has_none(self):
         # Adoption PR: the base commit has no ci-gate.sh. The gate of this commit
@@ -915,7 +915,7 @@ if [ -n "$jq_expr" ]; then printf '%%s\\n' "$body" | jq -r "$jq_expr"; else prin
         # policy and tests. The push run uses the gate of github.sha, which
         # accepts policy skipped when event=push and tests skipped when run_tests=false.
         wf = cw.load(os.path.join(ROOT, ".github", "workflows", "ci.yml"))
-        ref = next(s for s in wf["jobs"]["ci"]["steps"] if (s.get("with") or {}).get("path") == "base")["with"]["ref"]
+        ref = next(s for s in wf["jobs"]["ci"]["steps"] if "git archive" in (s.get("run") or ""))["env"]["BASE_SHA"]
         self.assertEqual(ref, "${{ github.event.pull_request.base.sha || github.sha }}")
         needs = ('{"changes":{"result":"success","outputs":{"event":"push","code":"false","run_tests":"false","workflows":"false"}},'
                  '"policy":{"result":"skipped"},"lint":{"result":"skipped"},"tests":{"result":"skipped"},"workflows":{"result":"skipped"}}')
@@ -1125,11 +1125,29 @@ class GhPinTests(unittest.TestCase):
             self.assertFalse(any(u.startswith("./") for u in uses), job)
         self.assertEqual(runs[0], runs[1])
         changes = wf["jobs"]["changes"]["steps"]
-        pin = [s for s in changes if s.get("name") == "Checkout the gh pin from the base"]
+        pin = [s for s in changes if s.get("name") == "Read the gh pin from the base"]
         self.assertEqual(len(pin), 1)
-        self.assertEqual(pin[0]["with"]["ref"], "${{ github.event.pull_request.base.sha || github.sha }}")
-        self.assertEqual(pin[0]["with"]["path"], "base")
-        self.assertFalse(pin[0]["with"].get("persist-credentials", True))
+        self.assertEqual(pin[0]["env"]["BASE_SHA"], "${{ github.event.pull_request.base.sha || github.sha }}")
+        self.assertIn("git archive", pin[0]["run"])
+
+    def test_checkout_can_be_replaced_by_a_command_of_the_repository(self):
+        # #247: a runner with no actions/* sets CI_CHECKOUT_CMD. Each checkout has a twin
+        # that runs the command from env, never from ${{ }} inside run.
+        wf = cw.load(os.path.join(ROOT, ".github", "workflows", "ci.yml"))
+        for job, body in wf["jobs"].items():
+            steps = body["steps"]
+            for i, st in enumerate(steps):
+                if not (st.get("uses") or "").startswith("actions/checkout"):
+                    continue
+                self.assertEqual(st["if"], "vars.CI_CHECKOUT_CMD == ''", job)
+                twin = steps[i + 1]
+                self.assertEqual(twin["if"], "vars.CI_CHECKOUT_CMD != ''", job)
+                self.assertEqual(twin["env"]["CI_CHECKOUT_CMD"], "${{ vars.CI_CHECKOUT_CMD }}")
+                self.assertEqual(twin["run"], 'eval "$CI_CHECKOUT_CMD"')
+                full = "fetch-depth" in (st.get("with") or {})
+                self.assertEqual(twin["env"]["CI_CHECKOUT_FULL"], "true" if full else "false", job)
+        text = open(os.path.join(ROOT, ".github", "workflows", "ci.yml"), encoding="utf-8").read()
+        self.assertNotRegex(text, r"run:[^\n]*\$\{\{ *vars\.")
 
     def run_install(self, extra_env):
         env = dict(os.environ)

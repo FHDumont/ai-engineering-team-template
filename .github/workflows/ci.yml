@@ -6,11 +6,14 @@
 # main, together with the review/independent status. `runs-on` reads the
 # CI_RUNS_ON variable (JSON: a string or a list of labels) for a self-hosted
 # runner; without it, ubuntu-latest (GitHub-hosted).
+# `CI_CHECKOUT_CMD` (variable, optional) replaces actions/checkout on a runner that
+# cannot download actions: the step runs the command with CI_CHECKOUT_FULL=true
+# when the job needs the full history. The base is read with git archive.
 #
 # The verifiers that decide the gate (scripts/ci-gate.sh,
 # scripts/check-attribution.sh, scripts/check-docs.sh,
 # scripts/lib/sensitive_paths.py and .github/sensitive-paths) are read from the
-# base commit of the PR, checked out at base/: a PR cannot weaken the check
+# base commit of the PR, extracted at base/ (git archive): a PR cannot weaken the check
 # that judges it. On push to main the gate is read from github.sha (the commit
 # that carries this workflow). github.event.before is the previous main: the
 # adoption push has no verifiers there, and an update still has the old gate.
@@ -63,16 +66,28 @@ jobs:
       confirmed: ${{ steps.detect.outputs.confirmed }}
     steps:
       - name: "Checkout"
+        if: vars.CI_CHECKOUT_CMD == ''
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
-      - name: "Checkout the gh pin from the base"
-        uses: actions/checkout@v4
-        with:
-          ref: ${{ github.event.pull_request.base.sha || github.sha }}
-          path: base
-          persist-credentials: false
-          sparse-checkout: .github
+      - name: "Checkout with CI_CHECKOUT_CMD"
+        if: vars.CI_CHECKOUT_CMD != ''
+        env:
+          CI_CHECKOUT_CMD: ${{ vars.CI_CHECKOUT_CMD }}
+          CI_CHECKOUT_FULL: "true"
+        run: eval "$CI_CHECKOUT_CMD"
+      - name: "Read the gh pin from the base"
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha || github.sha }}
+        run: |
+          set -euo pipefail
+          mkdir -p base
+          # Only what the base has: the base of an adoption PR has no method yet.
+          paths="$(git ls-tree --name-only "$BASE_SHA" -- .github)"
+          if [ -n "$paths" ]; then
+            # shellcheck disable=SC2086
+            git archive "$BASE_SHA" $paths | tar -x -C base
+          fi
       - name: "Install pinned gh"
         env:
           RUNNER_OS_NAME: ${{ runner.os }}
@@ -86,8 +101,13 @@ jobs:
               gh --version
               exit 0
             fi
-            echo "::error::base commit has no .github/gh-pin (version and sha256) and gh is not on PATH. The job does not install gh from the pull request."
-            exit 1
+            if [ ! -f base/.github/method-files.txt ] && [ -f .github/gh-pin ]; then
+              echo "::notice::base has no method (no .github/gh-pin, no .github/method-files.txt) and gh is not on PATH: first CI, using the .github/gh-pin of the pull request"
+              pin=".github/gh-pin"
+            else
+              echo "::error::base commit has no .github/gh-pin (version and sha256) and gh is not on PATH. The job does not install gh from the pull request."
+              exit 1
+            fi
           fi
           version="$(awk 'NF && $1 !~ /^#/ { print; exit }' "$pin")"
           case "${RUNNER_OS_NAME:-}" in
@@ -238,19 +258,29 @@ jobs:
       pull-requests: write
     steps:
       - name: "Checkout"
+        if: vars.CI_CHECKOUT_CMD == ''
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
+      - name: "Checkout with CI_CHECKOUT_CMD"
+        if: vars.CI_CHECKOUT_CMD != ''
+        env:
+          CI_CHECKOUT_CMD: ${{ vars.CI_CHECKOUT_CMD }}
+          CI_CHECKOUT_FULL: "true"
+        run: eval "$CI_CHECKOUT_CMD"
       # After the PR checkout, which cleans the workspace.
-      - name: "Checkout the verifiers from the base"
-        uses: actions/checkout@v4
-        with:
-          ref: ${{ github.event.pull_request.base.sha }}
-          path: base
-          persist-credentials: false
-          sparse-checkout: |
-            scripts
-            .github
+      - name: "Read the verifiers from the base"
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: |
+          set -euo pipefail
+          mkdir -p base
+          # Only what the base has: the base of an adoption PR has no method yet.
+          paths="$(git ls-tree --name-only "$BASE_SHA" -- .github scripts)"
+          if [ -n "$paths" ]; then
+            # shellcheck disable=SC2086
+            git archive "$BASE_SHA" $paths | tar -x -C base
+          fi
       - name: "Install pinned gh"
         env:
           RUNNER_OS_NAME: ${{ runner.os }}
@@ -264,8 +294,13 @@ jobs:
               gh --version
               exit 0
             fi
-            echo "::error::base commit has no .github/gh-pin (version and sha256) and gh is not on PATH. The job does not install gh from the pull request."
-            exit 1
+            if [ ! -f base/.github/method-files.txt ] && [ -f .github/gh-pin ]; then
+              echo "::notice::base has no method (no .github/gh-pin, no .github/method-files.txt) and gh is not on PATH: first CI, using the .github/gh-pin of the pull request"
+              pin=".github/gh-pin"
+            else
+              echo "::error::base commit has no .github/gh-pin (version and sha256) and gh is not on PATH. The job does not install gh from the pull request."
+              exit 1
+            fi
           fi
           version="$(awk 'NF && $1 !~ /^#/ { print; exit }' "$pin")"
           case "${RUNNER_OS_NAME:-}" in
@@ -368,7 +403,14 @@ jobs:
       contents: read
     steps:
       - name: "Checkout"
+        if: vars.CI_CHECKOUT_CMD == ''
         uses: actions/checkout@v4
+      - name: "Checkout with CI_CHECKOUT_CMD"
+        if: vars.CI_CHECKOUT_CMD != ''
+        env:
+          CI_CHECKOUT_CMD: ${{ vars.CI_CHECKOUT_CMD }}
+          CI_CHECKOUT_FULL: "false"
+        run: eval "$CI_CHECKOUT_CMD"
       - name: "Shellcheck and Python syntax"
         run: scripts/validate.sh --lint
 
@@ -382,7 +424,14 @@ jobs:
       contents: read
     steps:
       - name: "Checkout"
+        if: vars.CI_CHECKOUT_CMD == ''
         uses: actions/checkout@v4
+      - name: "Checkout with CI_CHECKOUT_CMD"
+        if: vars.CI_CHECKOUT_CMD != ''
+        env:
+          CI_CHECKOUT_CMD: ${{ vars.CI_CHECKOUT_CMD }}
+          CI_CHECKOUT_FULL: "false"
+        run: eval "$CI_CHECKOUT_CMD"
       - name: "Script and hook tests"
         run: scripts/validate.sh --tests
       # Example: the app is only built here on the PR; deploy-example.yml
@@ -404,7 +453,14 @@ jobs:
       ACTIONLINT_VERSION: "1.7.7"
     steps:
       - name: "Checkout"
+        if: vars.CI_CHECKOUT_CMD == ''
         uses: actions/checkout@v4
+      - name: "Checkout with CI_CHECKOUT_CMD"
+        if: vars.CI_CHECKOUT_CMD != ''
+        env:
+          CI_CHECKOUT_CMD: ${{ vars.CI_CHECKOUT_CMD }}
+          CI_CHECKOUT_FULL: "false"
+        run: eval "$CI_CHECKOUT_CMD"
       - name: "Install actionlint"
         env:
           RUNNER_OS_NAME: ${{ runner.os }}
@@ -451,16 +507,30 @@ jobs:
       contents: read
     steps:
       - name: "Checkout"
+        if: vars.CI_CHECKOUT_CMD == ''
         uses: actions/checkout@v4
         with:
+          # The base is read by git archive, so its commit must be in the history.
+          fetch-depth: 0
           persist-credentials: false
-      - name: "Checkout the gate from the base"
-        uses: actions/checkout@v4
-        with:
-          ref: ${{ github.event.pull_request.base.sha || github.sha }}
-          path: base
-          persist-credentials: false
-          sparse-checkout: scripts
+      - name: "Checkout with CI_CHECKOUT_CMD"
+        if: vars.CI_CHECKOUT_CMD != ''
+        env:
+          CI_CHECKOUT_CMD: ${{ vars.CI_CHECKOUT_CMD }}
+          CI_CHECKOUT_FULL: "true"
+        run: eval "$CI_CHECKOUT_CMD"
+      - name: "Read the gate from the base"
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha || github.sha }}
+        run: |
+          set -euo pipefail
+          mkdir -p base
+          # Only what the base has: the base of an adoption PR has no method yet.
+          paths="$(git ls-tree --name-only "$BASE_SHA" -- scripts)"
+          if [ -n "$paths" ]; then
+            # shellcheck disable=SC2086
+            git archive "$BASE_SHA" $paths | tar -x -C base
+          fi
       - name: "Aggregate required jobs"
         env:
           NEEDS: ${{ toJSON(needs) }}
