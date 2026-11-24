@@ -20,15 +20,16 @@ def body(**sections):
     return "\n".join("## %s\n\n%s\n" % (k, v) for k, v in sections.items())
 
 
-def first_area():
+def areas():
     path = os.path.join(ROOT, ".github", "labels.tsv")
-    for line in open(path, encoding="utf-8"):
-        if line.startswith("area:"):
-            return line.split("\t", 1)[0]
-    raise AssertionError("labels.tsv has no area label")
+    found = [l.split("\t", 1)[0] for l in open(path, encoding="utf-8") if l.startswith("area:")]
+    if len(found) < 2:
+        raise AssertionError(".github/labels.tsv needs at least two area:* labels for these tests (has %d)" % len(found))
+    return found
 
 
-AREA = first_area()
+AREAS = areas()
+AREA = AREAS[0]
 FULL_FEATURE = {"Objetivo": "Listar issues", "Pronto quando": "- [ ] lista",
                 "Arquivos ou áreas afetadas": AREA, "Prioridade sugerida": "alta"}
 
@@ -107,10 +108,41 @@ class AutoLabelTests(unittest.TestCase):
         self.assertIn("debt", r["add"])
 
     def test_sensitive_and_path_areas(self):
-        sections = dict(FULL_FEATURE, **{"Arquivos ou áreas afetadas": "scripts/ e o login com OAuth"})
+        # Areas come from the repository's own labels.tsv; rules are written for them.
+        sens, path = AREAS[0], AREAS[1]
+        self.with_rules("sensitive\t\\blogin\\b\t%s\npath\t(^|\\s)apps/\t%s\n" % (sens, path),
+                        lambda: self.check_areas(sens, path))
+
+    def check_areas(self, sens, path):
+        sections = dict(FULL_FEATURE, **{"Arquivos ou áreas afetadas": "apps/ e o login"})
         r = auto_label.compute(body(**sections), ["type:feature"])
-        self.assertIn("area:auth", r["add"])
-        self.assertIn("area:scripts", r["add"])
+        self.assertIn(sens, r["add"])
+        self.assertIn(path, r["add"])
+
+    def with_rules(self, text, check):
+        handle = tempfile.NamedTemporaryFile("w", suffix=".tsv", delete=False, encoding="utf-8")
+        handle.write(text)
+        handle.close()
+        previous = os.environ.get("LABEL_AREAS_FILE")
+        os.environ["LABEL_AREAS_FILE"] = handle.name
+        try:
+            check()
+        finally:
+            os.unlink(handle.name)
+            if previous is None:
+                os.environ.pop("LABEL_AREAS_FILE", None)
+            else:
+                os.environ["LABEL_AREAS_FILE"] = previous
+
+    def test_relay_note_between_repos_does_not_get_needs_context(self):
+        note = "**De:** gerenciadora A · **Para:** gerenciadora B · **Pedido:** x · **Responde a:** —\n\ntexto livre"
+        r = auto_label.compute(note, [])
+        self.assertNotIn("needs-context", r["add"])
+        self.assertEqual(r["missing"], [])
+        r = auto_label.compute(note, ["needs-context"])
+        self.assertEqual(r["remove"], ["needs-context"])
+        r = auto_label.compute("texto livre sem cabeçalho", [])
+        self.assertIn("needs-context", r["add"])
 
     def test_existing_priority_is_kept(self):
         r = auto_label.compute(body(**FULL_FEATURE), ["type:feature", "priority:low"])
@@ -135,24 +167,17 @@ class AutoLabelTests(unittest.TestCase):
 
     def test_area_rules_come_from_configuration(self):
         # A repository maps its own paths without editing auto-label.py (#101).
-        handle = tempfile.NamedTemporaryFile("w", suffix=".tsv", delete=False, encoding="utf-8")
-        handle.write("path\tapps/\tarea:docs\n")
-        handle.write("sensitive\t\\bpagamento\\b\tarea:auth\n")
-        handle.close()
-        previous = os.environ.get("LABEL_AREAS_FILE")
-        os.environ["LABEL_AREAS_FILE"] = handle.name
-        try:
+        a, b = AREAS[0], AREAS[1]
+
+        def check():
             sections = dict(FULL_FEATURE, **{"Arquivos ou áreas afetadas": "apps/web e pagamento"})
             r = auto_label.compute(body(**sections), ["type:feature"])
-            self.assertIn("area:docs", r["add"])
-            self.assertIn("area:auth", r["add"])
-            self.assertNotIn("area:scripts", r["add"])
-        finally:
-            os.unlink(handle.name)
-            if previous is None:
-                os.environ.pop("LABEL_AREAS_FILE", None)
-            else:
-                os.environ["LABEL_AREAS_FILE"] = previous
+            self.assertIn(a, r["add"])
+            self.assertIn(b, r["add"])
+            for other in AREAS[2:]:
+                self.assertNotIn(other, r["add"])
+
+        self.with_rules("path\tapps/\t%s\nsensitive\t\\bpagamento\\b\t%s\n" % (a, b), check)
 
 
 if __name__ == "__main__":
