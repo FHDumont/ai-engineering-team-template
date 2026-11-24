@@ -3,8 +3,15 @@
 The method paths live in this file. The repo file only adds globs; an
 update of the method adds new method paths without deleting repo ones.
 
-Usage: sensitive_paths.py <globs-file> < list-of-paths
-Prints the sensitive paths, one per line; always exits 0 (empty = none).
+The globs file has two classes, set by comment lines `# class: owner-ok` and
+`# class: gate`. A glob before any such line is owner-ok, so a file with no
+class lines (an adopter's old list) is all owner-ok. A path in both classes,
+or in the method paths or a write-token workflow, is owner-ok.
+
+Usage: [SENSITIVE_CLASS=owner-ok|gate] sensitive_paths.py <globs-file> < paths
+Paths come one per line, or NUL separated. Prints the sensitive paths, one per
+line (only those of the class in SENSITIVE_CLASS, when set); always exits 0
+(empty = none).
 """
 
 import os
@@ -55,6 +62,38 @@ def load_globs(path):
         return [l.strip() for l in f if l.strip() and not l.lstrip().startswith("#")]
 
 
+CLASS_LINE = re.compile(r"^#\s*class:\s*(owner-ok|gate)\s*$")
+
+
+def load_classed(path):
+    """The globs of the file as (glob, class) pairs; the class lines are comments."""
+    out, cls = [], "owner-ok"
+    with open(path, encoding="utf-8") as f:
+        for raw in f:
+            line = raw.strip()
+            m = CLASS_LINE.match(line)
+            if m:
+                cls = m.group(1)
+            elif line and not line.startswith("#"):
+                out.append((line, cls))
+    return out
+
+
+def sensitive_class(paths, globs_file, cls, root="."):
+    """The sensitive paths of one class. owner-ok wins when a path is in both."""
+    classed = load_classed(globs_file)
+    owner_globs = [g for g, c in classed if c == "owner-ok"]
+    gate_regs = [glob_to_regex(g) for g, c in classed if c == "gate"]
+    gate_globs = [g for g, c in classed if c == "gate"]
+    # A write-token workflow is owner-ok by its content, unless a gate glob names it.
+    owner = set(sensitive(paths, owner_globs, root=root, write_token=False))
+    owner |= {p for p in paths if workflow_has_write_token(p, root) and not any(r.match(p) for r in gate_regs)}
+    allhits = sensitive(paths, owner_globs + gate_globs, root=root)
+    if cls == "owner-ok":
+        return [p for p in allhits if p in owner]
+    return [p for p in allhits if p not in owner]
+
+
 def merged_globs(repo_globs):
     out = list(METHOD_GLOBS)
     for g in repo_globs:
@@ -73,11 +112,11 @@ def workflow_has_write_token(path, root="."):
     return bool(WRITE_PERM.search(text))
 
 
-def sensitive(paths, globs, root="."):
+def sensitive(paths, globs, root=".", write_token=True):
     regs = [glob_to_regex(g) for g in merged_globs(globs)]
     hits = []
     for p in paths:
-        if any(r.match(p) for r in regs) or workflow_has_write_token(p, root):
+        if any(r.match(p) for r in regs) or (write_token and workflow_has_write_token(p, root)):
             hits.append(p)
     return hits
 
@@ -94,7 +133,12 @@ def main(argv):
         if line:
             paths.append(line)
     root = os.getcwd()
-    for p in sensitive(paths, load_globs(argv[1]), root=root):
+    cls = os.environ.get("SENSITIVE_CLASS", "")
+    if cls in ("owner-ok", "gate"):
+        hits = sensitive_class(paths, argv[1], cls, root=root)
+    else:
+        hits = sensitive(paths, load_globs(argv[1]), root=root)
+    for p in hits:
         print(p)
     return 0
 

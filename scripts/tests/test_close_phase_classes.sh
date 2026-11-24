@@ -4,6 +4,8 @@
 # shellcheck source=scripts/tests/close_phase_common.sh
 source "$(dirname "$0")/close_phase_common.sh"
 
+# The gate_review event goes where the gate reads the trace.
+export PROCESS_EVENTS_FILE="$TRACE"
 reset_phase_evidence
 child_session 5
 mkdir -p "$repo/.process"
@@ -29,7 +31,7 @@ assert_status 0 "publishes the second review" sh -c "cd '$repo' && '$CLOSE' --pu
 assert_eq "success" "$(cat "$repo/.process/reviewer-gate-$SHA.verdict")" "the script writes the gate .verdict"
 assert_contains "$(gh_calls)" "pr comment 12" "posts the second review"
 assert_not_contains "$(gh_calls)" "context=review/independent" "the gate review is not the review/independent status"
-assert_eq "gate_review success" "$(jq -r 'select(.event == "gate_review") | [.event, .verdict] | join(" ")' "$PROCESS_EVENTS_FILE" "$TRACE" | tail -1)" "records gate_review in the trace"
+assert_eq "gate_review success" "$(jq -r 'select(.event == "gate_review") | [.event, .verdict] | join(" ")' "$TRACE" | tail -1)" "records gate_review in the trace"
 assert_status 0 "merges a gate PR with the approved second review, with no owner ok" sh -c "cd '$repo' && '$CLOSE' --merge"
 assert_contains "$(gh_calls)" "pr merge 12" "merges"
 assert_not_contains "$(gh_calls)" "<!-- owner-ok" "records no owner ok"
@@ -45,7 +47,7 @@ assert_status 5 "a second review that asks for changes is refused" sh -c "cd '$r
 assert_not_contains "$(gh_calls)" "pr merge" "no merge on a failing second review"
 
 # A review saved by hand and never published (no gate_review event) does not count.
-reset_phase_evidence; child_session 5
+reset_phase_evidence; export PROCESS_EVENTS_FILE="$TRACE"; child_session 5
 cp "$GATE_OPINION" "$repo/.process/reviewer-gate-$SHA.md"
 printf 'success\n' >"$repo/.process/reviewer-gate-$SHA.verdict"
 handler "type:feature,needs-gate-review" success
@@ -53,7 +55,7 @@ assert_status 5 "a gate opinion that was never published does not count" sh -c "
 
 # owner-ok paths still need the owner, with or without a gate review.
 set_list "# class: owner-ok" "feature.txt"
-reset_phase_evidence; child_session 5
+reset_phase_evidence; export PROCESS_EVENTS_FILE="$TRACE"; child_session 5
 cp "$GATE_OPINION" "$repo/.process/reviewer-gate-$SHA.md"
 handler "type:feature" success
 assert_status 5 "an owner-ok path is refused" sh -c "cd '$repo' && '$CLOSE' --merge"
@@ -63,7 +65,7 @@ assert_status 0 "an owner-ok path merges with the owner's ok" sh -c "cd '$repo' 
 
 # An adopter's old file has one class: every path asks for the owner.
 set_list "feature.txt"
-reset_phase_evidence; child_session 5
+reset_phase_evidence; export PROCESS_EVENTS_FILE="$TRACE"; child_session 5
 handler "type:feature" success
 assert_status 5 "a list without classes keeps asking the owner" sh -c "cd '$repo' && '$CLOSE' --merge"
 assert_contains "$(gh_calls)" "--add-label needs-owner-ok" "old list: needs-owner-ok"

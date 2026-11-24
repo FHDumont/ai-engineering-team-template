@@ -328,13 +328,26 @@ jobs:
             echo "ok: base has no sensitive-path checker (first CI); the checker of the pull request is not run beside the write token"
             exit 0
           fi
-          touched="$(git diff --name-only --no-renames -z "$BASE_SHA...$HEAD_SHA" | python3 base/scripts/lib/sensitive_paths.py base/.github/sensitive-paths)"
-          if [ -n "$touched" ]; then
-            echo "sensitive paths:"; echo "$touched"
+          # One path per line, read by any verifier of the base (the one of c1b76da
+          # does not know -z lists). quotepath off keeps accented paths whole.
+          git -c core.quotepath=off diff --name-only --no-renames "$BASE_SHA...$HEAD_SHA" >"$RUNNER_TEMP/touched.txt"
+          touched="$(python3 base/scripts/lib/sensitive_paths.py base/.github/sensitive-paths <"$RUNNER_TEMP/touched.txt")"
+          if [ -z "$touched" ]; then
+            echo "no sensitive paths"
+            exit 0
+          fi
+          echo "sensitive paths:"; echo "$touched"
+          # A verifier of the base that knows the classes lists only owner-ok paths with
+          # SENSITIVE_CLASS; an older one ignores it and lists everything, which keeps the
+          # stricter label.
+          owner="$(SENSITIVE_CLASS=owner-ok python3 base/scripts/lib/sensitive_paths.py base/.github/sensitive-paths <"$RUNNER_TEMP/touched.txt")"
+          if [ -n "$owner" ]; then
             gh api "repos/$GITHUB_REPOSITORY/issues/$PR_NUMBER/labels" -f "labels[]=needs-owner-ok" >/dev/null
             echo "::notice::needs-owner-ok: this PR touches sensitive paths and needs the owner's ok"
-          else
-            echo "no sensitive paths"
+          fi
+          if [ -n "$(printf '%s\n' "$touched" | grep -vxF -f <(printf '%s\n' "$owner") || true)" ]; then
+            gh api "repos/$GITHUB_REPOSITORY/issues/$PR_NUMBER/labels" -f "labels[]=needs-gate-review" >/dev/null
+            echo "::notice::needs-gate-review: this PR touches the gate and needs a second review"
           fi
       # The checker of the base judges the docs of the PR.
       - name: "Check docs limits"
