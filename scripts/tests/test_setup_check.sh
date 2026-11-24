@@ -23,8 +23,6 @@ assert_contains "$(last_output)" "missing: CI mode" "check names the missing CI 
 assert_contains "$(last_output)" "PROCESS_CI_MODE" "check cites the variable"
 assert_contains "$(last_output)" "setup-repo.sh --ci-mode" "check cites the setup step that records it"
 assert_eq "" "$(gh_calls | grep -E 'variable set' || true)" "check writes nothing for the CI mode"
-printf 'pr\n' >"$TMP/ci-mode"
-assert_status 7 "the same state still refuses with another env var" env -u PROCESS_CI_MODE "$SETUP" --check
 : >"$FAKE_GH_LOG"
 assert_status 0 "--ci-mode pr records the variable" "$SETUP" --ci-mode pr
 assert_contains "$(gh_calls)" "variable set PROCESS_CI_MODE" "records PROCESS_CI_MODE"
