@@ -107,7 +107,7 @@ found="$(cd "$r3" && "$DIFF" --find-base --template "$t4" 2>&1)" || rc=$?
 assert_eq "1" "$rc" "find-base on an empty template fails with exit 1"
 assert_contains "$found" "no template commit" "find-base on an empty template says why"
 
-# Files of the repository that have a template default (#207): missing when absent, never overwritten.
+# Files of the repository that have a template default (FHDumont/ai-engineering-team-template#207): missing when absent, never overwritten.
 ts="$(make_repo)"
 mkdir -p "$ts/.github"
 printf 'scripts/x.sh\n' >"$ts/.github/method-files.txt"
@@ -128,9 +128,28 @@ done
 assert_not_contains "$out" "missing .github/headless" "an existing repository file is not listed as missing"
 assert_eq "mine" "$(cat "$rs/.github/headless")" "an existing repository file is not overwritten"
 
-# The guide says to bring the default and to drop the old STATE sentence.
-assert_contains "$(cat "$SCRIPTS/../README.md")" "trazer o padrão do template quando faltar" "the guide brings the default of repository-owned files"
-assert_contains "$(cat "$SCRIPTS/../README.md")" "o job \`tests\` roda em todo PR" "the guide names the old STATE sentence"
+# README.md belongs to each repository: never listed (FHDumont/ai-engineering-team-template#207).
+assert_not_contains "$out" "README.md" "the update never lists README.md"
+
+# A method label the repository lacks is listed; the repository's own labels are not touched (FHDumont/ai-engineering-team-template#207).
+printf 'type:bug\td73a4a\tBug\t\nneeds-gate-review\te11d21\tGate\t\narea:app\t1\tex\t\nfinding\tc5def5\tF\t\nbot:<slug>\t1\tb\t\n' >"$ts/.github/labels.tsv"
+git -C "$ts" add .github
+git -C "$ts" commit --quiet -m "chore: labels"
+printf 'type:bug\td73a4a\tBug\t\nfinding\tc5def5\tF\t\nteam:mine\t1\tx\t\n' >"$rs/.github/labels.tsv"
+out="$(cd "$rs" && "$DIFF" --template "$ts")"
+assert_contains "$out" "missing-label needs-gate-review" "a method label the repository lacks is listed"
+assert_not_contains "$out" "missing-label type:bug" "a label the repository has is not listed"
+assert_not_contains "$out" "missing-label area:app" "an example area label is not listed"
+assert_not_contains "$out" "missing-label bot:" "a bot slug row is not listed"
+
+# Template-only tests copied to a repository are flagged and removed (FHDumont/ai-engineering-team-template#207).
+mkdir -p "$rs/scripts/tests/template"
+echo x >"$rs/scripts/tests/template/test_x.sh"
+git -C "$rs" add scripts
+out="$(cd "$rs" && "$DIFF" --template "$ts")"
+assert_contains "$out" "template-only scripts/tests/template/test_x.sh" "a template-only test in the repository is flagged"
+(cd "$rs" && "$DIFF" --template "$ts" --remove >/dev/null)
+assert_eq "no" "$([ -e "$rs/scripts/tests/template/test_x.sh" ] && echo yes || echo no)" "--remove deletes a template-only test"
 
 # find-base must not spawn git per file and commit: many commits, many files, a time limit.
 t5="$(make_repo)"

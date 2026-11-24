@@ -19,4 +19,16 @@ assert_contains "$notice" "uma prova local" "the notice asks one local proof"
 assert_contains "$notice" "fecha no merge" "the update issue closes at the merge"
 assert_contains "$notice" "primeira fase normal" "the first normal phase is the proof"
 assert_contains "$notice" "needs-gate-review" "the notice names the label of the gate class"
+# #207: every new step reaches the repository through the notice (its README is its own).
+for f in required-checks headless update-notice.md label-areas.tsv ci-extra-jobs; do
+  assert_contains "$notice" ".github/$f" "the notice names $f"
+done
+assert_contains "$notice" "trazer o padrão do template quando faltar" "the notice brings the default of repository files"
+assert_contains "$notice" "o job \`tests\` roda em todo PR" "the notice names the old STATE sentence"
+assert_contains "$notice" "check-docs.sh" "the notice cites the check-docs message"
+assert_contains "$notice" "missing-label" "the notice adds the missing method labels"
+assert_contains "$notice" "scripts/tests/template/" "the notice leaves the template-only tests out"
+assert_contains "$notice" ".claude/settings.json" "the notice says the new settings.json comes after the owner ok"
+assert_contains "$notice" "suíte fica vermelha" "the notice warns the suite fails without the new settings.json"
+assert_contains "$notice" "validate.sh --full" "the notice asks for the full suite"
 finish

@@ -15,13 +15,17 @@ Trazer o método do commit de destino, partindo do commit de origem gravado em `
 ## Pronto quando
 
 - [ ] O PR lista o que é idêntico, adaptado, faltante, removido e só do repo (`scripts/method-diff.sh`).
-- [ ] Arquivo do repo com padrão do template que faltava (`missing` no `method-diff.sh`) foi trazido; o que existe não foi sobrescrito.
+- [ ] Arquivo do repo com padrão do template que faltava (`missing` no `scripts/method-diff.sh`: `.github/required-checks`, `.github/headless`, `.github/update-notice.md`, `.github/label-areas.tsv`, `.github/ci-extra-jobs`) foi trazido: trazer o padrão do template quando faltar; o que existe não se sobrescreve.
+- [ ] Label do método que o repo não tem (`missing-label` no `scripts/method-diff.sh`) entrou no fim de `.github/labels.tsv`, sem trocar as do repo; sem ela `scripts/setup-repo.sh --check` falha e nenhuma fase abre.
+- [ ] `scripts/tests/template/` não foi copiada; se existe no repo, o `scripts/method-diff.sh` a marca `template-only` e o `--remove` a apaga.
+- [ ] A frase antiga do `docs/STATE.md` ("o job `tests` roda em todo PR") saiu na revisão do STATE, como a mensagem do `scripts/check-docs.sh` pede.
+- [ ] O PR traz o `.claude/settings.json` novo depois do ok do dono sobre o diff das permissões; sem ele a suíte fica vermelha (`test_settings_allow`).
 - [ ] O que o template removeu e o repo não mudou saiu; o que é só do repo ficou.
 - [ ] `.github/method-origin` passou a ser o commit de destino.
 - [ ] O PR traz `.github/ci-mode` (`push` ou `pr`) com a escolha do dono; num repo privado sem esse arquivo (nem a variável `PROCESS_CI_MODE`) nenhuma fase abre.
 - [ ] `docs/repo-notes.md` existe (modelo do template; junte a ele as regras do projeto do `AGENTS.md` antigo).
 - [ ] Script só deste repo que o desenho cita entra em `.github/method-files.txt`.
-- [ ] `scripts/validate.sh` e `scripts/check-docs.sh` verdes, e uma prova local: a atualização a partir da versão anterior.
+- [ ] `scripts/validate.sh --full` e `scripts/check-docs.sh` verdes, e uma prova local: a atualização a partir da versão anterior.
 
 Esta issue fecha no merge do PR. Não há fase de teste depois: a prova é a primeira fase normal, que abre e fecha pelo portão (primeira fase normal do repo).
 
