@@ -15,6 +15,8 @@
 
 ## Correções
 
+- fix: cancelled CI job is rerunnable and the merge wait leaves on it ([#210](https://github.com/FHDumont/ai-engineering-team-template/pull/210)) · 2026-11-24
+- fix: update brings repo files with a template default and find-base is fast ([#208](https://github.com/FHDumont/ai-engineering-team-template/pull/208)) · 2026-11-24
 - fix: friction stops of the previous group (end-check skipped CI, review path, stale base, slot wait, light finding) ([#205](https://github.com/FHDumont/ai-engineering-team-template/pull/205)) · 2026-11-24
 - feat: validate.sh runs only the tests the diff reaches in a phase ([#204](https://github.com/FHDumont/ai-engineering-team-template/pull/204)) · 2026-11-24
 - fix: find-base no longer dies silent with exit 128 ([#200](https://github.com/FHDumont/ai-engineering-team-template/pull/200)) · 2026-11-24
