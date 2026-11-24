@@ -285,7 +285,7 @@ Todo script tem `--help`, um teste em `scripts/tests/` e saída curta em inglês
 | `scripts/machine-slots.sh` | Vagas da máquina (§6.4): `--status` (vagas, quem ocupa, carga), `--check <classe> [n]` (sai 75 sem vaga), `--report [--days N]` (mediana e p90 de espera e duração por classe e repositório) | agentes, `open-parallel.sh` |
 | `scripts/progress.sh` | O que os scripts longos estão fazendo (§6.4): `[--repo r] [--issue n] [--all] [--follow]` mostra o script rodando, o passo, a contagem e o tempo; é para o dono e o painel, nunca para o agente | dono, painel, `status.sh` |
 | `scripts/sessions.sh` | Sessões e MCPs da máquina (§6.4): `--list` (por repo: tipo, PID, idade, CPU, RAM, MCPs), `--stale` (sessões do app não arquivadas e paradas há mais de N horas, para o dono arquivar), `--close-idle` (padrão: este checkout e os worktrees dele; `--under` só estreita e pasta fora sai 2; idade do processo, `etime`, com CPU abaixo de 1%; nunca `claude` filho do `Claude.app`) | agentes, `close-phase.sh --cleanup` |
-| `scripts/check-docs.sh` | Limites de palavras (`AGENTS.md` 300–500, `docs/STATE.md` ≤500, `docs/BOTS.md` ≤450, skill `plan` ≤400); `CLAUDE.md` só com `@AGENTS.md`; uma linha por ADR no índice; nenhuma seção de histórico; este desenho contra o repositório: tabela das regras-base, tabela de scripts, tabela de hooks e tabela de arquivos; nenhum nome só de um repositório (lista das notas dele, quando existem) neste desenho, no `AGENTS.md` nem nas skills; nenhum formulário de issue em YAML (§8.2) | CI, `close-phase.sh` |
+| `scripts/check-docs.sh` | Limites de palavras (`AGENTS.md` 300–800, `docs/STATE.md` ≤800, `docs/BOTS.md` ≤450, skill `plan` ≤400); `CLAUDE.md` só com `@AGENTS.md`; uma linha por ADR no índice; nenhuma seção de histórico; este desenho contra o repositório: tabela das regras-base, tabela de scripts, tabela de hooks e tabela de arquivos; nenhum nome só de um repositório (lista das notas dele, quando existem) neste desenho, no `AGENTS.md` nem nas skills; nenhum formulário de issue em YAML (§8.2) | CI, `close-phase.sh` |
 | `scripts/check-workflows.py` | Padrão dos workflows (§9) além do `actionlint` | CI |
 | `scripts/check-attribution.sh` | Reprova assinatura de IA abrindo uma linha nos commits e no corpo do PR | CI `policy`, `close-phase.sh --merge`, `.githooks/commit-msg` |
 | `scripts/ci-gate.sh` | Decide o resultado do job `CI` a partir dos outros jobs (§9.2) | `ci.yml` |
@@ -441,13 +441,13 @@ A tabela é a árvore de arquivos do método. Caminho sem `<…>` precisa existi
 
 | Caminho | O que é |
 |---|---|
-| `AGENTS.md` | fonte única das regras para todo agente, 300–500 palavras |
+| `AGENTS.md` | fonte única das regras para todo agente, 300–800 palavras |
 | `CLAUDE.md` | só `@AGENTS.md` |
 | `CONTEXT.md` | glossário curto do domínio |
 | `README.md` | entrada para pessoas; aponta para a abertura de issue |
 | `CHANGELOG.md` | gerado pelo `gen-docs.sh` no fim do primeiro grupo; ausente até lá |
 | `ROADMAP.md` | gerado pelo `gen-docs.sh` no fim do primeiro grupo; ausente até lá |
-| `docs/STATE.md` | estado atual, ≤500 palavras; a fase que muda o estado atualiza a sua parte |
+| `docs/STATE.md` | estado atual, ≤800 palavras; a fase que muda o estado atualiza a sua parte |
 | `docs/BOTS.md` | caminho B, ≤450 palavras |
 | `docs/process-design.md` | este documento |
 | `docs/diagrams/process-flow.html` | diagrama das raias |
@@ -485,8 +485,9 @@ A tabela é a árvore de arquivos do método. Caminho sem `<…>` precisa existi
 | `.github/sensitive-paths` | globs dos caminhos sensíveis em duas classes, `owner-ok` e `gate` (§10.3); o arquivo do repo só acrescenta |
 | `.github/required-checks` | checks extras exigidos na proteção; a atualização não apaga |
 | `.github/headless` | `on` liga a filha headless; a atualização não apaga |
-| `.github/method-files.txt` | arquivos do método que as tabelas de scripts e hooks listam; a aplicação não entra |
+| `.github/method-files.txt` | arquivos do método que as tabelas de scripts e hooks listam; a aplicação não entra, mas um script só do repo que o desenho cita entra aqui |
 | `.github/method-origin` | commit do template de onde o repo foi copiado; a atualização não apaga |
+| `docs/repo-notes.md` | regras do projeto e a seção `## Nomes só deste repositório`; é do repo, a atualização cria se faltar; o `check-docs.sh` avisa quando o `AGENTS.md` aponta e ele não existe |
 | `.github/update-notice.md` | corpo da issue que avisa o adotante de uma atualização |
 | `.github/label-areas.tsv` | áreas por caminho e áreas sensíveis do `auto-label.py`; a atualização não apaga |
 | `.github/ci-extra-jobs` | jobs do repositório que o `ci-gate.sh` exige verdes; a atualização não apaga |

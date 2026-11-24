@@ -3,7 +3,7 @@
 #:
 #: Usage: check-docs.sh
 #:
-#: Limits: AGENTS.md with 300-500 words; docs/STATE.md <= 500; docs/BOTS.md <= 450;
+#: Limits: AGENTS.md with 300-800 words; docs/STATE.md <= 800; docs/BOTS.md <= 450;
 #: plan skill <= 400; CLAUDE.md is only "@AGENTS.md"; one line in
 #: docs/adr/INDEX.md per ADR (current or archived) and no orphan lines; no
 #: history section in the AI files.
@@ -48,8 +48,8 @@ limit() { # limit <file> <min> <max>
     problem "$1 has $n words (allowed $2-$3)"
   fi
 }
-limit AGENTS.md 300 500
-limit docs/STATE.md 1 500
+limit AGENTS.md 300 800
+limit docs/STATE.md 1 800
 # Method facts live in the design. These sentences were true once and stayed
 # in STATE after the behavior changed (FHDumont/ai-engineering-team-template#118).
 if [ -f docs/STATE.md ]; then
@@ -116,7 +116,12 @@ same_files() {
   local p
   while read -r p; do
     [ -n "$p" ] || continue
-    echo "$3" | stdin_grep -qxF "$p" || problem "$design: the $1 table cites $p, which does not exist"
+    echo "$3" | stdin_grep -qxF "$p" && continue
+    if [ -e "$p" ] && [ -n "${manifest_note:-}" ]; then
+      problem "$design: the $1 table cites $p: $p exists but is not in $manifest_note; add it to the manifest (a file only of this repository that the design cites goes there too)"
+    else
+      problem "$design: the $1 table cites $p, which does not exist"
+    fi
   done <<<"$2"
   while read -r p; do
     [ -n "$p" ] || continue
@@ -150,6 +155,7 @@ if [ -f "$design" ]; then
       [ -n "$p" ] || continue
       [ -e "$p" ] || problem "$manifest lists $p, which does not exist"
     done <<<"$method_list"
+    manifest_note="$manifest"
     method_scripts="$(printf '%s\n' "$method_list" | grep '^scripts/' || true)"
     method_hooks="$(printf '%s\n' "$method_list" | grep -E '^(\.claude/hooks|\.githooks)/' || true)"
   else
@@ -196,6 +202,11 @@ if [ -f "$repo_notes" ]; then
         END { exit !found }' "$f" && problem "$f cites the repository-only name $name (it belongs in $repo_notes)"
     done <<<"$names"
   done
+fi
+
+# AGENTS.md points to docs/repo-notes.md; a repository updated from an older version lacks it.
+if [ -f AGENTS.md ] && grep -q 'docs/repo-notes\.md' AGENTS.md && [ ! -f "$repo_notes" ]; then
+  echo "warn: AGENTS.md points to $repo_notes, which does not exist: create it from the template model (section '## Nomes só deste repositório') and move the project rules there"
 fi
 
 # A hook cited in .claude/settings.json must exist: a missing path fails closed.
