@@ -162,4 +162,36 @@ jq -cn '{event: "phase_opened", session_id: "mgr", issue: "6"}' >"$repo/.process
 assert_status 2 "the opener does not record the phase from its worktree" \
   env CLAUDE_CODE_SESSION_ID=mgr bash -c "cd '$repo/.worktrees/issue-6' && '$SCRIPTS/status.sh' --state trabalhando --offline"
 assert_contains "$(last_output)" "from the main checkout" "says where the opener runs status"
+# #214: a reopened issue reads only what comes after its last phase_opened; a worktree
+# under .worktrees/issue-<n> that is not on a phase branch is not a phase.
+repo2="$(make_repo)"
+printf '.worktrees/\n' >"$repo2/.gitignore"
+git -C "$repo2" add .gitignore; git -C "$repo2" commit --quiet -m "chore: ignore"
+git -C "$repo2" worktree add --quiet -b fix/issue-9-z "$repo2/.worktrees/issue-9" main
+git -C "$repo2" worktree add --quiet --detach "$repo2/.worktrees/issue-10" main
+cat >"$TMP/handler.sh" <<'H'
+case "$*" in
+  "issue view 9 --json title"*) echo "Reaberta" ;;
+  "issue view"*) echo "end:auto-close" ;;
+esac
+H
+use_fake_gh "$TMP/handler.sh"
+EV="$TMP/ev214.jsonl"
+{
+  echo '{"event":"phase_opened","issue":"9"}'
+  echo '{"event":"phase_session","issue":"9","model":"opus","effort":"high"}'
+  echo '{"event":"phase_status","issue":"9","state":"esperando você","need":"X antigo"}'
+  echo '{"event":"phase_closed","issue":"9"}'
+  echo '{"event":"phase_opened","issue":"9"}'
+} >"$EV"
+out="$(cd "$repo2" && env PROCESS_EVENTS_FILE="$EV" "$SCRIPTS/status.sh" --state trabalhando --next "esperar")"
+assert_not_contains "$out" "X antigo" "the need of the previous phase is not shown"
+assert_not_contains "$out" "opus/high" "the pair of the previous session is not shown"
+assert_contains "$out" "- #9 — Reaberta — aberta, sem sessão" "no session after the last open: aberta, sem sessão"
+assert_not_contains "$out" "#10" "a worktree off a phase branch is not a phase"
+assert_eq "1" "$(printf '%s\n' "$out" | grep -c '^- #')" "one phase per phase branch"
+echo '{"event":"phase_session","issue":"9","model":"sonnet","effort":"low"}' >>"$EV"
+out="$(cd "$repo2" && env PROCESS_EVENTS_FILE="$EV" "$SCRIPTS/status.sh" --state trabalhando --next "esperar")"
+assert_contains "$out" "- #9 — Reaberta — trabalhando — modelo/esforço: sonnet/low" "the session after the last open counts"
+
 finish
