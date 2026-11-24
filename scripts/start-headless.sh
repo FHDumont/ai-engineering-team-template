@@ -80,7 +80,7 @@ model="${pair% *}" effort="${pair#* }"
 sid="$(python3 -c 'import uuid; print(uuid.uuid4())')"
 log="$wt/.process/headless.log"
 mode="${HEADLESS_PERMISSION_MODE:-acceptEdits}"
-prompt="Execute the phase of issue #$issue with the execute skill; work in the worktree $wt by absolute path. You run headless: there is no choice board and no one answers in this session. A question for the owner goes as a comment on issue #$issue (gh issue comment), then stop with scripts/status.sh --state esperando --need '<the question>'; the manager resumes this session with the answer."
+prompt="Execute the phase of issue #$issue with the execute skill; work in the worktree $wt by absolute path. You run headless: there is no choice board and no one answers in this session. A question for the owner goes as a comment on issue #$issue (gh issue comment), then stop with scripts/status.sh --state esperando --need '<the question>'; the manager resumes this session with the answer. Commit with plain git add <file> from inside the worktree (no -C, no &&). A template update brings the template with scripts/fetch-template.sh <sha> into .process/template; no worktree or clone of it."
 [ -z "$brief" ] || prompt="$prompt
 
 Brief of the manager:

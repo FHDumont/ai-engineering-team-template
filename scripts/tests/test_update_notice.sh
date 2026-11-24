@@ -38,4 +38,6 @@ assert_contains "$notice" "close-phase.sh" "the notice says the gate label enter
 out="$(cd "$REPO" && "$SCRIPTS/method-diff.sh" --template "$REPO" --from HEAD --to HEAD | grep ' .github/update-notice.md$' || true)"
 assert_not_contains "$out" "repo-owned" "the notice is text of the method, not repo-owned"
 assert_contains "$(cat "$REPO/.github/method-files.txt")" ".github/update-notice.md" "the notice is in the method manifest"
+assert_contains "$notice" ".process/template" "the notice says where the template checkout is (#215)"
+assert_contains "$notice" "fetch-template.sh" "the notice names fetch-template.sh"
 finish

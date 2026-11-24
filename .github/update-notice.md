@@ -12,6 +12,8 @@ Trazer o método do commit de destino, partindo do commit de origem gravado em `
 - Commit de origem: `<sha>`
 - Commit de destino: `<sha>`
 
+O checkout do template da filha é `.process/template` do worktree: `scripts/fetch-template.sh <sha-destino>` o traz (sem worktree extra nem clone), `scripts/method-diff.sh --template .process/template` compara e `scripts/fetch-template.sh <sha-destino> --apply` copia os caminhos do método.
+
 ## Pronto quando
 
 - [ ] O PR lista o que é idêntico, desatualizado (`outdated`: o repo ainda tem a versão da origem, traga a do destino), adaptado (o repo difere da origem e do destino: junte), faltante, removido e só do repo (`scripts/method-diff.sh`). `.github/update-notice.md` é texto do método: traga o do destino. Arquivo novo do destino nas pastas do método sai `missing`, mesmo fora do `method-files.txt`.
