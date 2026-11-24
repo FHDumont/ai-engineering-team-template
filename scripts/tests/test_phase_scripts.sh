@@ -25,6 +25,11 @@ H
 use_fake_gh "$TMP/handler.sh"
 
 assert_eq "listar-issues-por-area" "$(bash -c 'source "$1/lib/common.sh"; slug_ascii "Listar issues por área"' _ "$SCRIPTS")" "the slug drops the accent without starting Python"
+# The slug does not depend on the locale (macOS without LANG/LC_ALL doubled letters, #183).
+for loc in C POSIX en_US.UTF-8; do
+  assert_eq "por-area-cao" "$(LC_ALL=$loc bash -c 'source "$1/lib/common.sh"; slug_ascii "Por Área ÇÃO"' _ "$SCRIPTS")" "slug_ascii with LC_ALL=$loc"
+done
+assert_eq "por-area" "$(env -u LANG -u LC_ALL -u LC_CTYPE bash -c 'source "$1/lib/common.sh"; slug_ascii "por área"' _ "$SCRIPTS")" "slug_ascii with LANG and LC_ALL empty"
 out="$(cd "$repo" && scripts/new-phase.sh 7 --dry-run)"
 assert_contains "$out" "branch: feat/issue-7-listar-issues-por-area" "branch from type label and title"
 out="$(cd "$repo" && scripts/new-phase.sh 8 --dry-run)"

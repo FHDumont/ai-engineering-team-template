@@ -19,10 +19,15 @@ repo_root() {
 
 # Lowercase ASCII slug, hyphens, at most 40 characters. No Python process.
 slug_ascii() {
-  printf '%s' "$1" | tr '[:upper:]' '[:lower:]' |
-    sed -e 's/[áàâã]/a/g; s/[éê]/e/g; s/í/i/g; s/[óôõ]/o/g; s/ú/u/g; s/ç/c/g; s/ü/u/g' |
-    sed -E 's/[^a-z0-9]+/-/g; s/^-+//; s/-+$//' |
-    cut -c1-40 | sed 's/-$//'
+  # LC_ALL=C: bytewise, so the result does not depend on the locale (macOS
+  # without LANG made "[áà]" match single bytes and doubled letters). Accents
+  # are matched as whole UTF-8 sequences with alternation, never a bracket.
+  printf '%s' "$1" | LC_ALL=C sed -E \
+    -e 's/(á|à|â|ã|Á|À|Â|Ã)/a/g; s/(é|ê|É|Ê)/e/g; s/(í|Í)/i/g' \
+    -e 's/(ó|ô|õ|Ó|Ô|Õ)/o/g; s/(ú|Ú|ü|Ü)/u/g; s/(ç|Ç)/c/g' |
+    LC_ALL=C tr '[:upper:]' '[:lower:]' |
+    LC_ALL=C sed -E 's/[^a-z0-9]+/-/g; s/^-+//; s/-+$//' |
+    LC_ALL=C cut -c1-40 | LC_ALL=C sed 's/-$//'
 }
 
 # Short error and exit with code 1 (or the given code).
