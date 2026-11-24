@@ -1162,6 +1162,37 @@ class GhPinTests(unittest.TestCase):
         self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
         self.assertIn("already on PATH", r.stdout)
 
+    def test_first_ci_uses_the_pin_of_the_pull_request_when_the_base_has_no_method(self):
+        # #248: adoption PR on a runner with no gh. The base has neither .github/gh-pin
+        # nor .github/method-files.txt; the PR brings the pin.
+        bindir = self.bindir(["awk", "curl", "tar", "shasum"])
+        os.makedirs(os.path.join(self.repo, "base"))
+        os.makedirs(os.path.join(self.repo, ".github"))
+        payload = os.path.join(self.tmp, "payload")
+        os.makedirs(os.path.join(payload, "gh_2.105.0_linux_amd64", "bin"))
+        open(os.path.join(payload, "gh_2.105.0_linux_amd64", "bin", "gh"), "w").write("#!/bin/sh\n")
+        archive = os.path.join(self.tmp, "gh.tgz")
+        subprocess.run(["tar", "czf", archive, "-C", payload, "gh_2.105.0_linux_amd64"], check=True)
+        digest = subprocess.run(["shasum", "-a", "256", archive], check=True, text=True,
+                                capture_output=True).stdout.split()[0]
+        curl = os.path.join(bindir, "curl")
+        os.remove(curl)
+        open(curl, "w").write("#!/bin/sh\nout=\nwhile [ $# -gt 0 ]; do case \"$1\" in -o) out=\"$2\"; shift 2 ;; *) shift ;; esac; done\ncp '%s' \"$out\"\n" % archive)
+        os.chmod(curl, 0o755)
+        open(os.path.join(self.repo, ".github", "gh-pin"), "w").write("2.105.0\nlinux-amd64 %s tar.gz\n" % digest)
+        env = {"PATH": bindir + os.pathsep + "/usr/bin:/bin"}
+        r = self.run_install(env)
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        self.assertIn("::notice::", r.stdout)
+        self.assertIn("gh_2.105.0_linux_amd64/bin", open(os.path.join(self.tmp, "gh.path")).read())
+        # A base that already has the method does not take the pin of the PR.
+        open(os.path.join(self.repo, "base", ".github-method-marker"), "w").close()
+        os.makedirs(os.path.join(self.repo, "base", ".github"))
+        open(os.path.join(self.repo, "base", ".github", "method-files.txt"), "w").write("x\n")
+        r = self.run_install(env)
+        self.assertEqual(r.returncode, 1, r.stdout + r.stderr)
+        self.assertNotIn("::notice::", r.stdout)
+
     def test_pin_sha256_mismatch_fails_and_a_match_installs(self):
         bindir = self.bindir(["awk", "curl", "tar", "shasum"])
         os.makedirs(os.path.join(self.repo, "base", ".github"))
