@@ -135,6 +135,7 @@ select_tests() {
           names="$names $(basename "$r")"
         done ;;
     esac
+    # Substring matches (foo.sh in xfoo.sh) only select more tests: safe.
     printf '%s\n' $names >"$names_file"
     hit="$(grep -lFf "$names_file" "$@" 2>/dev/null || true)"
     [ -n "$hit" ] || return 1
