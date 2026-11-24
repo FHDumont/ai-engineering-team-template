@@ -123,7 +123,7 @@ printf '%s\n' "$(git -C "$ts" rev-parse HEAD)" >"$rs/.github/method-origin"
 git -C "$rs" add .github
 git -C "$rs" commit --quiet -m "chore: adopted"
 out="$(cd "$rs" && "$DIFF" --template "$ts")"
-for f in required-checks update-notice.md label-areas.tsv ci-extra-jobs; do
+for f in required-checks label-areas.tsv ci-extra-jobs; do
   assert_contains "$out" "missing .github/$f" "a missing repository file with a template default is listed: $f"
 done
 assert_not_contains "$out" "missing .github/headless" "an existing repository file is not listed as missing"

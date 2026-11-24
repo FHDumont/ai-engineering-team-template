@@ -42,6 +42,7 @@ scripts/triage.sh
 scripts/validate.sh
 scripts/wait-reply.sh
 scripts/weights.sh
+.github/update-notice.md
 .claude/hooks/block-agent-pair.sh
 .claude/hooks/block-attribution.sh
 .claude/hooks/block-bot-comment.sh

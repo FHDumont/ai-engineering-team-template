@@ -1,26 +1,31 @@
 #!/usr/bin/env bash
 #: method-diff.sh: compare this repository with a template checkout.
 #:
-#: Usage: method-diff.sh --template <dir> [--from <rev>] [--to <rev>] [--remove]
+#: Usage: method-diff.sh --template <dir> [--from <rev>] [--to <rev>] [--remove|--notice]
 #:        method-diff.sh --find-base --template <dir>
 #:
 #: Reads the template commit this repository came from (.github/method-origin,
 #: written by setup-repo.sh --record-origin) and lists method files by blob
-#: hash: identical, adapted, missing, removed, kept, repo-owned (a repository
-#: file with a template default) or repo-only. template-only marks a test of
+#: hash: identical, outdated (repository = origin, destination differs),
+#: adapted (repository differs from both), missing (also a file new in the
+#: destination inside the method folders, outside the manifest), removed, kept,
+#: repo-owned (a repository file with a template default) or repo-only. template-only marks a test of
 #: scripts/tests/template/ that a repository must not have (--remove deletes
 #: it); missing-label names a method label absent from .github/labels.tsv. --remove
 #: deletes a file the template dropped since that commit when this repository
 #: did not change it. A repository-only file is never deleted. --find-base
 #: prints the template commit whose blobs match the commit that introduced
 #: .github/method-origin (or the first commit), for a repository that does
-#: not have the file yet.
+#: not have the file yet. --notice prints the update checklist with only the items
+#: that apply to the interval (settings.json, ci-mode, missing files and labels,
+#: removed files, the old STATE sentence, the gate label by the origin verifier,
+#: and the check-docs.sh of the origin).
 set -euo pipefail
 HERE="$(cd "$(dirname "$0")" && pwd)"
 # shellcheck source=scripts/lib/common.sh
 source "$HERE/lib/common.sh"
 
-template="" from="" to="" remove=0 find=0
+template="" from="" to="" remove=0 find=0 notice=0
 while [ $# -gt 0 ]; do
   case "$1" in
     -h|--help) print_help "$0"; exit 0 ;;
@@ -29,6 +34,7 @@ while [ $# -gt 0 ]; do
     --to) to="$2"; shift 2 ;;
     --remove) remove=1; shift ;;
     --find-base) find=1; shift ;;
+    --notice) notice=1; shift ;;
     *) die "unknown option: $1 (see --help)" 2 ;;
   esac
 done
@@ -89,12 +95,23 @@ while read -r f; do
   paths="$paths
 $f"
 done < <(git -C "$root" ls-files)
+# Files new in the destination inside the method folders, outside the manifest (FHDumont/ai-engineering-team-template#213).
+while read -r f; do
+  [ -n "$f" ] || continue
+  case "$f" in scripts/tests/template/*|docs/specs/*) continue ;; esac
+  printf '%s\n' "$dirs" | stdin_grep -qx "${f%%/*}" || continue
+  [ "$f" != "${f#*/}" ] || continue
+  paths="$paths
+$f"
+done < <(comm -13 <(git -C "$template" ls-tree -r --name-only "$from" 2>/dev/null | sort) <(git -C "$template" ls-tree -r --name-only "$to" | sort))
 # Repository files that start from a template default: brought when missing, never overwritten.
-seeded=".github/required-checks .github/headless .github/update-notice.md .github/label-areas.tsv .github/ci-extra-jobs"
+seeded=".github/required-checks .github/headless .github/label-areas.tsv .github/ci-extra-jobs"
 paths="$paths
 $(printf '%s\n' $seeded)"
 paths="$(printf '%s\n' "$paths" | awk 'NF && !seen[$0]++')"
 
+report="$(mktemp)"
+trap 'rm -f "$report"' EXIT
 while read -r path; do
   [ -n "$path" ] || continue
   fb="$(blob_at "$template" "$from" "$path")"
@@ -128,9 +145,9 @@ while read -r path; do
   elif [ -n "$rb" ] && [ "$rb" = "$tb" ]; then
     echo "identical $path"
   elif [ -n "$rb" ] && [ -n "$tb" ]; then
-    echo "adapted $path"
+    if [ "$rb" = "$fb" ]; then echo "outdated $path"; else echo "adapted $path"; fi
   fi
-done <<<"$paths"
+done <<<"$paths" >"$report"
 
 # Method labels the repository lacks: its labels.tsv is its own, so a row is added by hand (FHDumont/ai-engineering-team-template#207).
 if git -C "$template" cat-file -e "$to:.github/labels.tsv" 2>/dev/null; then
@@ -141,4 +158,41 @@ if git -C "$template" cat-file -e "$to:.github/labels.tsv" 2>/dev/null; then
     case "$name" in ""|\#*|*"<"*|area:*|group:*|name) continue ;; esac
     printf '%s\n' "$have" | stdin_grep -qxF "$name" || echo "missing-label $name"
   done < <(git -C "$template" show "$to:.github/labels.tsv")
+fi >>"$report"
+
+if [ "$notice" = 0 ]; then cat "$report"; exit 0; fi
+
+# --notice: the checklist of this interval only.
+items() { grep "^$1 " "$report" | cut -d' ' -f2- || true; }
+echo "Itens da atualização $from → $to (gerado por scripts/method-diff.sh --notice):"
+echo
+for c in missing missing-label removed; do
+  for f in $(items "$c"); do echo "- [ ] \`$c\`: \`$f\`"; done
+done
+sb="$(blob_at "$template" "$to" .claude/settings.json)"
+sf="$(blob_at "$template" "$from" .claude/settings.json)"
+sr=""; [ -f "$root/.claude/settings.json" ] && sr="$(git -C "$root" hash-object .claude/settings.json)"
+if [ -n "$sb" ] && [ "$sb" != "$sf" ] && [ "$sb" != "$sr" ]; then
+  echo "- [ ] O PR traz o \`.claude/settings.json\` novo depois do ok do dono sobre o diff das permissões; sem ele a suíte fica vermelha (\`test_settings_allow\`)."
+fi
+if [ ! -f "$root/.github/ci-mode" ] && [ -z "${PROCESS_CI_MODE:-}" ] &&
+  ! { command -v gh >/dev/null 2>&1 && [ -n "$(cd "$root" && gh variable get PROCESS_CI_MODE 2>/dev/null)" ]; }; then
+  echo "- [ ] O PR traz \`.github/ci-mode\` (\`push\` ou \`pr\`) com a escolha do dono; sem esse arquivo nem a variável \`PROCESS_CI_MODE\`, nenhuma fase abre."
+fi
+if [ -f "$root/docs/STATE.md" ] && grep -qF 'o job `tests` roda em todo PR' "$root/docs/STATE.md"; then
+  echo "- [ ] A frase antiga do \`docs/STATE.md\` (\"o job \`tests\` roda em todo PR\") saiu na revisão do STATE."
+fi
+# The label the update PR gets depends on the verifier of the origin (the base of the PR runs it).
+if :; then
+  if git -C "$template" show "$from:scripts/lib/sensitive_paths.py" 2>/dev/null | grep -q SENSITIVE_CLASS; then
+    label=needs-gate-review
+  else
+    label=needs-owner-ok
+  fi
+  echo "- [ ] O verificador da origem põe \`$label\` neste PR. A label nova do portão entra no merge pelo \`close-phase.sh\` (FHDumont/ai-engineering-team-template#220), sem passo manual."
+  # The base of the PR runs its own check-docs.sh: lower limits there fail a doc the new one accepts (FHDumont/ai-engineering-team-template#216).
+  if ! diff <(git -C "$template" show "$from:scripts/check-docs.sh" 2>/dev/null | grep '^limit ') \
+    <(git -C "$template" show "$to:scripts/check-docs.sh" 2>/dev/null | grep '^limit ') >/dev/null; then
+    echo "- [ ] Confira os docs também com o \`check-docs.sh\` da origem, que tem limites menores (o Policy da CI usa o da base): \`git -C $template show $from:scripts/check-docs.sh >scripts/.check-docs-origin.sh && bash scripts/.check-docs-origin.sh; rm -f scripts/.check-docs-origin.sh\`"
+  fi
 fi

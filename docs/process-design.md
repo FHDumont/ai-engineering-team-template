@@ -299,7 +299,7 @@ Todo script tem `--help`, um teste em `scripts/tests/` e saída curta em inglês
 | `scripts/summarize-thread.sh` | Mantém o comentário de resumo de um fio longo (§5.1) | agentes |
 | `scripts/trace-view.py` | Lê o trace (§6.3): árvore de agentes, tabela de pares do PR e tempo por fase | `close-phase.sh --prepare`, agentes |
 | `scripts/measure-session.py` | Mede palavras lidas, toques do dono e acerto da triagem de uma sessão | sessão principal, sob pedido |
-| `scripts/method-diff.sh` | Compara o repo com o commit do template em `.github/method-origin`: idêntico, adaptado, faltante, removido e só do repo | atualização do método, `close-reviewer` |
+| `scripts/method-diff.sh` | Compara o repo com o commit do template em `.github/method-origin`: idêntico, desatualizado (`outdated`), adaptado, faltante (também arquivo novo do destino fora do manifest), removido e só do repo; `--notice` gera a lista do intervalo | atualização do método, `close-reviewer` |
 | `scripts/CLAUDE.md` | Regras da pasta `scripts/` | lido ao tocar a pasta |
 
 ### 6.1 `close-phase.sh`
@@ -490,7 +490,7 @@ A tabela é a árvore de arquivos do método. Caminho sem `<…>` precisa existi
 | `.github/method-files.txt` | arquivos do método que as tabelas de scripts e hooks listam; a aplicação não entra, mas um script só do repo que o desenho cita entra aqui |
 | `.github/method-origin` | commit do template de onde o repo foi copiado; a atualização não apaga |
 | `docs/repo-notes.md` | regras do projeto e a seção `## Nomes só deste repositório`; é do repo, a atualização cria se faltar; o `check-docs.sh` avisa quando o `AGENTS.md` aponta e ele não existe |
-| `.github/update-notice.md` | corpo da issue que avisa o adotante de uma atualização |
+| `.github/update-notice.md` | corpo da issue que avisa o adotante de uma atualização (texto do método, não do repo) |
 | `.github/label-areas.tsv` | áreas por caminho e áreas sensíveis do `auto-label.py`; a atualização não apaga |
 | `.github/ci-extra-jobs` | jobs do repositório que o `ci-gate.sh` exige verdes; a atualização não apaga |
 | `.github/workflows/ci.yml` | o CI único (§9.2) |
