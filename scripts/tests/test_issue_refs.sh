@@ -18,7 +18,7 @@ if os.path.exists(mf):
         if l and not l.startswith("#"):
             manifest.add(l.rstrip("/"))
 def in_method(rel):
-    if rel.startswith("scripts/lib/") or rel in (".github/workflows/ci.yml", ".github/workflows/issues-label.yml"):
+    if rel.startswith("scripts/lib/") or rel in ("docs/process-design.md", ".github/workflows/ci.yml", ".github/workflows/issues-label.yml"):
         return True
     return rel in manifest or any(rel.startswith(m + "/") for m in manifest)
 for dirpath, _, files in os.walk(root):
