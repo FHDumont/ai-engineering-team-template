@@ -64,7 +64,7 @@ mkdir -p "$t2/scripts"
 echo one >"$t2/scripts/a.sh"
 git -C "$t2" add scripts
 git -C "$t2" commit --quiet -m "chore: one"
-base1="$(git -C "$t2" rev-parse HEAD)"
+base1="$(git -C "$t2" rev-list --max-parents=0 HEAD)" # the seed commit both repos share
 echo two >"$t2/scripts/a.sh"
 git -C "$t2" add scripts
 git -C "$t2" commit --quiet -m "chore: two"
