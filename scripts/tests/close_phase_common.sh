@@ -83,7 +83,10 @@ case "\$*" in
     printf '%s\n' \${FAKE_PROTECTION:-CI review/independent} ;;
   # needs-owner-ok put on the PR by close-phase.sh (through label-issue.sh).
   "issue edit 12"*"--add-label needs-owner-ok"*) touch "$TMP/owner-label" ;;
-  "issue view 12"*"--json labels"*) [ ! -f "$TMP/owner-label" ] || echo needs-owner-ok ;;
+  "issue edit 12"*"--add-label needs-gate-review"*) touch "$TMP/gate-label" ;;
+  "issue view 12"*"--json labels"*)
+    [ ! -f "$TMP/owner-label" ] || echo needs-owner-ok
+    [ ! -f "$TMP/gate-label" ] || echo needs-gate-review ;;
   "pr view 12 --repo owner/repo --json state"*) echo "\${FAKE_PR_STATE:-OPEN}" ;;
   "pr view 12 --repo owner/repo --json mergeable,mergeStateStatus,headRefOid"*)
     # FAKE_UNKNOWN_READS: how many reads return UNKNOWN before the final value.
@@ -96,5 +99,5 @@ case "\$*" in
 esac
 H
   use_fake_gh "$TMP/handler.sh"
-  rm -f "$TMP/reads" "$TMP/owner-label" "$TMP/cmt_reads"
+  rm -f "$TMP/reads" "$TMP/owner-label" "$TMP/gate-label" "$TMP/cmt_reads"
 }

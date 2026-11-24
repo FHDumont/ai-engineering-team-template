@@ -3,6 +3,7 @@
 import importlib.util
 import json
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -202,6 +203,48 @@ class SensitivePathsTests(unittest.TestCase):
         for rel in paths:
             self.assertTrue(os.path.isfile(os.path.join(ROOT, rel)), rel)
 
+    def test_classes_of_the_list(self):
+        # owner-ok: migrations, secrets, auth, billing and the like. gate: dependencies,
+        # deploy workflows and the gate itself. A list with no class header is all owner-ok.
+        globs = os.path.join(ROOT, ".github", "sensitive-paths")
+        owner = [".env", "db/migrations/1.sql", "x/secrets/k", "x/credentials/k", "app/auth/a.py",
+                 "app/billing/b.py", "app/payments/p.py", "infra/production/m.tf", "scripts/setup-repo.sh"]
+        gate = ["package-lock.json", "uv.lock", "requirements-dev.txt", ".github/workflows/deploy-x.yml",
+                ".github/workflows/ci.yml", "scripts/ci-gate.sh", "scripts/check-attribution.sh",
+                "scripts/check-docs.sh", "scripts/close-phase.sh", "scripts/lib/sensitive_paths.py",
+                ".github/sensitive-paths"]
+        paths = owner + gate + ["README.md"]
+        self.assertEqual(sp.sensitive_class(paths, globs, "owner-ok"), owner)
+        self.assertEqual(sp.sensitive_class(paths, globs, "gate"), gate)
+        d = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, d, True)
+        old = os.path.join(d, "old")
+        open(old, "w").write("**/auth/**\nscripts/close-phase.sh\n")
+        self.assertEqual(sp.sensitive_class(["a/auth/x", "scripts/close-phase.sh"], old, "owner-ok"),
+                         ["a/auth/x", "scripts/close-phase.sh"])
+        self.assertEqual(sp.sensitive_class(["a/auth/x", "scripts/close-phase.sh"], old, "gate"), [])
+        # A path in both classes is owner-ok (the stricter one).
+        both = os.path.join(d, "both")
+        open(both, "w").write("# class: gate\nx/**\n# class: owner-ok\nx/y\n")
+        self.assertEqual(sp.sensitive_class(["x/y", "x/z"], both, "owner-ok"), ["x/y"])
+        self.assertEqual(sp.sensitive_class(["x/y", "x/z"], both, "gate"), ["x/z"])
+
+    def test_cli_lists_by_class_and_reads_lines_or_nul(self):
+        script = os.path.join(ROOT, "scripts", "lib", "sensitive_paths.py")
+        globs = os.path.join(ROOT, ".github", "sensitive-paths")
+        def run(stdin, cls=None):
+            env = dict(os.environ)
+            env.pop("SENSITIVE_CLASS", None)
+            if cls:
+                env["SENSITIVE_CLASS"] = cls
+            return subprocess.run(["python3", script, globs], input=stdin, text=True, capture_output=True,
+                                  env=env, cwd=ROOT).stdout.split()
+        lines = ".env\nscripts/close-phase.sh\nREADME.md\n"
+        self.assertEqual(run(lines), [".env", "scripts/close-phase.sh"])
+        self.assertEqual(run(lines, "owner-ok"), [".env"])
+        self.assertEqual(run(lines, "gate"), ["scripts/close-phase.sh"])
+        self.assertEqual(run(lines.replace("\n", "\0"), "gate"), ["scripts/close-phase.sh"])
+
     def test_double_star(self):
         r = sp.glob_to_regex("**/auth/**")
         self.assertTrue(r.match("a/b/auth/c/d"))
@@ -242,6 +285,22 @@ def ci_step(job, name):
     """The step <name> of the job <job> of the repo's ci.yml."""
     wf = cw.load(os.path.join(ROOT, ".github", "workflows", "ci.yml"))
     return next(s for s in wf["jobs"][job]["steps"] if s["name"] == name)
+
+
+def ci_mode():
+    """What .github/ci-mode of this repo records: push (default) or pr."""
+    try:
+        return open(os.path.join(ROOT, ".github", "ci-mode"), encoding="utf-8").read().strip() or "push"
+    except OSError:
+        return "push"
+
+
+def app_filter_sample():
+    """A path the app filter of this repo's ci.yml matches, read from the filter itself."""
+    text = open(os.path.join(ROOT, ".github", "workflows", "ci.yml"), encoding="utf-8").read()
+    m = re.search(r"echo \"app=\$\(has '\^\(([^)]*)\)'\)\"", text)
+    first = m.group(1).split("|")[0].replace("\\.", ".")
+    return first + ("README.md" if first.endswith("/") else "")
 
 
 def git(repo, *args):
@@ -600,6 +659,9 @@ if [ -n "$jq_expr" ]; then printf '%%s\\n' "$body" | jq -r "$jq_expr"; else prin
         # #137: a push to main that changes only CHANGELOG.md and ROADMAP.md starts
         # no run. paths-ignore is enough; the pull_request trigger is untouched.
         wf = cw.load(os.path.join(ROOT, ".github", "workflows", "ci.yml"))
+        if ci_mode() == "pr":
+            self.assertNotIn("push", wf["on"])  # mode pr: no run on the main
+            return
         self.assertEqual(sorted(wf["on"]["push"].get("paths-ignore", [])),
                          ["CHANGELOG.md", "ROADMAP.md"])
         self.assertEqual(wf["on"]["push"]["branches"], ["main"])
@@ -617,7 +679,10 @@ if [ -n "$jq_expr" ]; then printf '%%s\\n' "$body" | jq -r "$jq_expr"; else prin
 
     def test_ci_runs_on_push_to_main_without_policy(self):
         wf = cw.load(os.path.join(ROOT, ".github", "workflows", "ci.yml"))
-        self.assertEqual(wf["on"]["push"]["branches"], ["main"])
+        if ci_mode() == "pr":
+            self.assertNotIn("push", wf["on"])  # mode pr: no run on the main
+        else:
+            self.assertEqual(wf["on"]["push"]["branches"], ["main"])
         self.assertEqual(wf["jobs"]["policy"]["if"], "github.event_name == 'pull_request'")
         # A run of main is never cancelled by the next one: phase-start.sh waits for it.
         self.assertIn("github.event_name == 'pull_request'", wf["concurrency"]["cancel-in-progress"])
@@ -680,7 +745,8 @@ if [ -n "$jq_expr" ]; then printf '%%s\\n' "$body" | jq -r "$jq_expr"; else prin
         self.assertIn(rel, r.stdout)
 
     def test_filter_page(self):
-        self.assertEqual(self.detect({"app/README.md": "x\n"})["app"], "true")
+        # The filter is the part an adopter swaps for its own folders: read it from ci.yml.
+        self.assertEqual(self.detect({app_filter_sample(): "x\n"})["app"], "true")
 
     def base_checkout(self):
         """What the workflow checks out at base/: the base commit of the PR."""
@@ -706,6 +772,44 @@ if [ -n "$jq_expr" ]; then printf '%%s\\n' "$body" | jq -r "$jq_expr"; else prin
         self.assertEqual(r.returncode, 0, r.stderr)
         self.assertIn("scripts/close-phase.sh", r.stdout)
         self.assertIn("labels[]=needs-owner-ok", open(log).read())
+
+    def test_policy_labels_with_a_base_verifier_that_does_not_know_nul_lists(self):
+        # #186: the base of an update still has the verifier of c1b76da, which reads one
+        # path per line. A PR that touches ci.yml still gets a label (the old verifier
+        # cannot tell the classes, so the label is the strict one).
+        shutil.copy(os.path.join(HERE, "fixtures", "sensitive_paths_c1b76da.py"),
+                    os.path.join(self.repo, "scripts", "lib", "sensitive_paths.py"))
+        git(self.repo, "add", "scripts")
+        git(self.repo, "commit", "--quiet", "-m", "chore: old verifier")
+        self.base = git(self.repo, "rev-parse", "HEAD")
+        head = self.commit({".github/workflows/ci.yml": "name: CI\n", "scripts/close-phase.sh": "x\n"})
+        self.base_checkout()
+        env, log = self.fake_gh()
+        r = self.run_step("policy", "Label sensitive paths with needs-owner-ok", head, env)
+        self.assertEqual(r.returncode, 0, r.stderr)
+        self.assertIn(".github/workflows/ci.yml", r.stdout)
+        self.assertIn("labels[]=needs-owner-ok", open(log).read())
+
+    def policy_labels(self, files):
+        head = self.commit(files)
+        self.base_checkout()
+        env, log = self.fake_gh()
+        r = self.run_step("policy", "Label sensitive paths with needs-owner-ok", head, env)
+        self.assertEqual(r.returncode, 0, r.stderr)
+        calls = open(log).read()
+        return ("labels[]=needs-owner-ok" in calls, "labels[]=needs-gate-review" in calls)
+
+    def test_policy_gate_paths_get_needs_gate_review_not_owner_ok(self):
+        self.assertEqual(self.policy_labels({".github/workflows/ci.yml": "x\n"}), (False, True))
+        self.setUp()
+        self.assertEqual(self.policy_labels({"package-lock.json": "{}\n"}), (False, True))
+        self.setUp()
+        self.assertEqual(self.policy_labels({"db/migrations/001.sql": "x\n"}), (True, False))
+        self.setUp()
+        self.assertEqual(self.policy_labels({"db/migrations/001.sql": "x\n", "scripts/close-phase.sh": "x\n"}),
+                         (True, True))
+        self.setUp()
+        self.assertEqual(self.policy_labels({"README.md": "x\n"}), (False, False))
 
     def test_docs_checker_is_read_from_the_base(self):
         os.makedirs(os.path.join(self.repo, "scripts", "lib"), exist_ok=True)

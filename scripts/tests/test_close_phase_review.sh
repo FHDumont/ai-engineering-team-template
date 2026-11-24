@@ -6,7 +6,7 @@ source "$(dirname "$0")/close_phase_common.sh"
 handler "type:feature" success
 # Publish the review: comment + status on the HEAD SHA + review_round in the trace,
 # only with a reviewer round of this session after the last push of the branch.
-printf 'Revisão: aprovado.\n' >"$TMP/review.md"
+printf '## Revisão independente\n\nVeredito: aprovado\nRodada: 1\n' >"$TMP/review.md"
 export PROCESS_EVENTS_FILE="$TMP/events.jsonl"
 review_refused() { # review_refused <description> <text expected in the output>
   : >"$FAKE_GH_LOG"
@@ -32,8 +32,7 @@ review_refused "a new push asks for a new reviewer round" "no close-reviewer rou
 round_ev
 mkdir -p "$repo/.process"
 cp "$TMP/review.md" "$repo/.process/reviewer-$SHA.md"
-printf 'success\n' >"$repo/.process/reviewer-$SHA.verdict"
-printf 'Resumo próprio: aprovado sem o checklist.\n' >"$TMP/rewritten.md"
+printf '## Revisão independente\n\nVeredito: aprovado\nResumo próprio sem o checklist.\n' >"$TMP/rewritten.md"
 : >"$FAKE_GH_LOG"
 assert_status 1 "refuses a rewritten review" sh -c "cd '$repo' && '$CLOSE' --publish-review '$TMP/rewritten.md' --verdict success --round 1"
 assert_contains "$(last_output)" "differs from the saved" "says the file is not the saved reviewer output"
@@ -41,14 +40,35 @@ assert_not_contains "$(gh_calls)" "pr comment" "no comment for a rewritten revie
 assert_not_contains "$(gh_calls)" "statuses" "no status for a rewritten review"
 : >"$FAKE_GH_LOG"
 assert_status 1 "refuses a swapped verdict" sh -c "cd '$repo' && '$CLOSE' --publish-review '$TMP/review.md' --verdict failure --round 1"
-assert_contains "$(last_output)" "verdict" "says the verdict does not match the saved reviewer output"
+assert_contains "$(last_output)" "does not match the Veredito" "says the verdict does not match the opinion"
 assert_not_contains "$(gh_calls)" "statuses" "no status for a swapped verdict"
 : >"$FAKE_GH_LOG"
 assert_status 0 "publishes review" sh -c "cd '$repo' && '$CLOSE' --publish-review '$TMP/review.md' --verdict success --round 1"
 assert_eq "review_round 1 success 12" "$(jq -r '[.event, .round, .verdict, .pr] | join(" ")' "$PROCESS_EVENTS_FILE")" "records review_round in the trace"
+assert_eq "success" "$(cat "$repo/.process/reviewer-$SHA.verdict")" "the script writes .verdict from the Veredito line (#192)"
 calls="$(gh_calls)"
 assert_contains "$calls" "pr comment 12 --repo owner/repo --body-file $TMP/review.md" "posts the review comment"
 assert_contains "$calls" "api -X POST repos/owner/repo/statuses/$SHA -f state=success -f context=review/independent" "sets the status on HEAD"
+# #192: the agent saves only the .md; the verdict comes from its Veredito line.
+reset_phase_evidence
+push_ev "$SHA"
+round_ev
+rm -f "$repo/.process/reviewer-$SHA.md" "$repo/.process/reviewer-$SHA.verdict"
+: >"$FAKE_GH_LOG"
+assert_status 1 "a missing saved review says who writes it" sh -c "cd '$repo' && '$CLOSE' --publish-review '$TMP/review.md' --round 1"
+assert_contains "$(last_output)" "the phase session writes the whole close-reviewer output" "says the phase session saves the output"
+assert_contains "$(last_output)" "step 5" "points at step 5 of the skill"
+printf '## Revisão independente\n\nSem linha de veredito.\n' >"$TMP/noverdict.md"
+cp "$TMP/noverdict.md" "$repo/.process/reviewer-$SHA.md"
+assert_status 1 "an opinion without a Veredito line is refused" sh -c "cd '$repo' && '$CLOSE' --publish-review '$TMP/noverdict.md' --round 1"
+assert_contains "$(last_output)" "no Veredito line" "says the line is missing"
+printf '## Revisão independente\n\nVeredito: mudanças pedidas\n' >"$TMP/changes.md"
+cp "$TMP/changes.md" "$repo/.process/reviewer-$SHA.md"
+assert_status 1 "--verdict success on an opinion that asks for changes is refused" sh -c "cd '$repo' && '$CLOSE' --publish-review '$TMP/changes.md' --verdict success --round 1"
+assert_not_contains "$(gh_calls)" "statuses" "no status for a verdict that differs from the opinion"
+assert_status 0 "publishes an opinion that asks for changes with the verdict it states" sh -c "cd '$repo' && '$CLOSE' --publish-review '$TMP/changes.md' --round 1"
+assert_eq "failure" "$(cat "$repo/.process/reviewer-$SHA.verdict")" "mudanças pedidas is failure"
+assert_contains "$(gh_calls)" "-f state=failure -f context=review/independent" "status failure"
 printf 'Co-Authored-By: Claude <noreply@anthropic.com>\n' >"$TMP/signed.md"
 assert_status 1 "refuses a signed review" sh -c "cd '$repo' && '$CLOSE' --publish-review '$TMP/signed.md' --verdict success"
 
@@ -60,7 +80,6 @@ jq -cn --arg sha "$SHA" --arg b feat/issue-5-x '{event: "pre_review", verdict: "
 handler "type:feature" success
 mkdir -p "$repo/.process"
 cp "$TMP/review.md" "$repo/.process/reviewer-$SHA.md"
-printf 'success\n' >"$repo/.process/reviewer-$SHA.verdict"
 : >"$FAKE_GH_LOG"
 assert_status 0 "publishes without a session id when HEAD was pushed and pre-reviewed clean" \
   env -u CLAUDE_CODE_SESSION_ID sh -c "cd '$repo' && '$CLOSE' --publish-review '$TMP/review.md' --verdict success --round 1"
@@ -94,9 +113,8 @@ assert_status 0 "prepare pushes the commit the review will judge" \
   sh -c "cd '$repo' && '$CLOSE' --prepare --title 'feat: x' --body-file '$TMP/body131.md'"
 head131="$(git -C "$repo" rev-parse HEAD)"
 round_ev
-printf 'Revisão: aprovado.\n' >"$TMP/review131.md"
+printf '## Revisão independente\n\nVeredito: aprovado\nRodada: 1\n' >"$TMP/review131.md"
 cp "$TMP/review131.md" "$repo/.process/reviewer-$head131.md"
-printf 'success\n' >"$repo/.process/reviewer-$head131.verdict"
 assert_status 0 "prepare again when the SHA is already on origin" \
   sh -c "cd '$repo' && '$CLOSE' --prepare --body-file '$TMP/body131.md'"
 assert_eq "1" "$(jq -s --arg s "$head131" '[.[] | select(.event == "phase_push" and .sha == $s)] | length' "$TRACE")" "a prepare that does not push records no new phase_push"

@@ -4,7 +4,7 @@
 source "$(dirname "$0")/close_phase_common.sh"
 
 handler "type:feature" success
-printf '## Revisão independente\n\nModelo do revisor: sonnet · esforço: baixo\n' >"$TMP/review.md"
+printf '## Revisão independente\n\nVeredito: aprovado\n\nModelo do revisor: sonnet · esforço: baixo\n' >"$TMP/review.md"
 export PROCESS_EVENTS_FILE="$TMP/events.jsonl"
 reset_phase_evidence
 push_ev "$SHA"
@@ -12,7 +12,6 @@ round_ev
 jq -cn '{event:"SubagentStop", session_id:"child", agent_type:"close-reviewer", model:"claude-sonnet-9", effort:"medium"}' >>"$TRACE"
 mkdir -p "$repo/.process"
 cp "$TMP/review.md" "$repo/.process/reviewer-$SHA.md"
-printf 'success\n' >"$repo/.process/reviewer-$SHA.verdict"
 : >"$FAKE_GH_LOG"
 assert_status 0 "publishes the review" sh -c "cd '$repo' && '$CLOSE' --publish-review '$TMP/review.md' --verdict success --round 1"
 body="$(sed -n 's/.*--body-file //p' "$FAKE_GH_LOG" | head -1)"
