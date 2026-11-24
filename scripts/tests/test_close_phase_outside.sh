@@ -35,8 +35,10 @@ H
 
 save_review() { # save_review <sha> <verdict>
   mkdir -p "$repo/.process"
-  printf 'Revisão independente do SHA %s.\n' "$1" >"$repo/.process/reviewer-$1.md"
-  printf '%s\n' "$2" >"$repo/.process/reviewer-$1.verdict"
+  local word=aprovado
+  [ "$2" = success ] || word="mudanças pedidas"
+  printf 'Revisão independente do SHA %s.\n\nVeredito: %s\n' "$1" "$word" >"$repo/.process/reviewer-$1.md"
+  rm -f "$repo/.process/reviewer-$1.verdict"
 }
 
 outside_handler
