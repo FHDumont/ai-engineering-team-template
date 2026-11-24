@@ -6,7 +6,10 @@
 #:
 #: Reads the template commit this repository came from (.github/method-origin,
 #: written by setup-repo.sh --record-origin) and lists method files by blob
-#: hash: identical, adapted, missing, removed, kept or repo-only. --remove
+#: hash: identical, adapted, missing, removed, kept, repo-owned (a repository
+#: file with a template default) or repo-only. template-only marks a test of
+#: scripts/tests/template/ that a repository must not have (--remove deletes
+#: it); missing-label names a method label absent from .github/labels.tsv. --remove
 #: deletes a file the template dropped since that commit when this repository
 #: did not change it. A repository-only file is never deleted. --find-base
 #: prints the template commit whose blobs match the commit that introduced
@@ -101,7 +104,13 @@ while read -r path; do
   else
     rb=""
   fi
-  if printf '%s\n' $seeded | stdin_grep -qx "$path"; then
+  if [ "${path#scripts/tests/template/}" != "$path" ]; then
+    # Tests that only hold in the template: never part of a repository.
+    if [ -n "$rb" ]; then
+      echo "template-only $path"
+      if [ "$remove" = 1 ]; then rm -f "$root/$path"; fi
+    fi
+  elif printf '%s\n' $seeded | stdin_grep -qx "$path"; then
     if [ -n "$rb" ]; then echo "repo-owned $path"; elif [ -n "$tb" ]; then echo "missing $path"; fi
   elif [ -n "$rb" ] && [ -z "$fb" ] && [ -z "$tb" ]; then
     echo "repo-only $path"
@@ -122,3 +131,13 @@ while read -r path; do
     echo "adapted $path"
   fi
 done <<<"$paths"
+
+# Method labels the repository lacks: its labels.tsv is its own, so a row is added by hand (FHDumont/ai-engineering-team-template#207).
+if git -C "$template" cat-file -e "$to:.github/labels.tsv" 2>/dev/null; then
+  have=""
+  [ -f "$root/.github/labels.tsv" ] && have="$(cut -f1 "$root/.github/labels.tsv")"
+  while IFS=$'\t' read -r name _; do
+    case "$name" in ""|\#*|*"<"*|area:*|group:*|name) continue ;; esac
+    printf '%s\n' "$have" | stdin_grep -qxF "$name" || echo "missing-label $name"
+  done < <(git -C "$template" show "$to:.github/labels.tsv")
+fi
