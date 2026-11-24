@@ -15,7 +15,8 @@
 #:           this repository with its time targets
 #:           (.github/time-targets.tsv: measure, value, unit; the method default
 #:           applies when the file or a line is missing) and prints one
-#:           "over-target: ..." line per measure above its target.
+#:           "info: time ..." line per measure, with (above) when it passes the
+#:           target. Time is informative only; the exit status is always 0.
 #: Limits live in ~/.config/ai-method/machine-limits.env (created from
 #: scripts/lib/machine-limits.env.example on the first run); see process-design §6.
 set -euo pipefail
@@ -112,8 +113,8 @@ for c, key in (("fase", "phase"), ("validate", "validate")):
     val, unit = targets[key]
     target_s = val * 60 if unit == "min" else val
     m = med([x[1] for x in v])
-    if m > target_s:
-        print(f"over-target: {key} median {m:.0f} s above the target {val:g} {unit} ({me})")
+    above = " (above)" if m > target_s else ""
+    print(f"info: time {key} median {m:.0f} s, target {val:g} {unit}{above} ({me})")
 PY
     ;;
   *) die "unknown option: $1 (see --help)" 2 ;;
