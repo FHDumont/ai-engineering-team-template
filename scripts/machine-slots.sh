@@ -7,7 +7,7 @@
 #:           load, free memory and swap against the thresholds. Warns, never blocks.
 #: --check <class> [n]: exits 0 when n slots (default 1) of the class are free; exits
 #:           75 and says who holds them otherwise. Takes nothing.
-#: --report [--days N]: median and p90 of wait and duration per class and per
+#: --report [--days N]: median and p90 of wait, work duration and wall time per class and per
 #:           repository from ~/.cache/ai-method/history.tsv (default 7 days), to
 #:           compare before and after a change.
 #:           A phase duration in the history is wall time minus the wait for the
