@@ -283,7 +283,9 @@ repo_only_names() { # repo_only_names <file>
 name_hits() { # name_hits <repo> <names, one per line>
   local repo="$1" names="$2" name hits="" one paths
   [ -n "$names" ] || return 0
-  paths="$(method_existing "$repo")"
+  # The set check-docs.sh scans: the design, AGENTS.md, skills, and the method's scripts
+  # and hooks. STATE, BOTS, CONTEXT and the ADRs belong to the repository and may cite its names.
+  paths="$(method_existing "$repo" | grep -E '^(docs/process-design\.md|AGENTS\.md|\.claude/(skills|hooks)|\.githooks|scripts)$' || true)"
   [ -n "$paths" ] || return 0
   while IFS= read -r name; do
     [ -n "$name" ] || continue
@@ -305,6 +307,11 @@ git -C "$empty_repo" add scripts docs .github && git -C "$empty_repo" commit --q
 assert_eq "" "$(name_hits "$empty_repo" "$(repo_only_names "$empty_repo/docs/repo-notes.md")")" "an empty name list does not fail the scan"
 printf '\n- `project-runner-99`\n' >>"$empty_repo/docs/repo-notes.md"
 assert_eq "" "$(name_hits "$empty_repo" "$(repo_only_names "$empty_repo/docs/repo-notes.md")")" "a name only outside the method is not a hit"
+mkdir -p "$empty_repo/docs/adr"
+echo 'project-runner-99' >"$empty_repo/docs/STATE.md"
+echo 'project-runner-99' >"$empty_repo/docs/BOTS.md"
+echo 'project-runner-99' >"$empty_repo/docs/adr/0001-x.md"
+assert_eq "" "$(name_hits "$empty_repo" "$(repo_only_names "$empty_repo/docs/repo-notes.md")")" "a name in STATE, BOTS or an ADR is not a hit"
 echo 'project-runner-99' >>"$empty_repo/scripts/keep.sh"
 assert_contains "$(name_hits "$empty_repo" "$(repo_only_names "$empty_repo/docs/repo-notes.md")")" "scripts/keep.sh" "a name inside a method file is a hit"
 
