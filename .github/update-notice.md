@@ -24,6 +24,8 @@ Trazer o método do commit de destino, partindo do commit de origem gravado em `
 
 Esta issue fecha no merge do PR. Não há fase de teste depois: a prova é a primeira fase normal, que abre e fecha pelo portão (primeira fase normal do repo).
 
+> O PR de atualização que parte de `c1b76da` recebe `needs-owner-ok` do verificador antigo da base. Com as classes novas (`owner-ok` e `gate`), quem troca `ci.yml` e os verificadores recebe `needs-gate-review`: uma segunda revisão automática, sem o ok do dono.
+
 ## Arquivos ou áreas afetadas
 
 Arquivos do método listados em `.github/method-files.txt`. O que é só deste repositório não se sobrescreve.

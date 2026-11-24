@@ -22,6 +22,8 @@ spec seven.md 7
 assert_status 1 "phase-start refuses a private repository with no recorded CI mode" env -u PROCESS_CI_MODE FAKE_PRIVATE=true sh -c "cd '$repo' && scripts/phase-start.sh 7 --no-check"
 refusal="$(last_output)"
 assert_contains "$refusal" "PROCESS_CI_MODE" "the refusal cites the variable"
+assert_contains "$refusal" "the next PR tests the sum" "the refusal says the guarantee of mode pr"
+assert_contains "$refusal" "deploy runs validate.sh" "the refusal says the deploy runs validate.sh"
 assert_contains "$refusal" "setup-repo.sh --ci-mode" "the refusal cites the setup step"
 assert_eq "" "$(ls "$repo/.worktrees" 2>/dev/null || true)" "nothing is created by that refusal"
 assert_status 0 "the variable PROCESS_CI_MODE lets the phase open" env PROCESS_CI_MODE=push FAKE_PRIVATE=true CLAUDE_CODE_SESSION_ID=manager sh -c "cd '$repo' && scripts/phase-start.sh 7 --dry-run"
