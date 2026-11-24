@@ -16,6 +16,9 @@
 
 ## Correções
 
+- feat(ci): runner without actions or gh via CI_CHECKOUT_CMD ([#252](https://github.com/FHDumont/ai-engineering-team-template/pull/252)) · 2026-11-24
+- fix: phase-start exits at once when the group exceeds the fase slot limit ([#253](https://github.com/FHDumont/ai-engineering-team-template/pull/253)) · 2026-11-24
+- fix(tests): scan only the files of the method ([#250](https://github.com/FHDumont/ai-engineering-team-template/pull/250)) · 2026-11-24
 - fix: method-diff and fetch-template --apply cover the method docs ([#232](https://github.com/FHDumont/ai-engineering-team-template/pull/232)) · 2026-11-24
 - fix: fetch-template --apply brings outdated files outside the manifest ([#229](https://github.com/FHDumont/ai-engineering-team-template/pull/229)) · 2026-11-24
 - feat: fetch-template.sh and allow list for the headless update child ([#225](https://github.com/FHDumont/ai-engineering-team-template/pull/225)) · 2026-11-24
