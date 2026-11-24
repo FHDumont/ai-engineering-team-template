@@ -159,6 +159,7 @@ Espera acima de ~2 minutos: diga o que espera e onde (o run, o PR).
 | `end:lab-test` | testar no lab, iterar, "fechar fase" |
 | `end:auto-close` | nada |
 | PR com `needs-owner-ok` | 1 ok no quadro do merge |
+| PR com `needs-gate-review` | nenhum: uma segunda revisão do `close-reviewer` |
 | Achado `size:large` | 1 quadro: agora ou na próxima triagem |
 
 ### 4.2 Achados durante o trabalho
@@ -323,11 +324,12 @@ Roda só na sessão filha; na sessão que abriu a fase, `--prepare`, `--publish-
    | 8 | `mergeable` segue `UNKNOWN` após 5 leituras | olha o PR no GitHub e diz no status |
 
 3. **PR em conflito com a `main` (regra-base 4).** O `--check` chama o `scripts/redo-phase.sh` sem esperar CI e sem pergunta ao dono: branch nova a partir da `main`, cherry-pick dos commits da fase, PR novo com `Closes #n`, PR antigo fechado, branch remota antiga apagada, linha do registro paralelo regravada; cada passo lido de volta, sem push forçado. Conflito só em arquivo gerado é resolvido pelo script. Conflito real para o cherry-pick e sai 4: a filha resolve os arquivos listados, faz `git add` pelo nome, `git cherry-pick --continue` e roda `scripts/redo-phase.sh` de novo. PR só atrasado, sem conflito, não é refeito.
-4. **Revisão independente** (§10.2) e **`--publish-review <arquivo> --verdict success|failure`**: publica o status `review/independent` no SHA do HEAD e o parecer como comentário. O arquivo tem de ser a saída gravada do `close-reviewer` (`.process/reviewer-<sha>.md`); texto reescrito ou `--verdict` diferente de `.process/reviewer-<sha>.verdict` é recusado. Recusa parecer sem rodada do `close-reviewer` desta sessão posterior ao último push (lê `phase_push` e `SubagentStart` no trace).
+4. **Revisão independente** (§10.2) e **`--publish-review <arquivo> [--verdict success|failure]`**: publica o status `review/independent` no SHA do HEAD e o parecer como comentário. O arquivo tem de ser a saída gravada do `close-reviewer` (`.process/reviewer-<sha>.md`), que a sessão da fase grava inteira e literal; o agente não grava mais nada. O script lê a linha `Veredito:` do parecer (`aprovado` é `success`, `mudanças pedidas` é `failure`; sem a linha, recusa), grava o `.process/reviewer-<sha>.verdict` e recusa texto reescrito ou `--verdict` diferente do parecer. Recusa parecer sem rodada do `close-reviewer` desta sessão posterior ao último push (lê `phase_push` e `SubagentStart` no trace).
 5. **`--merge --wait`**. Recusa se um destes itens falhar:
    - a regra da sessão filha (§4.3);
    - o `--check` (com PR refeito sai 6: o PR novo ainda não tem CI nem revisão);
    - `needs-owner-ok` e label de área sensível (§10.3; sai 5);
+   - diff na classe `gate` da lista sensível sem a segunda revisão publicada com `--publish-review <arquivo> --gate` (§10.3; sai 5);
    - `review/independent` verde, com a rodada do revisor no trace depois do push do HEAD;
    - a proteção da branch base com `CI` e `review/independent`;
    - `check-attribution.sh --pr N` no corpo final e nos commits.
@@ -480,7 +482,7 @@ A tabela é a árvore de arquivos do método. Caminho sem `<…>` precisa existi
 | `.github/ISSUE_TEMPLATE/config.yml` | desliga a issue em branco |
 | `.github/pull_request_template.md` | corpo do PR |
 | `.github/labels.tsv` | labels do repo (§8.1) |
-| `.github/sensitive-paths` | globs dos caminhos sensíveis (§10.3); o arquivo do repo só acrescenta |
+| `.github/sensitive-paths` | globs dos caminhos sensíveis em duas classes, `owner-ok` e `gate` (§10.3); o arquivo do repo só acrescenta |
 | `.github/required-checks` | checks extras exigidos na proteção; a atualização não apaga |
 | `.github/headless` | `on` liga a filha headless; a atualização não apaga |
 | `.github/method-files.txt` | arquivos do método que as tabelas de scripts e hooks listam; a aplicação não entra |
@@ -521,7 +523,8 @@ Fonte: `.github/labels.tsv` (nomes em inglês, descrições em português). O `s
 | `size:small`, `size:medium`, `size:large` | tamanho do achado (§4.2) | quem abre |
 | `end:lab-test`, `end:auto-close` | modo de fim da fase | planejamento |
 | `needs-context` | não deu para classificar; seção obrigatória vazia | triagem, workflow |
-| `needs-owner-ok` | PR toca caminho sensível (§10.3) | CI `policy`, `close-phase.sh --merge` |
+| `needs-owner-ok` | PR toca caminho sensível da classe `owner-ok` (§10.3) | CI `policy`, `close-phase.sh --merge` |
+| `needs-gate-review` | PR toca caminho da classe `gate` (§10.3) | CI `policy`, `close-phase.sh --merge` |
 | `finding`, `friction` | achado durante o trabalho; atrito do método | agentes |
 | `ask:<bot>` | o bot não foi avisado (§5.1) | `notify-bot.sh`; sai quando o bot responde |
 | `approved` | ok do dono na spec, pelo GitHub | só o dono do repo |
@@ -585,7 +588,7 @@ O arquivo é a fonte. Jobs: `changes`, `policy`, `lint`, `tests`, `workflows` e 
 | Um run por rodada | editar título, corpo e labels do PR não gera run. O corpo final é conferido pelo `close-phase.sh --merge` |
 | Filtro de mudanças | o job `changes` decide o que roda, por `git diff` da base ao HEAD. O gatilho de `push` usa `paths-ignore` só para `CHANGELOG.md` e `ROADMAP.md`; qualquer outro arquivo no push abre o run, para o `CI` reportar |
 | Jobs condicionais | filtro por exclusão: doc é arquivo em `docs/` e `.md` (fora os templates de issue); todo o resto é código e roda `lint`. O job `tests` pula (`run_tests=false`) em duas situações, sem perguntar ao dono (decisão da FHDumont/ai-engineering-team-template#39): só mudou doc inerte (`docs/` exceto `process-design.md`, `.md` da raiz exceto `AGENTS.md` e `CLAUDE.md`, e os gerados `CHANGELOG.md` e `ROADMAP.md`, que nenhum teste lê), ou o código não mudou desde um commit do PR cujo resultado mais novo de `Tests` é sucesso (olha até 15 commits; só `skipped` olha um commit mais antigo; falha, cancelado, estouro ou pendente fazem rodar, e sucesso antigo não cobre um commit mais novo). Skills, scripts, hooks, workflows e app nunca são inertes. O `ci-gate.sh` exige `tests` salvo com `run_tests` exatamente `false`; `lint` só é dispensado com `code` exatamente `false`. Cada job de `.github/ci-extra-jobs` tem de terminar `success` neste run: `run_tests=false` não o dispensa, e `skipped` reprova |
-| `policy` | sempre roda: assinatura de IA nos commits e no corpo do PR, `.github/sensitive-paths` → label `needs-owner-ok`, `check-docs.sh` (o da base, sobre os docs do PR) |
+| `policy` | sempre roda: assinatura de IA nos commits e no corpo do PR, `.github/sensitive-paths` → label `needs-owner-ok` (classe `owner-ok`) e `needs-gate-review` (classe `gate`), `check-docs.sh` (o da base, sobre os docs do PR) |
 | Verificadores da base | `ci-gate.sh`, `check-attribution.sh`, `check-docs.sh`, `sensitive_paths.py` e `.github/sensitive-paths` são lidos do commit base do PR: o PR não enfraquece a checagem que o julga |
 | Agregador | o job `CI`, com `if: always()` salvo quando `confirmed` é `true`, é o único check exigido além de `review/independent`; falha se um job necessário falhou ou foi pulado sem motivo |
 | Runner | todo `runs-on` lê `vars.CI_RUNS_ON` (JSON: string ou lista de labels), padrão `ubuntu-latest` |
@@ -593,6 +596,10 @@ O arquivo é a fonte. Jobs: `changes`, `policy`, `lint`, `tests`, `workflows` e 
 | Timeouts | `timeout-minutes` em todo job (5–30) |
 | Permissões mínimas | `permissions: {}` no topo, liberadas por job |
 | Sem trabalho repetido | o shellcheck roda uma vez, dentro do `validate.sh` |
+
+O passo da label lê a lista de caminhos uma por linha, para qualquer verificador da base (o de `c1b76da` não lê lista separada por NUL). Um verificador da base que não conhece as classes lista tudo como `owner-ok`: o PR de atualização vindo de uma base antiga recebe `needs-owner-ok`; vindo de uma base com as classes, recebe `needs-gate-review` ao trocar o `ci.yml` e os verificadores.
+
+**Modo `pr` (`.github/ci-mode`).** Sem `push` na `main`, a soma de dois PRs mergeados em sequência não é testada na hora: a proteção não exige branch atualizada. A garantia é esta: o PR seguinte testa a soma (a árvore dele inclui o merge anterior) e o `deploy-*.yml` roda `scripts/validate.sh` na `main` antes de publicar; nada vai à produção sem a soma testada. O `strict: true` ou a recusa do merge por base velha fechariam a lacuna ao custo de um rebase e uma rodada a mais por PR; não são feitos, e quem precisa da `main` sempre verde fica no modo `push`. Os testes de `ci.yml` leem `.github/ci-mode` e, no modo `pr`, afirmam a ausência do `push`.
 
 Na atualização, quando o `.github/workflows/ci.yml` muda e a aplicação não, o filtro `app` pula o build: o job sai `skipped` e o `CI` verde não prova o build. No PR, inclua `.github/workflows/ci.yml` no filtro `app`, ou rode o build numa cópia local e registre o resultado.
 
@@ -672,10 +679,10 @@ O agente `close-reviewer`, aberto com o par do peso `reviewer` (§3), lê a issu
 
 ### 10.3 Nunca fecha sozinho
 
-Lista: cobrança, autenticação, migração de banco, credenciais, infraestrutura de produção, dependências e lockfiles. Vale mesmo com `end:auto-close`. Três camadas:
+Lista: cobrança, autenticação, migração de banco, credenciais, infraestrutura de produção, dependências e lockfiles, mais o próprio portão. Vale mesmo com `end:auto-close`. Duas classes, marcadas em `.github/sensitive-paths` por linhas `# class: owner-ok` e `# class: gate` (glob antes de qualquer linha é `owner-ok`; caminho nas duas é `owner-ok`; lista antiga, sem linha de classe, é toda `owner-ok`): `owner-ok` (migrações, `.env*`, `secrets/`, `credentials/`, `auth/`, `billing/`, `payments/`, `infra/production/`, mais os caminhos do método do item 2) pede o ok do dono; `gate` (dependências e lockfiles, `deploy-*.yml`, `ci.yml`, os verificadores, `close-phase.sh` e a própria lista) recebe `needs-gate-review` e pede, no lugar do dono, uma segunda revisão do `close-reviewer` focada em "o PR enfraquece o portão?", gravada em `.process/reviewer-gate-<sha>.md`, publicada com `--publish-review <arquivo> --gate` e com veredito `success` no HEAD. Sem ela o `--merge` sai 5. Uma classe só não basta para o portão se enfraquecer a si mesmo: o dono ainda aprova qualquer mudança de caminho `owner-ok`. Três camadas:
 
 1. As labels `area:billing`, `area:auth`, `area:migration` e `area:credentials` são aplicadas pela triagem e pelo workflow.
-2. Os caminhos do método (hooks, `.claude/settings.json`, `.githooks/`, `.github/actions/`, workflows com token de escrita, `scripts/lib/procs.sh`, `scripts/sessions.sh`, `scripts/start-headless.sh`, `scripts/setup-repo.sh`) valem no código (`scripts/lib/sensitive_paths.py`). `.github/sensitive-paths` só acrescenta os globs do projeto e os arquivos do próprio portão (`close-phase.sh`, workflows de deploy, `ci.yml`, os verificadores lidos da base e a própria lista); a atualização soma caminho novo do método sem apagar o do repo. O job `policy` do CI põe `needs-owner-ok` quando o diff toca um deles. O `close-phase.sh --merge` decide pela união da lista da base (`origin/main`) com a do PR: tirar uma entrada no próprio PR não dispensa o ok, e base sem lista legível recusa o merge.
+2. Os caminhos do método (hooks, `.claude/settings.json`, `.githooks/`, `.github/actions/`, workflows com token de escrita, `scripts/lib/procs.sh`, `scripts/sessions.sh`, `scripts/start-headless.sh`, `scripts/setup-repo.sh`) valem no código (`scripts/lib/sensitive_paths.py`). `.github/sensitive-paths` só acrescenta os globs do projeto e os arquivos do próprio portão (`close-phase.sh`, workflows de deploy, `ci.yml`, os verificadores lidos da base e a própria lista); a atualização soma caminho novo do método sem apagar o do repo. O job `policy` do CI põe `needs-owner-ok` quando o diff toca um da classe `owner-ok` e `needs-gate-review` quando toca um da classe `gate`. O `close-phase.sh --merge` decide pela união da lista da base (`origin/main`) com a do PR: tirar uma entrada no próprio PR não dispensa o ok, e base sem lista legível recusa o merge.
 3. O `close-phase.sh --merge` sai 5 com `needs-owner-ok` ou com label de área sensível. A filha pede o ok do dono num quadro `Fase #<n> — <título>:` cujas opções dizem a ação inteira e o SHA do HEAD, e roda `--merge --owner-ok <sha> --wait`. O `--owner-ok` recebe o SHA e só vale se for o HEAD e se a label `needs-owner-ok` já estiver no PR: sem ela, a recusa põe a label e sai 5. Quadros de sessões diferentes sobre o mesmo merge não ficam abertos juntos.
 
 Para todo o resto, `end:auto-close` vale como ok prévio do dono para o merge.
@@ -697,7 +704,7 @@ A proteção exige `review/independent` em todo PR. A branch de fase (`feat/issu
 
 Um PR cuja branch não é uma dessas recebe o status e faz merge só por `close-phase.sh --pr <N>`:
 
-- `--publish-review <arquivo> --verdict success|failure` publica `review/independent` no SHA do head desse PR. O arquivo tem de ser o parecer salvo daquele SHA (`.process/reviewer-<sha>.md`) e o veredito tem de ser o de `.process/reviewer-<sha>.verdict`.
+- `--publish-review <arquivo> [--verdict success|failure]` publica `review/independent` no SHA do head desse PR. O arquivo tem de ser o parecer salvo daquele SHA (`.process/reviewer-<sha>.md`) e o veredito é o da sua linha `Veredito:`.
 - `--merge --owner-ok <SHA>` só mergeia quando esse SHA é o HEAD do PR, o check run `CI` desse SHA terminou com `success` e o parecer independente salvo desse SHA tem veredito `success`. SHA diferente, CI ausente e head de fase (`fix/issue-*` e os outros três prefixos) são recusados.
 
 O `scripts/setup-repo.sh` e o README avisam isso antes de a proteção ser ligada.

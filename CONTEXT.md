@@ -7,7 +7,7 @@
 - **Modo de fim**: `end:auto-close` (o agente fecha pelo portão) ou `end:lab-test` (o dono do repo testa no lab e diz "fechar fase").
 - **Portão**: o check `CI` mais o status `review/independent`; nada entra na `main` sem os dois.
 - **Revisão independente**: o agente `close-reviewer` lê a issue, o diff e os testes (nunca o resumo do executor) e publica `review/independent`.
-- **Caminho sensível**: glob de `.github/sensitive-paths`; o PR que toca um deles recebe `needs-owner-ok` e não fecha sozinho.
+- **Caminho sensível**: glob de `.github/sensitive-paths`, em duas classes: `owner-ok` (PR recebe `needs-owner-ok` e não fecha sem o dono) e `gate` (PR recebe `needs-gate-review` e fecha com uma segunda revisão do `close-reviewer`).
 - **Achado**: algo encontrado durante uma fase; vira issue `finding` com `size:small|medium|large`.
 - **Caminho A / B**: A é só o agente de código; B acrescenta o time de bots, chamados pelo `scripts/ask-bot.sh`.
 - **Marca de resposta**: `<!-- bot:<slug> reply-to:<id> -->`; é como a resposta de um bot é reconhecida, mesmo quando todos usam a mesma conta.

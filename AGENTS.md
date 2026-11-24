@@ -34,7 +34,7 @@ Código novo e o do método, comentários, identificadores, nomes de arquivos, l
 
 ## Quando perguntar
 
-- Sempre: ação destrutiva ou irreversível, gasto, dependência nova, arquitetura ou schema, segredos, cobrança, autenticação, migração, credenciais, infraestrutura de produção, lockfiles.
+- Sempre: ação destrutiva ou irreversível, gasto, dependência nova, arquitetura ou schema, segredos, cobrança, autenticação, migração, credenciais, infraestrutura de produção.
 - Nunca: passo rotineiro e reversível de spec aprovada, setup, labels, issue de achado, branch e PR.
 - Dúvida em passo reversível: siga e liste em "Decisões tomadas sem perguntar" no PR; nunca suponha em silêncio.
 
