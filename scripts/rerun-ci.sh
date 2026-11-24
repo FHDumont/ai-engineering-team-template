@@ -4,7 +4,7 @@
 #: Usage: rerun-ci.sh <run-id>
 #:
 #: Refuses any other workflow, a run whose SHA is not the head of its open pull
-#: request, and a run with no failed job. After RERUN_CI_LIMIT reruns (default 2)
+#: request, and a run with no failed job (failure, timed_out or cancelled). After RERUN_CI_LIMIT reruns (default 2)
 #: it stops and offers an issue; it does not rerun again.
 #:
 #: A raw `gh run rerun` stays blocked by the hook and by the deny list, including
@@ -37,7 +37,7 @@ pr_head="$(gh pr view "$pr" --repo "$slug" --json headRefOid --jq .headRefOid)" 
   die "could not read the head of PR #$pr; nothing was rerun"
 [ "$pr_head" = "$head" ] || die "run $run is not the HEAD of PR #$pr; nothing was rerun"
 jobs="$(gh api "repos/$slug/actions/runs/$run/jobs")" || die "could not read the jobs of run $run; nothing was rerun"
-failed="$(printf '%s' "$jobs" | jq '[.jobs[]? | select(.conclusion == "failure" or .conclusion == "timed_out")] | length')"
+failed="$(printf '%s' "$jobs" | jq '[.jobs[]? | select(.conclusion == "failure" or .conclusion == "timed_out" or .conclusion == "cancelled")] | length')"
 [ "${failed:-0}" -gt 0 ] || die "run $run has no failed job; nothing was rerun"
 limit="${RERUN_CI_LIMIT:-2}"
 case "$limit" in ''|*[!0-9]*) die "RERUN_CI_LIMIT must be a number" 2 ;; esac

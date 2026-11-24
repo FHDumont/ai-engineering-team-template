@@ -90,7 +90,8 @@
 #:   that runs --merge (CLAUDE_CODE_SESSION_ID) must be another one, with its own
 #:   phase_session (check-env.sh) and an event recorded by the hooks; --issue
 #:   different from the branch's issue is refused (exit 2). --wait waits for the merge and
-#:   runs --cleanup. Never dispatches a deploy: scripts/deploy.sh does, run by
+#:   runs --cleanup; it leaves at once (exit 1) when a check on HEAD was cancelled,
+#:   naming scripts/rerun-ci.sh <run>. Never dispatches a deploy: scripts/deploy.sh does, run by
 #:   the main session after the last merge of the group.
 #: --pr N: a pull request whose head is not a phase branch. A phase branch is
 #:   <type>/issue-<n>-* with type feat, fix, docs or chore (new-phase.sh),
@@ -893,6 +894,15 @@ Ok do dono do repo registrado (quadro de escolha) para:$reasons." >/dev/null
     until [ "$(gh pr view "$n" --repo "$repo" --json state --jq .state)" = MERGED ]; do
       tries=$((tries + 1))
       [ "$tries" -le 120 ] || die "PR #$n not merged after 60 minutes"
+      # A cancelled check (network failure in Checkout) never recovers by itself: leave at once.
+      local cancelled run_id
+      cancelled="$(gh api "repos/$repo/commits/$sha/check-runs" --jq '[.check_runs[] | select(.conclusion == "cancelled")][0].html_url // empty' 2>/dev/null || true)"
+      if [ -n "$cancelled" ]; then
+        run_id="$(printf '%s' "$cancelled" | sed -n 's#.*/actions/runs/\([0-9][0-9]*\).*#\1#p')"
+        echo "PR #$n: a check on HEAD ${sha:0:12} was cancelled ($cancelled); it will not recover by itself"
+        echo "rerun: scripts/rerun-ci.sh ${run_id:-<run-id>}, then --merge --wait again"
+        exit 1
+      fi
       sleep "${CLOSE_PHASE_MERGE_POLL:-30}"
       progress_step "waiting for the merge" "$tries" 120
     done
