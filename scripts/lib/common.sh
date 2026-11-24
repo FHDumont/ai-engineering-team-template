@@ -350,3 +350,13 @@ $prs
 EOF2
   echo "no merged PR holds it"; return 1
 }
+
+# is_method_doc <path>: a method doc outside the method folders (FHDumont/ai-engineering-team-template#231).
+# README.md, CONTEXT.md, docs/STATE.md, docs/BOTS.md, docs/repo-notes.md, app/, CHANGELOG.md and ROADMAP.md stay with the repository.
+is_method_doc() {
+  case "$1" in
+    AGENTS.md|CLAUDE.md|docs/process-design.md|docs/adr/TEMPLATE.md|docs/adr/INDEX.md) return 0 ;;
+    docs/adr/ADR-*.md|.cursor/rules/*) return 0 ;;
+    *) return 1 ;;
+  esac
+}

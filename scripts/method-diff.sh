@@ -8,7 +8,8 @@
 #: written by setup-repo.sh --record-origin) and lists method files by blob
 #: hash: identical, outdated (repository = origin, destination differs),
 #: adapted (repository differs from both), missing (also a file new in the
-#: destination inside the method folders, outside the manifest), removed, kept,
+#: destination inside the method folders, outside the manifest, and a method doc: AGENTS.md, CLAUDE.md,
+#: docs/process-design.md, docs/adr/{TEMPLATE,INDEX,ADR-*}.md, .cursor/rules/*), removed, kept,
 #: repo-owned (a repository file with a template default) or repo-only. template-only marks a test of
 #: scripts/tests/template/ that a repository must not have (--remove deletes
 #: it); missing-label names a method label absent from .github/labels.tsv. --remove
@@ -104,6 +105,12 @@ while read -r f; do
   paths="$paths
 $f"
 done < <(comm -13 <(git -C "$template" ls-tree -r --name-only "$from" 2>/dev/null | sort) <(git -C "$template" ls-tree -r --name-only "$to" | sort))
+# Method docs outside the method folders: the template's at both ends and the repository's own (a repo-only ADR).
+while read -r f; do
+  [ -n "$f" ] || continue
+  is_method_doc "$f" && paths="$paths
+$f"
+done < <({ git -C "$template" ls-tree -r --name-only "$from" 2>/dev/null; git -C "$template" ls-tree -r --name-only "$to"; git -C "$root" ls-files; } | sort -u)
 # Repository files that start from a template default: brought when missing, never overwritten.
 seeded=".github/required-checks .github/headless .github/label-areas.tsv .github/ci-extra-jobs"
 paths="$paths
