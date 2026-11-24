@@ -106,4 +106,54 @@ rc=0
 found="$(cd "$r3" && "$DIFF" --find-base --template "$t4" 2>&1)" || rc=$?
 assert_eq "1" "$rc" "find-base on an empty template fails with exit 1"
 assert_contains "$found" "no template commit" "find-base on an empty template says why"
+
+# Files of the repository that have a template default (#207): missing when absent, never overwritten.
+ts="$(make_repo)"
+mkdir -p "$ts/.github"
+printf 'scripts/x.sh\n' >"$ts/.github/method-files.txt"
+for f in required-checks headless update-notice.md label-areas.tsv ci-extra-jobs; do echo "default $f" >"$ts/.github/$f"; done
+git -C "$ts" add .github
+git -C "$ts" commit --quiet -m "chore: defaults"
+rs="$(make_repo)"
+mkdir -p "$rs/.github"
+printf 'scripts/x.sh\n' >"$rs/.github/method-files.txt"
+echo mine >"$rs/.github/headless"
+printf '%s\n' "$(git -C "$ts" rev-parse HEAD)" >"$rs/.github/method-origin"
+git -C "$rs" add .github
+git -C "$rs" commit --quiet -m "chore: adopted"
+out="$(cd "$rs" && "$DIFF" --template "$ts")"
+for f in required-checks update-notice.md label-areas.tsv ci-extra-jobs; do
+  assert_contains "$out" "missing .github/$f" "a missing repository file with a template default is listed: $f"
+done
+assert_not_contains "$out" "missing .github/headless" "an existing repository file is not listed as missing"
+assert_eq "mine" "$(cat "$rs/.github/headless")" "an existing repository file is not overwritten"
+
+# The guide says to bring the default and to drop the old STATE sentence.
+assert_contains "$(cat "$SCRIPTS/../README.md")" "trazer o padrão do template quando faltar" "the guide brings the default of repository-owned files"
+assert_contains "$(cat "$SCRIPTS/../README.md")" "o job \`tests\` roda em todo PR" "the guide names the old STATE sentence"
+
+# find-base must not spawn git per file and commit: many commits, many files, a time limit.
+t5="$(make_repo)"
+mkdir -p "$t5/scripts"
+for i in $(seq 1 40); do echo "v0 $i" >"$t5/scripts/f$i.sh"; done
+git -C "$t5" add scripts
+git -C "$t5" commit --quiet -m "chore: files"
+for i in $(seq 1 60); do
+  echo "v$i" >"$t5/scripts/f$((i % 40 + 1)).sh"
+  git -C "$t5" commit --quiet -am "chore: edit $i"
+done
+r5="$(mktemp -d)"
+git -C "$r5" init --quiet -b main
+git -C "$r5" config user.email test@example.org
+git -C "$r5" config user.name test
+git -C "$r5" config commit.gpgsign false
+mkdir -p "$r5/scripts"
+for i in $(seq 1 40); do echo "v0 $i" >"$r5/scripts/f$i.sh"; done
+git -C "$r5" add scripts
+git -C "$r5" commit --quiet -m "chore: adopted"
+start=$SECONDS
+found="$(cd "$r5" && "$DIFF" --find-base --template "$t5" 2>&1)"
+elapsed=$((SECONDS - start))
+assert_eq "yes" "$([ "$elapsed" -le 3 ] && echo yes || echo "no ($elapsed s)")" "find-base on 60 commits and 40 files is fast"
+assert_eq "$(git -C "$t5" rev-list --reverse HEAD | sed -n 2p)" "$found" "find-base names the commit whose blobs match"
 finish
