@@ -151,6 +151,10 @@ if [ "$offline" = 0 ]; then
     completed/success*) ;;
     queued/*|in_progress/*|waiting/*|pending/*|requested/*)
       fail "CI of origin/main ${base:0:9} is still running (${ci#* }): wait for it" ;;
+    completed/skipped*)
+      # The same rule as phase-start.sh: skipped is accepted when the merged PR had CI green on the same tree.
+      pr="$(cd "$main_root" && base_pr_vouches "$base")" ||
+        fail "CI of origin/main ${base:0:9} is skipped and ${pr} (${ci#* })" ;;
     ""|absent)
       prs="$(gh api "repos/$repo/commits/$base/pulls" 2>/dev/null | jq -r '.[]? | select(.merged_at != null) | .number' 2>/dev/null || true)"
       if [ -z "$prs" ]; then

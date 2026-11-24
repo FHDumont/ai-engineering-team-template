@@ -58,6 +58,10 @@ check 1 "CI of main still running" FAKE_BASE_CI=running
 assert_contains "$(last_output)" "still running" "in-progress CI is named"
 assert_contains "$(last_output)" "wait for it" "in-progress CI says to wait"
 fails_with "an absent CI of main with no voucher" "no check 'CI'" FAKE_BASE_CI=absent FAKE_BASE_PR=none
+check 0 "a skipped CI of main passes when the merged PR had CI green on the same tree" FAKE_BASE_CI=skipped FAKE_BASE_PR=green
+fails_with "a skipped CI of main whose merged PR was red" "CI of origin/main" FAKE_BASE_CI=skipped FAKE_BASE_PR=red
+fails_with "a skipped CI of main with no merged PR" "CI of origin/main" FAKE_BASE_CI=skipped FAKE_BASE_PR=none
+fails_with "a skipped CI of main whose PR has another tree" "CI of origin/main" FAKE_BASE_CI=skipped FAKE_BASE_PR=tree
 
 # Extra local branch of a phase still fails. A branch the phase did not create is a warning.
 git -C "$repo" branch feat/issue-5-x
