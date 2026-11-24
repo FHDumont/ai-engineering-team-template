@@ -26,6 +26,12 @@ assert_not_contains "$plan" "Tentar de novo" "plan has no second path after a re
 assert_contains "$design" 'initiation: "own_initiative"' "the design has the same path for a refused start_session"
 assert_not_contains "$design" "Tentar de novo" "the design has no second path after a refusal"
 
+# A phase that waits for a slot opens in the same turn; a light finding of an approved opinion asks no new round.
+assert_contains "$plan" "Sem vaga" "plan says what to do with no free phase slot"
+assert_contains "$plan" "nunca cartão por vaga" "plan never turns a missing slot into a card"
+assert_contains "$close" "não pede outra rodada" "close-phase asks no new round for a light finding of an approved opinion"
+assert_contains "$design" "não pede outra rodada" "the design says the same about the light finding"
+
 # close-phase: the session that opened the phase forwards and stops; the owner's ok is asked in the phase session.
 assert_contains "$close" "repasse e pare" "close-phase has the forward-and-stop step"
 assert_contains "$close" "saída 9" "close-phase names the exit code of the opening session"
