@@ -32,7 +32,7 @@
 #: variable PROCESS_CI_MODE) to keep CI on pull requests only: a base with no check
 #: is then accepted when the merged PR that contains it had CI green, with a warning
 #: when the tree differs, and a red base stays refused. A private repository with
-#: no record is refused until .github/ci-mode on main says push or pr. ci.yml also runs on push to main, so a run of main that is still going is waited
+#: no record (file, variable PROCESS_CI_MODE, or setup-repo.sh --ci-mode) is refused. ci.yml also runs on push to main, so a run of main that is still going is waited
 #: for (PHASE_START_CI_WAIT seconds, default 900; progress step "waiting for the CI of main"), even before the
 #: job CI exists (the workflow run of the commit counts); with no run there is nothing to wait for. A red
 #: check is not cleared by rerunning that run: it keeps the gate of the commit it checked out. Push a new
@@ -98,7 +98,7 @@ esac
 if [ "$ci_recorded" = 0 ]; then
   priv="$(gh api "repos/$(repo_slug)" --jq .private 2>/dev/null || true)"
   if [ "$priv" = true ]; then
-    die "this private repository has not recorded whether CI runs on push to main. That push spends Actions minutes (about 2 when the tree was already tested, about 5 to 10 when the suite runs). Record the choice in .github/ci-mode on main: push, or pr (pull requests only; a base with no check is accepted when the merged PR had CI green, with a warning if the tree differs). No phase opens until that file is on main; nothing was created"
+    die "$(ci_mode_unrecorded_text). No phase opens until then; nothing was created"
   fi
 fi
 
