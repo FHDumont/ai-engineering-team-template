@@ -593,7 +593,9 @@ O arquivo é a fonte. Jobs: `changes`, `policy`, `lint`, `tests`, `workflows` e 
 | Filtro de mudanças | o job `changes` decide o que roda, por `git diff` da base ao HEAD. O gatilho de `push` usa `paths-ignore` só para `CHANGELOG.md` e `ROADMAP.md`; qualquer outro arquivo no push abre o run, para o `CI` reportar |
 | Jobs condicionais | filtro por exclusão: doc é arquivo em `docs/` e `.md` (fora os templates de issue); todo o resto é código e roda `lint`. O job `tests` pula (`run_tests=false`) em duas situações, sem perguntar ao dono (decisão da FHDumont/ai-engineering-team-template#39): só mudou doc inerte (`docs/` exceto `process-design.md`, `.md` da raiz exceto `AGENTS.md` e `CLAUDE.md`, e os gerados `CHANGELOG.md` e `ROADMAP.md`, que nenhum teste lê), ou o código não mudou desde um commit do PR cujo resultado mais novo de `Tests` é sucesso (olha até 15 commits; só `skipped` olha um commit mais antigo; falha, cancelado, estouro ou pendente fazem rodar, e sucesso antigo não cobre um commit mais novo). Skills, scripts, hooks, workflows e app nunca são inertes. O `ci-gate.sh` exige `tests` salvo com `run_tests` exatamente `false`; `lint` só é dispensado com `code` exatamente `false`. Cada job de `.github/ci-extra-jobs` tem de terminar `success` neste run: `run_tests=false` não o dispensa, e `skipped` reprova |
 | `policy` | sempre roda: assinatura de IA nos commits e no corpo do PR, `.github/sensitive-paths` → label `needs-owner-ok` (classe `owner-ok`) e `needs-gate-review` (classe `gate`), `check-docs.sh` (o da base, sobre os docs do PR) |
-| Verificadores da base | `ci-gate.sh`, `check-attribution.sh`, `check-docs.sh`, `sensitive_paths.py` e `.github/sensitive-paths` são lidos do commit base do PR: o PR não enfraquece a checagem que o julga |
+| Verificadores da base | `ci-gate.sh`, `check-attribution.sh`, `check-docs.sh`, `sensitive_paths.py` e `.github/sensitive-paths` são lidos do commit base do PR, por `git archive` (só o que a base tem), em `base/`: o PR não enfraquece a checagem que o julga |
+| `gh` fixado | o pin é o `.github/gh-pin` da base. Só no primeiro CI (a base sem `.github/gh-pin` nem `.github/method-files.txt`, e o runner sem `gh`) o passo usa o pin do PR, com `::notice::`; o YAML que roda já é o do PR, então isso não abre brecha nova (#248) |
+| Checkout | cada `actions/checkout` tem um passo gêmeo que roda a variável `CI_CHECKOUT_CMD` (passada por `env`, nunca por `${{ }}` dentro do `run`), com `CI_CHECKOUT_FULL=true` quando o job precisa do histórico completo. Sem a variável, o `actions/checkout` roda como antes (#247) |
 | Agregador | o job `CI`, com `if: always()` salvo quando `confirmed` é `true`, é o único check exigido além de `review/independent`; falha se um job necessário falhou ou foi pulado sem motivo |
 | Runner | todo `runs-on` lê `vars.CI_RUNS_ON` (JSON: string ou lista de labels), padrão `ubuntu-latest` |
 | Concurrency | cancela o CI em andamento do mesmo PR |
@@ -621,6 +623,8 @@ O `issues-label.yml` roda em `opened` e em `edited` só quando o corpo mudou, co
 ### 9.3 Runner próprio
 
 O registro é só `scripts/setup-runner.sh --register`. Ele recusa repo público e repo de visibilidade ilegível, porque o runner rodaria o código de qualquer PR. Um runner recusado no setup só volta a ser oferecido pelo gatilho da triagem (`triage.sh --runner-offer`): média de run acima de 5 minutos ou cota acima de 50%.
+
+Num runner próprio sem `actions/*` e sem `gh` (#247): defina `CI_RUNS_ON` e, se o runner não baixa actions, `CI_CHECKOUT_CMD` antes de abrir o PR de adoção. O `runs-on` padrão fica `ubuntu-latest` no template; o repositório não o troca no arquivo. Job extra de `.github/ci-extra-jobs` que precisa de outro runner tem `runs-on` próprio e roda sempre, porque o `ci-gate.sh` reprova job extra `skipped`: em PR só de doc (`docs_only`), são os passos do job que pulam, não o job.
 
 ### 9.4 Deploy (regra-base 3)
 
