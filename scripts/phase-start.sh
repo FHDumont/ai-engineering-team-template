@@ -215,6 +215,7 @@ while :; do
   else
     "$HERE/open-parallel.sh" "${issues[@]}" ${pass[@]+"${pass[@]}"} || rc=$?
   fi
+  # 76: the group is bigger than the machine limit; waiting cannot help, so it ends here.
   [ "$rc" = 75 ] || break
   [ "$dry" = 0 ] || break
   if [ "$slot_waited" -ge "$slot_max" ]; then
