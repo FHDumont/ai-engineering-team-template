@@ -16,6 +16,8 @@ set -euo pipefail
 HERE="$(cd "$(dirname "$0")" && pwd)"
 # shellcheck source=scripts/lib/common.sh
 source "$HERE/lib/common.sh"
+# shellcheck source=scripts/lib/slots.sh
+source "$HERE/lib/slots.sh"
 
 issues=() pass=()
 while [ $# -gt 0 ]; do
@@ -47,6 +49,12 @@ fi
 
 # Enough phase slots for the whole group, before anything is created.
 if [ "$dry" = 0 ]; then
+  slots_load_limits
+  fase_limit="$(slots_limit fase)"
+  if [ "${#issues[@]}" -gt "$fase_limit" ]; then
+    echo "error: ${#issues[@]} phases asked, the machine limit of fase slots is $fase_limit: nothing was created; split the group: open up to $fase_limit issues now and the rest when a slot is free" >&2
+    exit 76
+  fi
   "$HERE/machine-slots.sh" --check fase "${#issues[@]}" || exit $?
 fi
 
