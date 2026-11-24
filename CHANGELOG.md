@@ -50,6 +50,7 @@
 
 ## Outros
 
+- fix: hash the close-reviewer opinion from its transcript ([#243](https://github.com/FHDumont/ai-engineering-team-template/pull/243)) · 2026-11-24
 - feat: time is informative, never a cut for the owner ([#240](https://github.com/FHDumont/ai-engineering-team-template/pull/240)) · 2026-11-24
 - fix: apply and notice follow the destination method-diff ([#239](https://github.com/FHDumont/ai-engineering-team-template/pull/239)) · 2026-11-24
 - fix: correct phase time, CI reruns, and deadlines ([#176](https://github.com/FHDumont/ai-engineering-team-template/pull/176)) · 2026-11-23
