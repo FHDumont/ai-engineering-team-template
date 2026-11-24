@@ -450,7 +450,7 @@ if [ "$mode" = check ]; then
   case "$only" in ""|protection) check_part "protection of $branch" sync_protection ;; esac
   if [ -z "$only" ]; then
     # Same decision as phase-start.sh: a private repository with no recorded CI mode is refused.
-    main_root="$(git worktree list --porcelain | sed -n '1s/^worktree //p')"
+    main_root="$(git -C "$ROOT" worktree list --porcelain | sed -n '1s/^worktree //p')"
     if [ ! -f "${main_root:-$ROOT}/.github/ci-mode" ] && [ -z "${PROCESS_CI_MODE:-}" ] && ! var_exists PROCESS_CI_MODE; then
       read_repo_info 2>/dev/null || true
       if [ "$(printf '%s' "$repo_info" | jq -r .private 2>/dev/null)" = "true" ]; then
