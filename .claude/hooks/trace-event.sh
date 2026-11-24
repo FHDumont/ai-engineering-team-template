@@ -12,7 +12,8 @@
 # the request to the right SubagentStart/Stop when several subagents start together.
 # When the hook input has no model, the model comes from the transcript: the session's
 # for a session event, the subagent's for SubagentStop.
-# SubagentStop of the close-reviewer also records output_sha (opinion_sha of its last message).
+# SubagentStop of the close-reviewer also records output_sha (opinion_sha of its last text with a
+# "Veredito:" line in the subagent transcript; else of last_assistant_message).
 # Never blocks: always exits 0, even on error.
 here="$(cd "$(dirname "$0")" && pwd)"
 # shellcheck source=scripts/lib/common.sh
@@ -62,7 +63,18 @@ line="$(printf '%s' "$input" | jq -c --arg fill_model "$fill_model" \
 # The close-reviewer output is hashed here, when the subagent stops, so close-phase.sh can refuse
 # an opinion edited after it was saved. Only the hash goes to the trace, never the text.
 if [ -n "$line" ] && printf '%s' "$line" | jq -e '.event == "SubagentStop" and .agent_type == "close-reviewer"' >/dev/null 2>&1; then
-  out_sha="$(printf '%s' "$input" | jq -r '.last_assistant_message // empty' 2>/dev/null | opinion_sha)"
+  # The opinion is the last text with a "Veredito:" line in the subagent transcript: an assistant text
+  # block or the message of a tool that delivers the report. Without it: last_assistant_message.
+  sub_tr="$(printf '%s' "$input" | jq -r '(.agent_transcript_path // (if (.transcript_path // "") != "" and (.agent_id // "") != ""
+    then "\(.transcript_path | sub("\\.jsonl$"; ""))/subagents/agent-\(.agent_id).jsonl" else empty end)) // empty' 2>/dev/null)"
+  opinion=""
+  if [ -n "$sub_tr" ] && [ -f "$sub_tr" ]; then
+    opinion="$(jq -rs '[.[] | select(.type == "assistant") | .message.content? | arrays | .[]
+      | (if .type == "text" then .text elif .type == "tool_use" then .input.message else empty end)
+      | strings | select(test("(^|\n)Veredito:"))] | last // empty' "$sub_tr" 2>/dev/null)"
+  fi
+  [ -n "$opinion" ] || opinion="$(printf '%s' "$input" | jq -r '.last_assistant_message // empty' 2>/dev/null)"
+  out_sha="$(printf '%s' "$opinion" | opinion_sha)"
   [ "$out_sha" = "$(printf '' | opinion_sha)" ] ||
     line="$(printf '%s' "$line" | jq -c --arg h "$out_sha" '. + {output_sha: $h}' 2>/dev/null || printf '%s' "$line")"
 fi
