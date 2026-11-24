@@ -50,7 +50,7 @@ while IFS= read -r f; do
   grep -qE 'set -euo pipefail|set -eo pipefail|pipefail' "$f" || continue
   hits="$(grep -nE '[^[:space:]] \| grep -[a-zA-Z]*q' "$f" | grep -vE '^[0-9]+:[[:space:]]*#' || true)"
   [ -z "$hits" ] || offenders="$offenders$f:"$'\n'"$hits"$'\n'
-done <<<"$(git -C "$REPO" ls-files '*.sh' '.claude/hooks/*' '.githooks/*')"
+done < <(cd "$REPO" && printf '%s\n' scripts/*.sh scripts/lib/* .claude/hooks/* .githooks/*)
 yml="$REPO/.github/workflows/ci.yml"
 hits="$(grep -nE '[^[:space:]] \| grep -[a-zA-Z]*q' "$yml" || true)"
 [ -z "$hits" ] || offenders="$offenders$yml:"$'\n'"$hits"$'\n'
