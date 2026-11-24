@@ -771,7 +771,7 @@ if [ -n "$jq_expr" ]; then printf '%%s\\n' "$body" | jq -r "$jq_expr"; else prin
         r = self.run_step("policy", "Label sensitive paths with needs-owner-ok", head, env)
         self.assertEqual(r.returncode, 0, r.stderr)
         self.assertIn("scripts/close-phase.sh", r.stdout)
-        self.assertIn("labels[]=needs-owner-ok", open(log).read())
+        self.assertIn("labels[]=needs-gate-review", open(log).read())
 
     def test_policy_labels_with_a_base_verifier_that_does_not_know_nul_lists(self):
         # #186: the base of an update still has the verifier of c1b76da, which reads one

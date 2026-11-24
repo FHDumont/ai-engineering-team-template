@@ -131,8 +131,8 @@ commit_push "chore: drop entries from the list" .github/sensitive-paths
 handler "type:feature" success
 assert_status 5 "refuses merge of a PR that drops the entry of a path it touches" sh -c "cd '$repo' && '$CLOSE' --merge"
 assert_contains "$(last_output)" "src/auth/login.py" "the base list still covers the dropped path"
-assert_contains "$(last_output)" ".github/sensitive-paths" "the base list still covers the list itself"
-printf 'newzone/**\n' >>"$repo/.github/sensitive-paths"
+# The list itself is in the class gate (#186): a PR that touches only it needs the second review.
+printf '# class: owner-ok\nnewzone/**\n' >>"$repo/.github/sensitive-paths"
 mkdir -p "$repo/newzone"; echo z >"$repo/newzone/a.txt"
 commit_push "chore: add an entry to the list" .github/sensitive-paths newzone/a.txt
 handler "type:feature" success

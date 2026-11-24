@@ -3,11 +3,11 @@
 #:
 #: Usage:
 #:   close-phase.sh --prepare --title "chore: ..." --body-file F [--issue N]
-#:   close-phase.sh --publish-review F --verdict success|failure [--round N]
+#:   close-phase.sh --publish-review F [--verdict success|failure] [--gate] [--round N]
 #:   close-phase.sh --pre-review --verdict clean|findings [--round N]
 #:   close-phase.sh --check
 #:   close-phase.sh --merge [--owner-ok SHA] [--wait]
-#:   close-phase.sh --pr N --publish-review F --verdict success|failure
+#:   close-phase.sh --pr N --publish-review F [--verdict success|failure]
 #:   close-phase.sh --pr N --merge --owner-ok SHA
 #:
 #: Do not pipe --check or --merge (the pipe hides the exit code and the cleanup
@@ -32,8 +32,14 @@
 #:   has in that section is replaced.
 #: --publish-review: posts the independent review (file, in Portuguese) as a PR
 #:   comment and sets the review/independent status on the HEAD SHA. The file must
-#:   be the saved close-reviewer output (.process/reviewer-<sha>.md) and --verdict
-#:   must match .process/reviewer-<sha>.verdict; a rewrite is refused. Refuses an
+#:   be the saved close-reviewer output (.process/reviewer-<sha>.md), written whole
+#:   and literally by the phase session (step 5 of the close-phase skill); the agent
+#:   writes only that .md. The script reads its "Veredito:" line (aprovado = success,
+#:   mudanças pedidas = failure; no line: refused), writes .process/reviewer-<sha>.verdict
+#:   and refuses a --verdict that differs from it (--verdict is optional); a rewrite is
+#:   refused. --gate publishes the second review of a PR that touches the gate
+#:   (.process/reviewer-gate-<sha>.md): comment and gate_review in the trace, no
+#:   review/independent status. Refuses an
 #:   opinion without a reviewer round after the last push: the trace of the main
 #:   checkout must hold the phase_push of the branch (recorded by --prepare and
 #:   by redo-phase.sh) on the PR head SHA and, after it, a SubagentStart of the
@@ -57,11 +63,15 @@
 #:   of the HEAD it starts from.
 #: --merge: first refuses (exit 12) while the issue holds a comment headed "Para: fase #n"
 #:   (scripts/lib/author.sh) after the last comment of the phase itself; then refuses with needs-owner-ok, a sensitive area label or a diff in
-#:   .github/sensitive-paths (union of the base's list and the PR's; no readable
-#:   list on the base: refused), unless --owner-ok SHA (only after the owner's ok in a
+#:   .github/sensitive-paths in the class owner-ok (union of the base's list and the PR's;
+#:   no readable list on the base: refused; a list with no `# class:` line is all owner-ok),
+#:   unless --owner-ok SHA (only after the owner's ok in a
 #:   choice question, bound to that SHA of HEAD). --owner-ok only counts with needs-owner-ok already on the
 #:   PR: without it the refusal puts the label (read back) and exits 5, with or
-#:   without the flag. Requires review/independent = success on HEAD and, in the
+#:   without the flag. A diff in the class gate (or needs-gate-review on the PR) needs, instead
+#:   of the owner, a second close-reviewer opinion about "does it weaken the gate?",
+#:   published with --publish-review F --gate on that HEAD with verdict success;
+#:   without it the refusal puts needs-gate-review (read back) and exits 5. Requires review/independent = success on HEAD and, in the
 #:   trace, the close-reviewer round of this session after the push of that HEAD
 #:   (a status posted by hand does not count); requires the protection of the
 #:   base branch with CI and review/independent (no protection, no merge), except in
@@ -86,7 +96,7 @@
 #:   including fix/issue-*. --pr does not use the phase gate and it does not
 #:   change --merge for a phase branch. --publish-review posts review/independent
 #:   on that pull request's head SHA from the saved review of that SHA
-#:   (.process/reviewer-<sha>.md and the matching .verdict). --merge is refused
+#:   (.process/reviewer-<sha>.md; the .verdict is read from its Veredito line). --merge is refused
 #:   unless --owner-ok is that same SHA, the CI check run on it is success, and
 #:   the saved independent review of that SHA has verdict success. A wrong SHA,
 #:   missing CI and a phase head are refused. The phase path stays --merge.
@@ -148,7 +158,7 @@ gh() {
   return "$rc"
 }
 
-mode="" title="" body_file="" issue="" review_file="" verdict="" round="" owner_ok=0 owner_ok_sha="" wait=0 discard=0 pr=""
+mode="" title="" body_file="" issue="" review_file="" verdict="" round="" owner_ok=0 owner_ok_sha="" wait=0 discard=0 pr="" gate_review=0
 while [ $# -gt 0 ]; do
   case "$1" in
     -h|--help) print_help "$0"; exit 0 ;;
@@ -156,6 +166,7 @@ while [ $# -gt 0 ]; do
     --pre-review) mode=prereview; shift ;;
     --publish-review) mode=review; review_file="$2"; shift 2 ;;
     --verdict) verdict="$2"; shift 2 ;;
+    --gate) gate_review=1; shift ;;
     --round) round="$2"; shift 2 ;;
     --check) mode=check; shift ;;
     --merge) mode=merge; shift ;;
@@ -550,26 +561,58 @@ PY
   printf '%s\n' "$posted"
 }
 
+# The verdict of a saved close-reviewer opinion, read from its "Veredito:" line.
+opinion_verdict() { # opinion_verdict <saved opinion>
+  local line v
+  line="$(grep -m1 -E '^Veredito:' "$1" || true)"
+  [ -n "$line" ] || die "no Veredito line in the saved opinion $1: save the whole close-reviewer output, which has the line 'Veredito: aprovado | mudanças pedidas'"
+  v="$(printf '%s' "${line#Veredito:}" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//' | tr 'A-Z' 'a-z')"
+  case "$v" in
+    aprovado) echo success ;;
+    "mudanças pedidas") echo failure ;;
+    *) die "the Veredito line of $1 is neither 'aprovado' nor 'mudanças pedidas': $line" ;;
+  esac
+}
+
+# Reads the verdict of the saved opinion, refuses a --verdict that differs and records
+# it in the .verdict file next to it (the agent writes only the .md).
+save_opinion_verdict() { # save_opinion_verdict <saved .md> <.verdict file> [<given verdict>]
+  local got
+  got="$(opinion_verdict "$1")" || exit $?
+  [ -z "${3:-}" ] || [ "$3" = "$got" ] || die "review --verdict $3 does not match the Veredito of the saved opinion ($got)"
+  printf '%s\n' "$got" >"$2"
+  printf '%s' "$got"
+}
+
+missing_opinion_msg() { # missing_opinion_msg <sha> <path>
+  echo "no saved reviewer output for ${1:0:12}: the phase session writes the whole close-reviewer output, literally and unchanged, to $2 (step 5 of the close-phase skill); no hook writes it, and the verdict is read from its Veredito line"
+}
+
 publish_review() {
   [ -f "$review_file" ] || die "review file not found: $review_file"
-  case "$verdict" in success|failure) ;; *) die "--verdict must be success or failure" 2 ;; esac
+  case "$verdict" in ''|success|failure) ;; *) die "--verdict must be success or failure" 2 ;; esac
   "$HERE/check-attribution.sh" --text-file "$review_file" >/dev/null || die "review has AI attribution"
-  local n sha events saved savedv got
+  local n sha events saved savedv got prefix=reviewer
+  [ "$gate_review" = 0 ] || prefix=reviewer-gate
   n="$(pr_number)"; [ -n "$n" ] || die "no open PR for $branch"
   sha="$(gh pr view "$n" --repo "$repo" --json headRefOid --jq .headRefOid)"
   [ "$sha" = "$(git rev-parse HEAD)" ] || die "local HEAD differs from PR head $sha: push or pull first"
   review_after_push "$sha"
   events="$(phase_trace_file "$ROOT")" || die "cannot locate the trace: review refused"
-  saved="$(dirname "$events")/reviewer-$sha.md"
-  savedv="$(dirname "$events")/reviewer-$sha.verdict"
-  [ -f "$saved" ] || die "no saved reviewer output for ${sha:0:12}: write the close-reviewer output to $saved without rewriting it"
+  saved="$(dirname "$events")/$prefix-$sha.md"
+  savedv="$(dirname "$events")/$prefix-$sha.verdict"
+  [ -f "$saved" ] || die "$(missing_opinion_msg "$sha" "$saved")"
   cmp -s "$saved" "$review_file" || die "review file differs from the saved close-reviewer output"
-  [ -f "$savedv" ] || die "no saved reviewer verdict for ${sha:0:12}"
-  got="$(tr -d '[:space:]' <"$savedv")"
-  [ "$got" = "$verdict" ] || die "review --verdict $verdict does not match the saved reviewer verdict $got"
+  got="$(save_opinion_verdict "$saved" "$savedv" "$verdict")" || exit $?
+  verdict="$got"
   local body
   body="$(reviewer_body "$review_file" "$events")"
   gh_role pr comment "$n" --repo "$repo" --body-file "$body" >/dev/null
+  if [ "$gate_review" = 1 ]; then
+    trace_event gate_review pr="$n" round="${round:-1}" verdict="$verdict" sha="$sha"
+    echo "published the gate review=$verdict on ${sha:0:12} (PR #$n)"
+    return 0
+  fi
   local desc="Revisão independente aprovada"
   [ "$verdict" = success ] || desc="Revisão independente pediu mudanças"
   gh api -X POST "repos/$repo/statuses/$sha" -f state="$verdict" -f context=review/independent \
@@ -679,6 +722,31 @@ refuse_pending_notes() {
   fi
 }
 
+# A PR that touches the gate needs a published second review (--publish-review --gate)
+# of this HEAD with verdict success: the saved opinion and its gate_review event.
+gate_review_required() { # gate_review_required <pr> <sha> <labels> <gate paths>
+  local n="$1" sha="$2" labels="$3" paths="$4" events saved ok=0 got=""
+  if ! echo "$labels" | stdin_grep -qxF needs-gate-review; then
+    "$HERE/label-issue.sh" "$n" --add needs-gate-review >/dev/null ||
+      die "PR #$n needs a gate review, but needs-gate-review could not be put on it"
+    echo "needs-gate-review is now on PR #$n (read back)"
+  fi
+  events="$(phase_trace_file "$ROOT" 2>/dev/null || true)"
+  if [ -n "$events" ] && [ -f "$events" ]; then
+    saved="$(dirname "$events")/reviewer-gate-$sha.md"
+    if [ -f "$saved" ]; then
+      got="$(opinion_verdict "$saved" 2>/dev/null || true)"
+      if [ "$got" = success ] && jq -e -s --arg sha "$sha" \
+        '[.[] | select(type == "object" and .event == "gate_review" and .sha == $sha and .verdict == "success")] | length > 0' \
+        "$events" >/dev/null 2>&1; then ok=1; fi
+    fi
+  fi
+  [ "$ok" = 1 ] && return 0
+  echo "refused: PR #$n touches the gate and needs a second review (needs-gate-review)${paths:+: $(echo "$paths" | paste -sd, -)}"
+  echo "run the close-reviewer agent on HEAD $sha with the question 'does this PR weaken the gate?', save its whole output to .process/reviewer-gate-$sha.md, publish it with --publish-review <file> --gate, then rerun --merge; the owner is not asked"
+  exit 5
+}
+
 merge() {
   local n info labels sha state
   n="$(pr_number)"; [ -n "$n" ] || die "no open PR for $branch"
@@ -702,9 +770,14 @@ merge() {
   globs="$(mktemp)"
   git show "origin/$base:.github/sensitive-paths" >"$globs" 2>/dev/null ||
     { rm -f "$globs"; die "cannot read .github/sensitive-paths of origin/$base: merge blocked"; }
-  [ ! -f "$ROOT/.github/sensitive-paths" ] || { echo; cat "$ROOT/.github/sensitive-paths"; } >>"$globs"
-  touched="$(git diff --name-only --no-renames -z "origin/$base...$sha" 2>/dev/null | python3 "$HERE/lib/sensitive_paths.py" "$globs" || true)"
-  rm -f "$globs"
+  # The class line before the PR's list keeps its globs owner-ok whatever the base ended with.
+  [ ! -f "$ROOT/.github/sensitive-paths" ] || { echo; echo "# class: owner-ok"; cat "$ROOT/.github/sensitive-paths"; } >>"$globs"
+  local diffed touched_gate
+  diffed="$(mktemp)"
+  git diff --name-only --no-renames -z "origin/$base...$sha" >"$diffed" 2>/dev/null || true
+  touched="$(SENSITIVE_CLASS=owner-ok python3 "$HERE/lib/sensitive_paths.py" "$globs" <"$diffed" || true)"
+  touched_gate="$(SENSITIVE_CLASS=gate python3 "$HERE/lib/sensitive_paths.py" "$globs" <"$diffed" || true)"
+  rm -f "$globs" "$diffed"
   [ -z "$touched" ] || reasons="$reasons sensitive-paths($(echo "$touched" | paste -sd, -))"
   if [ -n "$reasons" ]; then
     # --owner-ok only counts with needs-owner-ok already on the PR: the label is the
@@ -734,6 +807,11 @@ merge() {
     fi
     gh_role pr comment "$n" --repo "$repo" --body "<!-- owner-ok sha:$sha -->
 Ok do dono do repo registrado (quadro de escolha) para:$reasons." >/dev/null
+  fi
+
+  # The gate class: no owner, but a second close-reviewer opinion on this HEAD.
+  if [ -n "$touched_gate" ] || echo "$labels" | stdin_grep -qxF needs-gate-review; then
+    gate_review_required "$n" "$sha" "$labels" "$touched_gate"
   fi
 
   state="$(gh api "repos/$repo/commits/$sha/status" --jq '[.statuses[] | select(.context == "review/independent")][0].state // "missing"')"
@@ -970,9 +1048,8 @@ require_saved_review() { # require_saved_review <sha> <verdict>
   events="$(phase_trace_file "$ROOT")" || die "cannot locate the trace: review refused"
   saved="$(dirname "$events")/reviewer-$sha.md"
   savedv="$(dirname "$events")/reviewer-$sha.verdict"
-  [ -f "$saved" ] || die "no saved reviewer output for ${sha:0:12}: write the close-reviewer output to $saved without rewriting it"
-  [ -f "$savedv" ] || die "no saved reviewer verdict for ${sha:0:12}"
-  got="$(tr -d '[:space:]' <"$savedv")"
+  [ -f "$saved" ] || die "$(missing_opinion_msg "$sha" "$saved")"
+  got="$(save_opinion_verdict "$saved" "$savedv")" || exit $?
   [ "$got" = "$want" ] || die "saved reviewer verdict $got is not $want for ${sha:0:12}"
   if [ -n "$review_file" ]; then
     cmp -s "$saved" "$review_file" || die "review file differs from the saved close-reviewer output"
@@ -1001,11 +1078,14 @@ require_base_protection() { # require_base_protection <base> <sha>
 
 outside_publish() {
   [ -f "$review_file" ] || die "review file not found: $review_file"
-  case "$verdict" in success|failure) ;; *) die "--verdict must be success or failure" 2 ;; esac
+  case "$verdict" in ''|success|failure) ;; *) die "--verdict must be success or failure" 2 ;; esac
   "$HERE/check-attribution.sh" --text-file "$review_file" >/dev/null || die "review has AI attribution"
   local refs sha desc
   refs="$(outside_refs "$pr")" || exit $?
   sha="${refs%%$'\t'*}"
+  if [ -z "$verdict" ]; then
+    verdict="$(opinion_verdict "$(dirname "$(phase_trace_file "$ROOT")")/reviewer-$sha.md")" || exit $?
+  fi
   require_saved_review "$sha" "$verdict"
   local body events
   events="$(phase_trace_file "$ROOT" 2>/dev/null || true)"

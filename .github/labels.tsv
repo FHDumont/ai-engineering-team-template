@@ -25,6 +25,7 @@ end:lab-test	0052cc	Fim da fase: o dono do repo testa no lab e diz "fechar fase"
 end:auto-close	0e8a16	Fim da fase: o agente fecha sozinho pelo portão	
 needs-context	fbca04	Não deu para classificar ou falta seção obrigatória	
 needs-owner-ok	e11d21	PR toca caminho ou área sensível: precisa do ok do dono do repo	
+needs-gate-review	e11d21	PR toca o portão (CI, verificadores, dependências): precisa de uma segunda revisão, sem o dono	
 finding	c5def5	Achado durante o trabalho	achado
 friction	f9d0c4	Atrito do método (na 2ª vez, propor um hook)	
 ask:<slug>	ededed	O bot <name> não foi avisado	
