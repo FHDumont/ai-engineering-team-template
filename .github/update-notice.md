@@ -15,6 +15,7 @@ Trazer o método do commit de destino, partindo do commit de origem gravado em `
 ## Pronto quando
 
 - [ ] O PR lista o que é idêntico, adaptado, faltante, removido e só do repo (`scripts/method-diff.sh`).
+- [ ] Arquivo do repo com padrão do template que faltava (`missing` no `method-diff.sh`) foi trazido; o que existe não foi sobrescrito.
 - [ ] O que o template removeu e o repo não mudou saiu; o que é só do repo ficou.
 - [ ] `.github/method-origin` passou a ser o commit de destino.
 - [ ] O PR traz `.github/ci-mode` (`push` ou `pr`) com a escolha do dono; num repo privado sem esse arquivo (nem a variável `PROCESS_CI_MODE`) nenhuma fase abre.
