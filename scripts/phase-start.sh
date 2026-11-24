@@ -205,9 +205,9 @@ done
 progress_step "opening the phase(s)" 0 "${#issues[@]}"
 # No free phase slot (exit 75, nothing created): wait for one here, in the turn of the request, so the
 # child sessions open in this same turn and none becomes a card the owner has to click (a card does
-# not show in Remote Control). Deadline and poll in seconds, PHASE_START_SLOT_WAIT (default 1200)
+# not show in Remote Control). Deadline and poll in seconds, PHASE_START_SLOT_WAIT (default 540, under the 600 s of a foreground command)
 # and PHASE_START_SLOT_POLL (default 15).
-slot_max="${PHASE_START_SLOT_WAIT:-1200}" slot_poll="${PHASE_START_SLOT_POLL:-15}" slot_waited=0
+slot_max="${PHASE_START_SLOT_WAIT:-540}" slot_poll="${PHASE_START_SLOT_POLL:-15}" slot_waited=0
 while :; do
   rc=0
   if [ ${#issues[@]} -eq 1 ]; then
