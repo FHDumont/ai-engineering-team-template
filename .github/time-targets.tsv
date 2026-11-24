@@ -1,4 +1,5 @@
 # measure	value	unit: time targets of this project (the method default applies to a missing line).
+# Informative only: the report prints "info: time" lines and never stops anything.
 # Never overwritten by the template update. Measures: phase (median of a phase, min), validate (median of validate.sh, s).
 phase	45	min
 validate	240	s
