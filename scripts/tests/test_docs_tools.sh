@@ -63,13 +63,19 @@ CHECK="$SCRIPTS/check-docs.sh"
 
 d="$(fixture)"
 assert_status 0 "passes a good fixture" env REPO_ROOT="$d" "$CHECK"
-words 600 >"$d/AGENTS.md"
-assert_status 1 "fails AGENTS.md over 500 words" env REPO_ROOT="$d" "$CHECK"
+words 700 >"$d/AGENTS.md"
+assert_status 0 "passes AGENTS.md of 700 words (limit 800)" env REPO_ROOT="$d" "$CHECK"
+words 801 >"$d/AGENTS.md"
+assert_status 1 "fails AGENTS.md over 800 words" env REPO_ROOT="$d" "$CHECK"
 words 200 >"$d/AGENTS.md"
 assert_status 1 "fails AGENTS.md under 300 words" env REPO_ROOT="$d" "$CHECK"
 
-d="$(fixture)"; words 501 >"$d/docs/STATE.md"
-assert_status 1 "fails STATE.md over 500 words" env REPO_ROOT="$d" "$CHECK"
+d="$(fixture)"; words 800 >"$d/docs/STATE.md"
+assert_status 0 "passes STATE.md of 800 words" env REPO_ROOT="$d" "$CHECK"
+words 801 >"$d/docs/STATE.md"
+assert_status 1 "fails STATE.md over 800 words" env REPO_ROOT="$d" "$CHECK"
+assert_contains "$(last_output)" "allowed 1-800" "the message names the STATE.md limit"
+assert_contains "$("$CHECK" --help)" "300-800" "--help names the AGENTS.md limit"
 d="$(fixture)"; echo "leia o AGENTS.md" >"$d/CLAUDE.md"
 assert_status 1 "fails CLAUDE.md that is not @AGENTS.md" env REPO_ROOT="$d" "$CHECK"
 d="$(fixture)"; printf '\n## Histórico\n- fase 1\n' >>"$d/docs/STATE.md"
@@ -130,6 +136,24 @@ assert_status 1 "fails a skill that cites a repository-only name" env REPO_ROOT=
 assert_contains "$(last_output)" ".claude/skills/ask-bot/notes.md cites the repository-only name AcmeBot" "names the skill file"
 d="$(fixture)"; mkdir -p "$d/.claude/skills/ask-bot"; echo "Pergunte ao AcmeBot." >"$d/.claude/skills/ask-bot/SKILL.md"
 assert_status 0 "with no docs/repo-notes.md there is no list to check" env REPO_ROOT="$d" "$CHECK"
+
+# #188: a script that exists but is not in the manifest is not "missing": say how to fix it.
+d="$(fixture)"; mkdir -p "$d/.github"; printf 'scripts/gate.sh\n.claude/hooks/block-x.sh\n.githooks/pre-commit\n' >"$d/.github/method-files.txt"
+: >"$d/scripts/only-here.sh"
+edit_design "$d" 's#^| `scripts/gate.sh` | Barra | agentes |$#&\
+| `scripts/only-here.sh` | Do repo | ninguém |#'
+assert_status 1 "fails a documented script that is only in this repository and not in the manifest" env REPO_ROOT="$d" "$CHECK"
+assert_contains "$(last_output)" "scripts/only-here.sh exists but is not in .github/method-files.txt" "says the file exists and the manifest lacks it"
+assert_contains "$(last_output)" "add it to the manifest" "says how to fix it"
+assert_not_contains "$(last_output)" "only-here.sh, which does not exist" "does not claim the file is missing"
+# #193: AGENTS.md points to docs/repo-notes.md; a repository updated from an old version lacks it.
+d="$(fixture)"; echo "Regras do projeto: docs/repo-notes.md." >>"$d/AGENTS.md"
+assert_status 0 "a missing docs/repo-notes.md only warns" env REPO_ROOT="$d" "$CHECK"
+assert_contains "$(last_output)" "warn: AGENTS.md points to docs/repo-notes.md, which does not exist" "warns about the missing notes"
+printf '# Notas\n\n## Nomes só deste repositório\n\n- `AcmeBot`\n' >"$d/docs/repo-notes.md"
+assert_status 0 "no warning once the file exists" env REPO_ROOT="$d" "$CHECK"
+assert_not_contains "$(last_output)" "repo-notes.md, which does not exist" "silent when the notes exist"
+assert_contains "$(cat "$REPO/docs/repo-notes.md" 2>/dev/null)" "## Nomes só deste repositório" "the template ships a model of docs/repo-notes.md"
 
 # A hook cited in settings.json that does not exist fails the check.
 d="$(fixture)"

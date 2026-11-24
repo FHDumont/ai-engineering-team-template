@@ -86,7 +86,7 @@ esac
 # FAKE_SETUP (set by fake_setup of lib.sh) answers the four reads of
 # `setup-repo.sh --check` before the handler of the test: ok (configured),
 # nolabels, noprotection, offer (an unanswered offer), freeplan (no branch protection,
-# mode not recorded) or unprotected (no branch protection, PROCESS_BRANCH_MODE recorded).
+# mode not recorded), nocimode (private, CI mode not recorded) or unprotected (no branch protection, PROCESS_BRANCH_MODE recorded).
 if [ -n "${FAKE_SETUP:-}" ]; then
   case "$*" in
     "label list --repo $GH_REPO --limit 500 --json name,color,description")
@@ -107,6 +107,7 @@ if [ -n "${FAKE_SETUP:-}" ]; then
     "variable list --repo $GH_REPO --json name --jq .[].name")
       [ "$FAKE_SETUP" = offer ] || printf 'PROCESS_OFFER_PROJECT\nPROCESS_OFFER_RUNNER\n'
       [ "$FAKE_SETUP" != unprotected ] || echo PROCESS_BRANCH_MODE
+      [ "$FAKE_SETUP" = nocimode ] || echo PROCESS_CI_MODE
       exit 0 ;;
   esac
 fi

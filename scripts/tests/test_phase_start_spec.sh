@@ -16,6 +16,17 @@ assert_eq "docs/specs/later.md" "$(git -C "$repo/.worktrees/issue-14" show --nam
 assert_eq "" "$(git -C "$repo" status --porcelain)" "the loose copy leaves with the last phase of the spec"
 unset FAKE_OPEN
 
+# #194: a phase that was already opened (phase_opened in the trace) and merged, whose issue stays
+# open by design, does not hold the loose copy: it has no worktree because it is done.
+spec merged.md 31
+printf '\n## Fase #32 — y\n\n1. Etapa. modelo: sonnet · esforço: low · motivo: leve\n' >>"$repo/docs/specs/merged.md"
+printf '{"event":"phase_opened","issue":"31","session_id":"s0"}\n' >>"$PROCESS_EVENTS_FILE"
+export FAKE_OPEN="31 32"
+assert_status 0 "phase-start opens the second phase after the first was opened and merged" sh -c "cd '$repo' && scripts/phase-start.sh 32 --no-check"
+assert_not_contains "$(last_output)" "kept the loose copy" "an opened phase with an open issue does not keep the loose copy"
+assert_eq "" "$(git -C "$repo" status --porcelain)" "the loose copy of the spec is gone"
+unset FAKE_OPEN
+
 # #50: an open issue only cited in the text of the spec (solved inside the phase, or
 # roadmap) has no phase to open: it does not hold the loose copy.
 spec cited.md 17

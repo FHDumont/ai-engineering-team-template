@@ -16,6 +16,16 @@ assert_eq "" "$(git -C "$repo" branch --list '*issue-*')" "no branch is created 
 assert_not_contains "$(events)" "phase_opened" "no phase_opened without a spec"
 rm "$repo/docs/specs/eight.md" "$repo/docs/specs/other.md"
 
+spec seven.md 7
+# #190: the refusal for a private repository with no recorded CI mode names the way out that needs no
+# commit on main, and --check of the setup says the same text.
+assert_status 1 "phase-start refuses a private repository with no recorded CI mode" env -u PROCESS_CI_MODE FAKE_PRIVATE=true sh -c "cd '$repo' && scripts/phase-start.sh 7 --no-check"
+refusal="$(last_output)"
+assert_contains "$refusal" "PROCESS_CI_MODE" "the refusal cites the variable"
+assert_contains "$refusal" "setup-repo.sh --ci-mode" "the refusal cites the setup step"
+assert_eq "" "$(ls "$repo/.worktrees" 2>/dev/null || true)" "nothing is created by that refusal"
+assert_status 0 "the variable PROCESS_CI_MODE lets the phase open" env PROCESS_CI_MODE=push FAKE_PRIVATE=true CLAUDE_CODE_SESSION_ID=manager sh -c "cd '$repo' && scripts/phase-start.sh 7 --dry-run"
+
 # The check CI of the base commit of main decides before anything is created: red, still
 # running or absent refuse, name the run, and leave no branch, worktree, registry or phase_opened.
 spec seven.md 7

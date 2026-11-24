@@ -25,6 +25,7 @@ case "$*" in
   "issue view 9 "*) echo '{"state":"CLOSED","title":"Fechada","labels":[{"name":"type:bug"}]}' ;;
   "issue view 10 "*) echo '{"state":"OPEN","title":"Teste de fluxo","labels":[{"name":"test"}]}' ;;
   "issue view "*"--json state,title,labels"*) echo '{"state":"OPEN","title":"Listar issues","labels":[{"name":"type:feature"}]}' ;;
+  "api repos/"*"--jq .private") echo "${FAKE_PRIVATE:-false}" ;;
   "issue list"*"--state open"*) printf '%s\n' ${FAKE_OPEN:-} ;;
 esac
 H
