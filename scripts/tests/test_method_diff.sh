@@ -252,4 +252,55 @@ assert_not_contains "$out" "missing-label" "no missing label, none in the notice
 out="$(cd "$rz" && env -u PROCESS_CI_MODE "$DIFF" --notice --template "$tz" --from "$(git -C "$tz" rev-parse HEAD)" --to "$(git -C "$tz" rev-parse HEAD)")"
 assert_contains "$out" "needs-gate-review" "an origin verifier with the classes puts needs-gate-review"
 assert_not_contains "$out" "check-docs.sh" "no interval, no check-docs command"
+
+# #235: a file both ends have, the repository dropped on purpose, is deleted: never missing, never in the notice.
+td="$(make_repo)"
+mkdir -p "$td/scripts" "$td/.github/workflows"
+printf 'scripts/a.sh\n.github/update-notice.md\n' >"$td/.github/method-files.txt"
+echo a >"$td/scripts/a.sh"
+echo notice >"$td/.github/update-notice.md"
+echo ex >"$td/.github/workflows/deploy-example.yml"
+echo pin >"$td/.github/gh-pin"
+git -C "$td" add .github scripts
+git -C "$td" commit --quiet -m "chore: origin"
+dorigin="$(git -C "$td" rev-parse HEAD)"
+echo a2 >"$td/scripts/a.sh"
+git -C "$td" add scripts
+git -C "$td" commit --quiet -m "chore: dest"
+rd="$(make_repo)"
+mkdir -p "$rd/scripts" "$rd/.github/workflows"
+echo a >"$rd/scripts/a.sh"
+echo notice >"$rd/.github/update-notice.md"
+echo mine >"$rd/.github/workflows/deploy-x.yml"
+printf 'scripts/a.sh\n.github/update-notice.md\n' >"$rd/.github/method-files.txt"
+printf '%s\n' "$dorigin" >"$rd/.github/method-origin"
+git -C "$rd" add .github scripts
+git -C "$rd" commit --quiet -m "chore: adopted"
+out="$(cd "$rd" && "$DIFF" --template "$td")"
+assert_contains "$out" "deleted .github/workflows/deploy-example.yml" "a file the repository dropped on purpose is deleted"
+assert_contains "$out" "deleted .github/gh-pin" "gh-pin dropped by the repository is deleted"
+assert_not_contains "$out" "missing .github/workflows/deploy-example.yml" "a dropped file is not missing"
+out="$(cd "$rd" && env -u PROCESS_CI_MODE "$DIFF" --notice --template "$td")"
+assert_not_contains "$out" "deploy-example.yml" "the notice does not list a deleted file"
+
+# #234: the notice lists an adapted file only when the template changed it in the interval, and never method-origin.
+printf 'own-labels\n' >"$rd/.github/labels.tsv"
+printf 'tpl-labels\n' >"$td/.github/labels.tsv"
+echo tpl-origin >"$td/.github/method-origin"
+printf 'scripts/a.sh\n.github/update-notice.md\n.github/labels.tsv\n.github/method-origin\n' >"$td/.github/method-files.txt"
+git -C "$td" add .github
+git -C "$td" commit --quiet -m "chore: labels in the template"
+dorigin2="$(git -C "$td" rev-parse HEAD)"
+printf '%s\n' "$dorigin2" >"$rd/.github/method-origin"
+echo more >>"$td/scripts/a.sh"
+echo tpl-origin2 >"$td/.github/method-origin"
+git -C "$td" add scripts .github
+git -C "$td" commit --quiet -m "chore: next"
+printf 'scripts/a.sh\n.github/update-notice.md\n.github/labels.tsv\n.github/method-origin\n' >"$rd/.github/method-files.txt"
+out="$(cd "$rd" && "$DIFF" --template "$td")"
+assert_contains "$out" "adapted .github/labels.tsv" "the list still shows labels.tsv as adapted"
+assert_contains "$out" "adapted .github/method-origin" "the list still shows method-origin as adapted"
+out="$(cd "$rd" && env -u PROCESS_CI_MODE "$DIFF" --notice --template "$td")"
+assert_not_contains "$out" "labels.tsv" "the notice skips an adapted file the template did not change"
+assert_not_contains "$out" "method-origin" "the notice never lists method-origin"
 finish
