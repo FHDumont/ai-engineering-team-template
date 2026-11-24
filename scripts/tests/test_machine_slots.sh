@@ -203,4 +203,30 @@ assert_status 0 "--report reads the phase that ended" "$repo/scripts/machine-slo
 assert_not_contains "$(last_output)" "over-target: phase" "60s without the owner wait is inside a 90s target"
 rm -f "$repo/.github/time-targets.tsv"
 
+# #221: the wait for the owner and the gap between a close and the next open of the
+# same issue are not work; the report shows wall time and work time and the
+# over-target line uses the work time.
+rm -rf "$SLOTS/fase"; mkdir -p "$SLOTS/fase/1"
+start=$(( $(date +%s) - 100 ))
+printf '%s\t142\t1\t%s\t%s\t0\n' "$me" "$start" "$TMP/phase-wt" >"$SLOTS/fase/1/info"
+iso() { date -u -v-"$1"S +%Y-%m-%dT%H:%M:%SZ 2>/dev/null || date -u -d "$1 seconds ago" +%Y-%m-%dT%H:%M:%SZ; }
+: >"$PROCESS_EVENTS_FILE"
+jq -cn --arg t "$(iso 60)" '{ts:$t, event:"phase_closed", issue:"142"}' >>"$PROCESS_EVENTS_FILE"
+jq -cn --arg t "$(iso 20)" '{ts:$t, event:"phase_opened", issue:"142"}' >>"$PROCESS_EVENTS_FILE"
+rm -f "$H"
+assert_status 0 "ending a reopened phase" slots_end_phase "$TMP/phase-wt"
+dur="$(awk -F'\t' '$2=="fase" {print $6}' "$H" 2>/dev/null || true)"
+if [ -n "$dur" ] && [ "$dur" -ge 50 ] && [ "$dur" -le 70 ]; then ok; else bad "duration leaves out the 40s between close and reopen (got ${dur:-none})"; fi
+wall="$(awk -F'\t' '$2=="fase" {print $7}' "$H" 2>/dev/null || true)"
+if [ -n "$wall" ] && [ "$wall" -ge 95 ]; then ok; else bad "history keeps the wall time (got ${wall:-none})"; fi
+rm -f "$H"
+printf 'ts\tclass\trepo\tissue\twait_s\tduration_s\twall_s\n' >"$H"
+printf '%s\tfase\t%s\t1\t0\t1800\t72000\n' "$(date +%s)" "$me" >>"$H"
+printf 'phase\t45\tmin\n' >"$repo/.github/time-targets.tsv"
+assert_status 0 "--report with 30 min of work and 20 h of wall" "$repo/scripts/machine-slots.sh" --report
+assert_not_contains "$(last_output)" "over-target: phase" "30 min of work is inside a 45 min target"
+assert_contains "$(last_output)" "wall med" "the report shows the wall time"
+assert_contains "$(last_output)" "72000" "the wall time is in the report"
+rm -f "$repo/.github/time-targets.tsv"
+
 finish

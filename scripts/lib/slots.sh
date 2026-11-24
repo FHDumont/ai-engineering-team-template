@@ -76,13 +76,14 @@ now_epoch() { date +%s; }
 
 pid_alive() { [ -n "$1" ] && [ "$1" -gt 0 ] 2>/dev/null && kill -0 "$1" 2>/dev/null; }
 
-# Appends a line to history.tsv: class, repo, issue, wait seconds, duration seconds.
-history_add() { # history_add <class> <repo> <issue> <wait> <duration>
+# Appends a line to history.tsv: class, repo, issue, wait seconds, duration (work)
+# seconds and wall seconds (equal to the duration when not given).
+history_add() { # history_add <class> <repo> <issue> <wait> <duration> [wall]
   local f
   f="$(slots_home)/history.tsv"
   mkdir -p "$(dirname "$f")" 2>/dev/null || return 0
-  [ -f "$f" ] || printf 'ts\tclass\trepo\tissue\twait_s\tduration_s\n' >"$f" 2>/dev/null || return 0
-  printf '%s\t%s\t%s\t%s\t%s\t%s\n' "$(now_epoch)" "$1" "$2" "$3" "$4" "$5" >>"$f" 2>/dev/null || true
+  [ -f "$f" ] || printf 'ts\tclass\trepo\tissue\twait_s\tduration_s\twall_s\n' >"$f" 2>/dev/null || return 0
+  printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\n' "$(now_epoch)" "$1" "$2" "$3" "$4" "$5" "${6:-$5}" >>"$f" 2>/dev/null || true
 }
 
 # True when the slot directory holds nothing alive. validate: its process is dead or
@@ -109,8 +110,8 @@ slots_trace_file() {
   events_file
 }
 
-# Seconds spent waiting for the owner: phase_status "esperando" until the next
-# event of that issue. Same intervals as trace-view.py --timings. 0 when unread.
+# Seconds not spent working: phase_status "esperando" until the next event of
+# that issue, and the gap between a phase_closed and the next phase_opened. Same intervals as trace-view.py --timings. 0 when unread.
 slots_owner_wait() { # slots_owner_wait <issue>
   local f out
   f="$(slots_trace_file 2>/dev/null || true)"
@@ -121,6 +122,9 @@ slots_owner_wait() { # slots_owner_wait <issue>
     | reduce range(0; length - 1) as $k (0;
         if ($e[$k].event == "phase_status" and ($e[$k].state | tostring | startswith("esperando")))
         then . + (($e[$k + 1].ts | fromdateiso8601) - ($e[$k].ts | fromdateiso8601))
+        elif $e[$k].event == "phase_closed"
+        then ([ $e[$k + 1:][] | select(.event == "phase_opened") ] | first) as $o
+          | if $o == null then . else . + (($o.ts | fromdateiso8601) - ($e[$k].ts | fromdateiso8601)) end
         else . end)
     | round
   ' "$f" 2>/dev/null)" || out=0
@@ -148,7 +152,7 @@ slots_end_phase() { # slots_end_phase <worktree>
     IFS="$(printf '\t')" read -r repo issue pid start wt wait <"$d/info" || true
     have="$(cd "$wt" 2>/dev/null && pwd -P || printf '%s' "$wt")"
     [ "$have" = "$want" ] || continue
-    history_add fase "$repo" "$issue" "${wait:-0}" "$(slots_phase_duration "$start" "$issue")"
+    history_add fase "$repo" "$issue" "${wait:-0}" "$(slots_phase_duration "$start" "$issue")" "$(( $(now_epoch) - start ))"
     rm -rf "$d"
   done
 }
@@ -162,7 +166,7 @@ slots_reap() { # slots_reap <class>
     slots_is_stale "$d" "$1" || continue
     if [ "$1" = fase ]; then
       IFS="$(printf '\t')" read -r repo issue pid start wt wait <"$d/info" || true
-      history_add fase "$repo" "$issue" "${wait:-0}" "$(slots_phase_duration "$start" "$issue")"
+      history_add fase "$repo" "$issue" "${wait:-0}" "$(slots_phase_duration "$start" "$issue")" "$(( $(now_epoch) - start ))"
     fi
     rm -rf "$d"
   done
