@@ -2,6 +2,6 @@
 
 <!-- Gerado por scripts/gen-roadmap.py; não editar à mão. -->
 
-## ci
+## process
 
-- [#227](https://github.com/FHDumont/ai-engineering-team-template/issues/227) over-target no grupo segunda-leva: fase 54 min e validate 347 s acima da meta (informativa) · baixa
+- [#241](https://github.com/FHDumont/ai-engineering-team-template/issues/241) Hash do parecer é o da última mensagem do close-reviewer: um aviso depois do parecer recusa a publicação · alta

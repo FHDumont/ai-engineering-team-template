@@ -50,6 +50,8 @@
 
 ## Outros
 
+- feat: time is informative, never a cut for the owner ([#240](https://github.com/FHDumont/ai-engineering-team-template/pull/240)) · 2026-11-24
+- fix: apply and notice follow the destination method-diff ([#239](https://github.com/FHDumont/ai-engineering-team-template/pull/239)) · 2026-11-24
 - fix: correct phase time, CI reruns, and deadlines ([#176](https://github.com/FHDumont/ai-engineering-team-template/pull/176)) · 2026-11-23
 - fix(process): bind merge notes, reviewer text and phase_session ([#170](https://github.com/FHDumont/ai-engineering-team-template/pull/170)) · 2026-11-22
 - fix: keep phase cleanup inside the worktree it created ([#167](https://github.com/FHDumont/ai-engineering-team-template/pull/167)) · 2026-11-22
