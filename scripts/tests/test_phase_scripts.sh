@@ -128,8 +128,9 @@ assert_not_contains "$open_out" "npm install" "opening does not suggest npm inst
 assert_not_contains "$open_out" "DeprecationWarning" "opening prints no maxsplit warning"
 assert_eq "" "$(cat "$TMP/install.log")" "opening installs nothing"
 wt8="$repo/.worktrees/issue-8"
-assert_status 0 "the child check-env warns, not fails, while a python dependency is missing" sh -c "cd '$wt8' && scripts/check-env.sh"
-assert_contains "$(last_output)" "warn: missing dependency: no-such-package-xyz (folder .): declared in requirements.txt" "the child still names the missing package"
+assert_status 1 "the child check-env still fails for the missing node_modules, and only warns for the python package" sh -c "cd '$wt8' && scripts/check-env.sh"
+assert_contains "$(last_output)" "warn: missing dependency: no-such-package-xyz (folder .): declared in requirements.txt" "the child names the missing python package as a warning"
+assert_contains "$(last_output)" "error: missing dependency: node_modules" "the child fails for the missing node_modules"
 assert_not_contains "$(last_output)" "pip install" "the child does not suggest pip install"
 if [ -d "$wt8" ]; then
   git -C "$repo" worktree remove --force "$wt8"
