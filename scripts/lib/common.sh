@@ -171,6 +171,16 @@ spec_open_phases() { # spec_open_phases <spec file> <open issue numbers>
   return 0
 }
 
+# Whether the trace holds a phase_opened of <issue>: the phase was opened once, so a
+# missing worktree means it is done, not that it has yet to open (#194).
+phase_was_opened() { # phase_was_opened <issue> [directory]
+  local trace
+  trace="$(events_file "${2:-.}")" || return 1
+  [ -f "$trace" ] || return 1
+  jq -rs --arg i "$1" '[.[] | select(type == "object" and .event == "phase_opened" and (.issue | tostring) == $i)] | length > 0' "$trace" 2>/dev/null |
+    grep -qx true
+}
+
 # Pairs a spec asks for an issue, one "model effort" per line, without repeats:
 # every "modelo: X · esforço: Y" of the issue's sections ("## ... #<n> ..."); when
 # they have none, the first one of a spec that cites the issue. The first line is
