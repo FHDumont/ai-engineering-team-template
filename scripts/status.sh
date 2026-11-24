@@ -95,17 +95,22 @@ if [ -z "$issue" ] && is_main_branch "$branch"; then
   while read -r wt; do
     p="$(phase_of_path "$wt")"
     [ -n "$p" ] || continue
-    n="${p%%"$TAB"*}" title="" p_state="aberta, sem sessão" p_need="" p_pair="" has_session=""
+    n="${p%%"$TAB"*}"
+    # One phase per phase branch: a worktree off a branch of issue <n> is not a phase.
+    case "$(current_branch "$wt")" in *issue-"$n"-*|*issue-"$n") ;; *) continue ;; esac
+    title="" p_state="aberta, sem sessão" p_need="" p_pair="" has_session=""
     if [ "$offline" = 0 ] && command -v gh >/dev/null 2>&1; then
       title="$(gh issue view "$n" --json title --jq .title 2>/dev/null || true)"
     fi
     [ -n "$title" ] || title="$(current_branch "$wt")"
     if [ -f "$trace" ]; then
-      last="$(jq -rs --arg i "$n" '[.[] | select(type == "object" and .event == "phase_status" and (.issue | tostring) == $i)]
-        | last | select(. != null) | "\(.state)\t\(.need // "")"' "$trace" 2>/dev/null || true)"
+      # Only what comes after the last phase_opened of the issue (a reopened issue).
+      since='[.[] | select(type == "object" and (.issue | tostring) == $i)] | (to_entries | map(select(.value.event == "phase_opened")) | last | .key // -1) as $o | [.[$o + 1:][]? ]'
+      last="$(jq -rs --arg i "$n" "$since"'
+        | map(select(.event == "phase_status")) | last | select(. != null) | "\(.state)\t\(.need // "")"' "$trace" 2>/dev/null || true)"
       if [ -n "$last" ]; then p_state="${last%%"$TAB"*}"; p_need="${last#*"$TAB"}"; fi
-      p_pair="$(jq -rs --arg i "$n" '[.[] | select(type == "object" and .event == "phase_session" and (.issue | tostring) == $i)]
-        | last | select(. != null) | "\(.model)/\(.effort)"' "$trace" 2>/dev/null || true)"
+      p_pair="$(jq -rs --arg i "$n" "$since"'
+        | map(select(.event == "phase_session")) | last | select(. != null) | "\(.model)/\(.effort)"' "$trace" 2>/dev/null || true)"
       [ -z "$p_pair" ] || has_session=1
     fi
     if [ -z "$has_session" ]; then
