@@ -41,7 +41,8 @@ blob_at() { # blob_at <repo> <rev> <path>
 to="${to:-$(git -C "$template" rev-parse HEAD)}"
 if [ "$find" = 1 ]; then
   first="$(git -C "$root" rev-list --reverse HEAD | while read -r c; do
-    git -C "$root" cat-file -e "$c:.github/method-origin" 2>/dev/null && echo "$c" && break
+    # An if, not an && list: a missing file must not leak cat-file's 128 as the loop status.
+    if git -C "$root" cat-file -e "$c:.github/method-origin" 2>/dev/null; then echo "$c"; break; fi
   done)"
   [ -n "$first" ] || first="$(git -C "$root" rev-list --max-parents=0 HEAD | tail -1)"
   best="" bestn=-1
