@@ -5,9 +5,9 @@ update of the method adds new method paths without deleting repo ones.
 
 The globs file has two classes, set by comment lines `# class: owner-ok` and
 `# class: gate`. A glob before any such line is owner-ok, so a file with no
-class lines (an adopter's old list) is all owner-ok, except the method's gate
-paths (METHOD_GATE_GLOBS), which are gate whatever the file says. A path in both classes,
-or in the method paths or a write-token workflow, is owner-ok.
+class lines (an adopter's old list) is all owner-ok, except the method's
+gate paths (METHOD_GATE_GLOBS), which are gate whatever the file says. A path
+in both classes, or in the method paths or a write-token workflow, is owner-ok.
 
 Usage: [SENSITIVE_CLASS=owner-ok|gate] sensitive_paths.py <globs-file> < paths
 Paths come one per line, or NUL separated. Prints the sensitive paths, one per
