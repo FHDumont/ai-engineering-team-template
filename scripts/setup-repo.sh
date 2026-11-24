@@ -23,6 +23,11 @@
 #:    without it --check stays dirty and none of that is applied. An "Upgrade to
 #:    GitHub" response does not record PROCESS_BRANCH_MODE by itself.
 #:
+#: CI mode (#190): a private repository records whether CI runs on push to main in
+#: .github/ci-mode (the update PR brings it), the variable PROCESS_CI_MODE, or
+#: `setup-repo.sh --ci-mode push|pr`, which sets the variable (the owner chose; no commit
+#: on main). --check fails with `missing: CI mode` when phase-start.sh would refuse for it.
+#:
 #: Usage: setup-repo.sh --offers | [--dry-run] --project | --decline project|runner|runner-trigger
 #: Offers (asked once; the agent shows one choice board per offer):
 #:    --offers   lists unanswered offers (`offer:project`, `offer:runner`);
@@ -64,6 +69,7 @@ while [ $# -gt 0 ]; do
     --project) mode=project; shift ;;
     --decline) mode=decline; decline="${2:-}"; shift 2 ;;
     --record-origin) mode=origin; origin="$2"; shift 2 ;;
+    --ci-mode) mode=cimode; cimode="${2:-}"; shift 2 ;;
     *) die "unknown option: $1 (see --help)" 2 ;;
   esac
 done
@@ -80,6 +86,16 @@ require_cmd gh jq
 repo="$(repo_slug)"
 branch="${SETUP_BRANCH:-main}"
 changes=0
+
+if [ "$mode" = cimode ]; then
+  case "${cimode:-}" in
+    push|pr) ;;
+    *) die "--ci-mode needs push or pr" 2 ;;
+  esac
+  gh variable set PROCESS_CI_MODE --repo "$repo" --body "$cimode" >/dev/null
+  echo "ok: recorded PROCESS_CI_MODE=$cimode for $repo"
+  exit 0
+fi
 
 # One-time offers of the Project and of the runner. The "no" stays in the repository variable.
 # The variable names and the repository are read once per run, whatever asks for them.
@@ -433,6 +449,15 @@ if [ "$mode" = check ]; then
   case "$only" in ""|settings) check_part "repository settings" sync_settings ;; esac
   case "$only" in ""|protection) check_part "protection of $branch" sync_protection ;; esac
   if [ -z "$only" ]; then
+    # Same decision as phase-start.sh: a private repository with no recorded CI mode is refused.
+    main_root="$(git worktree list --porcelain | sed -n '1s/^worktree //p')"
+    if [ ! -f "${main_root:-$ROOT}/.github/ci-mode" ] && [ -z "${PROCESS_CI_MODE:-}" ] && ! var_exists PROCESS_CI_MODE; then
+      read_repo_info 2>/dev/null || true
+      if [ "$(printf '%s' "$repo_info" | jq -r .private 2>/dev/null)" = "true" ]; then
+        echo "missing: CI mode: $(ci_mode_unrecorded_text)" >&2
+        changes=$((changes + 1))
+      fi
+    fi
     run_offers
     for o in $offers_pending; do
       echo "missing: answer to $o (asked once, by the setup skill)" >&2
