@@ -6,10 +6,11 @@
 #: Checks: tools of the method (git, gh, jq, python3, shellcheck: a missing one
 #: is named with the command that installs it), the declared dependencies of the
 #: product (requirements*.txt and package.json files tracked in git: a missing
-#: package or an absent node_modules is named with its folder). A missing product
-#: dependency warns, and nothing is installed, when CHECK_ENV_OPENING=1
-#: (new-phase.sh sets it while opening). The child session, without that
-#: variable, still fails until the environment exists. The message names the
+#: package or an absent node_modules is named with its folder). A Python package
+#: the system python3 lacks is only a `warn:` (validate.sh may use its own venv);
+#: an absent node_modules warns when CHECK_ENV_OPENING=1 (new-phase.sh sets it
+#: while opening) and fails in the child session until the environment exists.
+#: Nothing is ever installed. The message names the
 #: lockfile manager (npm ci, pnpm install --frozen-lockfile, yarn install
 #: --frozen-lockfile) and never suggests pip install into the global Python, nor
 #: npm install when a lockfile exists. A missing tool of the method still blocks.
@@ -107,7 +108,9 @@ PY
 )"
     if [ -n "$missing" ]; then
       names="$(echo "$missing" | paste -sd' ' -)"
-      missing_dep "$names (folder $dir): declared in $f"
+      # Only a warning: validate.sh may run the tests in a throwaway venv, so the system
+      # python3 lacking the package is not a block. Nothing is installed (#191).
+      echo "warn: missing dependency: $names (folder $dir): declared in $f"
       warned=1
     fi
   done <<<"$(git ls-files 'requirements*.txt' '*/requirements*.txt')"
