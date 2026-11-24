@@ -4,6 +4,7 @@
 
 ## Funcionalidades
 
+- feat: method-diff outdated class, new destination files and --notice ([#224](https://github.com/FHDumont/ai-engineering-team-template/pull/224)) · 2026-11-24
 - fix: close the remaining method gaps ([#178](https://github.com/FHDumont/ai-engineering-team-template/pull/178)) · 2026-11-23
 - feat(setup): ask the time target and the machine limits in setup ([#64](https://github.com/FHDumont/ai-engineering-team-template/pull/64)) · 2026-11-21
 - feat(scripts): per-project time targets, lab-test without owner scripts, close-phase progress ([#51](https://github.com/FHDumont/ai-engineering-team-template/pull/51)) · 2026-11-21
@@ -15,6 +16,9 @@
 
 ## Correções
 
+- feat: fetch-template.sh and allow list for the headless update child ([#225](https://github.com/FHDumont/ai-engineering-team-template/pull/225)) · 2026-11-24
+- fix: close-phase merge creates the gate label and refuses an edited opinion ([#223](https://github.com/FHDumont/ai-engineering-team-template/pull/223)) · 2026-11-24
+- fix: status of reopened phases, bots name scan set and work time in the slots report ([#222](https://github.com/FHDumont/ai-engineering-team-template/pull/222)) · 2026-11-24
 - fix: cancelled CI job is rerunnable and the merge wait leaves on it ([#210](https://github.com/FHDumont/ai-engineering-team-template/pull/210)) · 2026-11-24
 - fix: update brings repo files with a template default and find-base is fast ([#208](https://github.com/FHDumont/ai-engineering-team-template/pull/208)) · 2026-11-24
 - fix: friction stops of the previous group (end-check skipped CI, review path, stale base, slot wait, light finding) ([#205](https://github.com/FHDumont/ai-engineering-team-template/pull/205)) · 2026-11-24
