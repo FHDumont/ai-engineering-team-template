@@ -44,7 +44,8 @@ else
 fi
 assert_contains "$(cat "$REPO/AGENTS.md")" "docs/repo-notes.md" "AGENTS.md points at the project rules"
 n="$(wc -w <"$REPO/AGENTS.md" | tr -d ' ')"
-[ "$n" -le 480 ] && ok || bad "AGENTS.md has $n words (leave room under 500)"
+max="$(sed -n 's/^limit AGENTS.md [0-9]* \([0-9]*\)$/\1/p' "$SCRIPTS/check-docs.sh")"
+[ -n "$max" ] && [ "$n" -le $((max - 20)) ] && ok || bad "AGENTS.md has $n words (leave room under ${max:-?}, the limit of check-docs.sh)"
 assert_contains "$adopt" "git worktree add" "adoption uses a worktree"
 assert_not_contains "$adopt" "git switch -c" "adoption does not switch the main checkout"
 assert_contains "$adopt" "não apague" "adoption does not wipe an existing glossary"
@@ -71,7 +72,7 @@ check_spans() { # check_spans <text>
       python3) first="$(printf '%s' "$span" | awk '{print $2}')" ;;
       git|gh|'#'*|'--'*|'<'*) continue ;;
       # Lines of the adopter's .gitignore and names that are not files of this repo.
-      .process/|.worktrees/|__pycache__/|review/independent|package.json) continue ;;
+      .process/|.worktrees/|__pycache__/|review/independent|package.json|.github/ci-mode) continue ;;
     esac
     case "$first" in *'<'*|*'*'*|*'{'*|'') continue ;; esac
     case "$first" in
