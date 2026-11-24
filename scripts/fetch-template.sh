@@ -9,7 +9,7 @@
 #: No worktree is registered and nothing is cloned: .process/ is outside git, and the
 #: phase is listed once. --url defaults to https://github.com/FHDumont/ai-engineering-team-template
 #: (a local path works). --apply then copies the method paths of <sha> (its
-#: .github/method-files.txt, plus files of the method folders the worktree lacks) over this
+#: .github/method-files.txt, plus files of the method folders the worktree lacks or has outdated: equal to the origin, different at <sha>) over this
 #: worktree; files only of the repository stay. The copy is a headless-safe step:
 #: this script is in the allow list, `git checkout <sha> -- <paths>` is not.
 set -euo pipefail
@@ -52,11 +52,18 @@ info "template $dest extracted in .process/template"
 paths="$(git -C "$dir" show "$dest:.github/method-files.txt" 2>/dev/null | grep -vE '^[[:space:]]*(#|$)' || true)"
 [ -n "$paths" ] || die "$dest has no .github/method-files.txt" 1
 dirs="$(printf '%s\n' "$paths" | awk -F/ 'NF>1 { print $1 }' | sort -u)"
+origin_ref=""
+git -C "$dir" rev-parse --verify --quiet refs/heads/origin >/dev/null && origin_ref=refs/heads/origin
 while read -r f; do
   [ -n "$f" ] || continue
   case "$f" in scripts/tests/template/*|docs/specs/*) continue ;; esac
-  [ ! -e "$root/$f" ] || continue # only files the repository lacks (method-diff: missing)
   printf '%s\n' "$dirs" | stdin_grep -qx "${f%%/*}" || continue
+  if [ -e "$root/$f" ]; then
+    # Present: only an outdated file (repository = origin, destination differs); adapted stays.
+    [ -n "$origin_ref" ] || continue
+    ob="$(git -C "$dir" rev-parse --verify --quiet "$origin_ref:$f" 2>/dev/null)" || continue
+    [ "$(git -C "$root" hash-object "$root/$f")" = "$ob" ] || continue
+  fi
   paths="$paths
 $f"
 done < <(git -C "$dir" ls-tree -r --name-only "$dest")
