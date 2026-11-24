@@ -174,7 +174,7 @@ spec_open_phases() { # spec_open_phases <spec file> <open issue numbers>
 # Text of the refusal when a private repository has not recorded whether CI runs on push to
 # main. phase-start.sh refuses with it and setup-repo.sh --check fails with the same text (#190).
 ci_mode_unrecorded_text() {
-  printf '%s' "this private repository has not recorded whether CI runs on push to main. That push spends Actions minutes (about 2 when the tree was already tested, about 5 to 10 when the suite runs). Record the choice, push or pr (pull requests only; a base with no check is accepted when the merged PR had CI green, with a warning if the tree differs): run scripts/setup-repo.sh --ci-mode push|pr (sets the repository variable PROCESS_CI_MODE, no commit on main), or let the update PR bring .github/ci-mode"
+  printf '%s' "this private repository has not recorded whether CI runs on push to main. That push spends Actions minutes (about 2 when the tree was already tested, about 5 to 10 when the suite runs). Record the choice, push or pr (pull requests only: the next PR tests the sum, and the deploy runs validate.sh; a base with no check is accepted when the merged PR had CI green, with a warning if the tree differs): run scripts/setup-repo.sh --ci-mode push|pr (sets the repository variable PROCESS_CI_MODE, no commit on main), or let the update PR bring .github/ci-mode"
 }
 
 # Whether the trace holds a phase_opened of <issue>: the phase was opened once, so a
