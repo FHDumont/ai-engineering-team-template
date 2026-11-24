@@ -44,6 +44,9 @@ child_session() { # child_session <issue> [session_id of the working session]
   ev phase_session "${2:-child}" "$1"
   [ -n "${NO_REVIEW:-}" ] || { push_ev "$SHA"; round_ev "${2:-child}"; }
 }
+# The saved close-reviewer output as the hook records it: sha256 of the text without trailing newlines.
+opinion_sha() { printf '%s' "$(cat "$1")" | shasum -a 256 | cut -d' ' -f1; }
+out_ev() { jq -cn --arg s "${2:-child}" --arg h "$(opinion_sha "$1")" '{event: "SubagentStop", session_id: $s, agent_type: "close-reviewer", output_sha: $h}' >>"$TRACE"; }
 reset_phase_evidence() { rm -f "$PROCESS_EVENTS_FILE" "$TRACE" "$TMP/subagent-phases"; }
 # Every close-phase.sh call below runs as the child session, unless it says otherwise.
 export CLAUDE_CODE_SESSION_ID=child
@@ -83,7 +86,12 @@ case "\$*" in
     printf '%s\n' \${FAKE_PROTECTION:-CI review/independent} ;;
   # needs-owner-ok put on the PR by close-phase.sh (through label-issue.sh).
   "issue edit 12"*"--add-label needs-owner-ok"*) touch "$TMP/owner-label" ;;
-  "issue edit 12"*"--add-label needs-gate-review"*) touch "$TMP/gate-label" ;;
+  # FAKE_GATE_LABEL_MISSING: the repository has no needs-gate-review until "label create" makes it.
+  "label list"*) { [ -z "\${FAKE_GATE_LABEL_MISSING:-}" ] || [ -f "$TMP/gate-created" ]; } && echo needs-gate-review; echo bug ;;
+  "label create needs-gate-review"*) touch "$TMP/gate-created" ;;
+  "issue edit 12"*"--add-label needs-gate-review"*)
+    if [ -n "\${FAKE_GATE_LABEL_MISSING:-}" ] && [ ! -f "$TMP/gate-created" ]; then echo "could not add label: 'needs-gate-review' not found" >&2; exit 1; fi
+    touch "$TMP/gate-label" ;;
   "issue view 12"*"--json labels"*)
     [ ! -f "$TMP/owner-label" ] || echo needs-owner-ok
     [ ! -f "$TMP/gate-label" ] || echo needs-gate-review ;;
@@ -100,5 +108,5 @@ case "\$*" in
 esac
 H
   use_fake_gh "$TMP/handler.sh"
-  rm -f "$TMP/reads" "$TMP/owner-label" "$TMP/gate-label" "$TMP/cmt_reads"
+  rm -f "$TMP/reads" "$TMP/owner-label" "$TMP/gate-label" "$TMP/gate-created" "$TMP/cmt_reads"
 }

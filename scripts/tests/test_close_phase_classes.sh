@@ -23,6 +23,15 @@ assert_contains "$(gh_calls)" "--add-label needs-gate-review" "puts needs-gate-r
 assert_not_contains "$(gh_calls)" "needs-owner-ok" "a gate PR does not get needs-owner-ok"
 assert_not_contains "$(gh_calls)" "pr merge" "no merge without the second review"
 
+# #220: the gate label is missing in the repository (an update from before the class):
+# --merge creates it from labels.tsv of the PR HEAD, then puts it on the PR.
+handler "type:feature" success
+: >"$FAKE_GH_LOG"
+assert_status 5 "a missing needs-gate-review label does not stop the refusal" env FAKE_GATE_LABEL_MISSING=1 sh -c "cd '$repo' && '$CLOSE' --merge"
+assert_contains "$(gh_calls)" "label create needs-gate-review --repo owner/repo --color e11d21" "creates the missing label with the color of labels.tsv"
+assert_contains "$(gh_calls)" "--add-label needs-gate-review" "then puts it on the PR"
+assert_contains "$(last_output)" "needs-gate-review is now on PR #12 (read back)" "read back"
+
 # The second review is published like the first one, with --gate, and saved apart.
 handler "type:feature,needs-gate-review" success
 cp "$GATE_OPINION" "$repo/.process/reviewer-gate-$SHA.md"

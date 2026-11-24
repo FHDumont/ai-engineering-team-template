@@ -101,6 +101,29 @@ assert_status 0 "merges without a session id when HEAD was pushed and pre-review
   env -u CLAUDE_CODE_SESSION_ID sh -c "cd '$repo' && '$CLOSE' --merge"
 assert_contains "$(gh_calls)" "pr merge 12" "merges without a session id"
 
+# #219: a suffix on the Veredito line is refused with what to do; an opinion edited after it was saved is refused.
+reset_phase_evidence
+push_ev "$SHA"
+round_ev
+printf '## Revisão independente\n\nVeredito: aprovado, com uma ressalva\n' >"$TMP/suffix.md"
+cp "$TMP/suffix.md" "$repo/.process/reviewer-$SHA.md"
+assert_status 1 "a Veredito line with a suffix is refused" sh -c "cd '$repo' && '$CLOSE' --publish-review '$TMP/suffix.md' --round 1"
+assert_contains "$(last_output)" "run the close-reviewer again; never edit the opinion" "says to run the reviewer again"
+reset_phase_evidence
+push_ev "$SHA"
+printf '## Revisão independente\n\nVeredito: aprovado\nRessalva: x\n' >"$TMP/orig.md"
+round_ev
+out_ev "$TMP/orig.md"
+printf '## Revisão independente\n\nVeredito: aprovado\nRessalva: editada\n' >"$TMP/edited.md"
+cp "$TMP/edited.md" "$repo/.process/reviewer-$SHA.md"
+: >"$FAKE_GH_LOG"
+assert_status 1 "an opinion edited after it was saved is refused" sh -c "cd '$repo' && '$CLOSE' --publish-review '$TMP/edited.md' --round 1"
+assert_contains "$(last_output)" "does not match the close-reviewer output recorded in the trace" "says the hash differs"
+assert_not_contains "$(gh_calls)" "statuses" "no status for an edited opinion"
+cp "$TMP/orig.md" "$repo/.process/reviewer-$SHA.md"
+assert_status 0 "the opinion as recorded is published" sh -c "cd '$repo' && '$CLOSE' --publish-review '$TMP/orig.md' --round 1"
+handler "type:feature" success
+
 # #131: a second --prepare that sends nothing must not record phase_push, or the
 # review of that same SHA is refused. A later prepare that does push still asks
 # for a new round.
