@@ -46,6 +46,11 @@ assert_contains "$(cat "$REPO/AGENTS.md")" "docs/repo-notes.md" "AGENTS.md point
 n="$(wc -w <"$REPO/AGENTS.md" | tr -d ' ')"
 max="$(sed -n 's/^limit AGENTS.md [0-9]* \([0-9]*\)$/\1/p' "$SCRIPTS/check-docs.sh")"
 [ -n "$max" ] && [ "$n" -le $((max - 20)) ] && ok || bad "AGENTS.md has $n words (leave room under ${max:-?}, the limit of check-docs.sh)"
+# The update chapter records the CI mode, creates the repo notes, names the manifest and asks no test phase.
+assert_contains "$update" ".github/ci-mode" "the update guide records the CI mode"
+assert_contains "$update" "docs/repo-notes.md" "the update guide creates docs/repo-notes.md"
+assert_contains "$update" ".github/method-files.txt" "the update guide says a script only of the repo goes in the manifest"
+assert_not_contains "$update" "fase \`test\`" "the update guide asks for no post-merge test phase"
 assert_contains "$adopt" "git worktree add" "adoption uses a worktree"
 assert_not_contains "$adopt" "git switch -c" "adoption does not switch the main checkout"
 assert_contains "$adopt" "não apague" "adoption does not wipe an existing glossary"

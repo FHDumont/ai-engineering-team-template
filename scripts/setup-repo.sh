@@ -23,7 +23,7 @@
 #:    without it --check stays dirty and none of that is applied. An "Upgrade to
 #:    GitHub" response does not record PROCESS_BRANCH_MODE by itself.
 #:
-#: CI mode (#190): a private repository records whether CI runs on push to main in
+#: CI mode: a private repository records whether CI runs on push to main in
 #: .github/ci-mode (the update PR brings it), the variable PROCESS_CI_MODE, or
 #: `setup-repo.sh --ci-mode push|pr`, which sets the variable (the owner chose; no commit
 #: on main). --check fails with `missing: CI mode` when phase-start.sh would refuse for it.
