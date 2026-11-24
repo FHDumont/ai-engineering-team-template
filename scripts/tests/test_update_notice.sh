@@ -31,4 +31,11 @@ assert_contains "$notice" "scripts/tests/template/" "the notice leaves the templ
 assert_contains "$notice" ".claude/settings.json" "the notice says the new settings.json comes after the owner ok"
 assert_contains "$notice" "suíte fica vermelha" "the notice warns the suite fails without the new settings.json"
 assert_contains "$notice" "validate.sh --full" "the notice asks for the full suite"
+# #213 (#216, #217): the notice is generated from the interval; the gate label comes from close-phase.sh.
+assert_contains "$notice" "method-diff.sh --notice" "the notice points to the generated list"
+assert_contains "$notice" "check-docs.sh da origem" "the notice asks to check the docs with the origin limits"
+assert_contains "$notice" "close-phase.sh" "the notice says the gate label enters at the merge"
+out="$(cd "$REPO" && "$SCRIPTS/method-diff.sh" --template "$REPO" --from HEAD --to HEAD | grep ' .github/update-notice.md$' || true)"
+assert_not_contains "$out" "repo-owned" "the notice is text of the method, not repo-owned"
+assert_contains "$(cat "$REPO/.github/method-files.txt")" ".github/update-notice.md" "the notice is in the method manifest"
 finish
