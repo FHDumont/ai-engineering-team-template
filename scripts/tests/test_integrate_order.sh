@@ -7,12 +7,12 @@ skill="$(cat "$REPO/.claude/skills/integrate/SKILL.md")"
 design="$(cat "$REPO/docs/process-design.md")"
 line() { printf '%s\n' "$skill" | grep -n "$1" | head -1 | cut -d: -f1; }
 g="$(line 'scripts/gen-docs.sh')"
-t="$(line 'Abrir issue para cortar tempo')"
+t="$(line 'Tempo é só informativo')"
 a="$(line 'Achados leves')"
 before() { # before <earlier> <later> <description>
   if [ -n "$1" ] && [ -n "$2" ] && [ "$1" -lt "$2" ]; then ok; else bad "$3 (lines '$1' then '$2')"; fi
 }
-before "$t" "$g" "the time-target issue is opened before gen-docs.sh"
+before "$t" "$g" "the time lines are read before gen-docs.sh"
 before "$a" "$g" "group findings are opened before gen-docs.sh"
 assert_contains "$skill" "Nada que muda o roadmap" "the skill says nothing that changes the roadmap happens after gen-docs"
 assert_contains "$design" "Nada que muda o roadmap" "the design says nothing that changes the roadmap happens after gen-docs"
