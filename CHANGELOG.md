@@ -16,6 +16,7 @@
 
 ## Correções
 
+- fix: fetch-template --apply brings outdated files outside the manifest ([#229](https://github.com/FHDumont/ai-engineering-team-template/pull/229)) · 2026-11-24
 - feat: fetch-template.sh and allow list for the headless update child ([#225](https://github.com/FHDumont/ai-engineering-team-template/pull/225)) · 2026-11-24
 - fix: close-phase merge creates the gate label and refuses an edited opinion ([#223](https://github.com/FHDumont/ai-engineering-team-template/pull/223)) · 2026-11-24
 - fix: status of reopened phases, bots name scan set and work time in the slots report ([#222](https://github.com/FHDumont/ai-engineering-team-template/pull/222)) · 2026-11-24
