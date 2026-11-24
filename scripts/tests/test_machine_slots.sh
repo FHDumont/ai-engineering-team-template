@@ -219,6 +219,16 @@ dur="$(awk -F'\t' '$2=="fase" {print $6}' "$H" 2>/dev/null || true)"
 if [ -n "$dur" ] && [ "$dur" -ge 50 ] && [ "$dur" -le 70 ]; then ok; else bad "duration leaves out the 40s between close and reopen (got ${dur:-none})"; fi
 wall="$(awk -F'\t' '$2=="fase" {print $7}' "$H" 2>/dev/null || true)"
 if [ -n "$wall" ] && [ "$wall" -ge 95 ]; then ok; else bad "history keeps the wall time (got ${wall:-none})"; fi
+# A close and reopen before the slot was taken are not part of its duration.
+rm -rf "$SLOTS/fase"; mkdir -p "$SLOTS/fase/1"
+printf '%s\t142\t1\t%s\t%s\t0\n' "$me" "$(( $(date +%s) - 100 ))" "$TMP/phase-wt" >"$SLOTS/fase/1/info"
+: >"$PROCESS_EVENTS_FILE"
+jq -cn --arg t "$(iso 300)" '{ts:$t, event:"phase_closed", issue:"142"}' >>"$PROCESS_EVENTS_FILE"
+jq -cn --arg t "$(iso 200)" '{ts:$t, event:"phase_opened", issue:"142"}' >>"$PROCESS_EVENTS_FILE"
+rm -f "$H"
+assert_status 0 "ending a phase reopened before its slot" slots_end_phase "$TMP/phase-wt"
+dur="$(awk -F'\t' '$2=="fase" {print $6}' "$H" 2>/dev/null || true)"
+if [ -n "$dur" ] && [ "$dur" -ge 95 ]; then ok; else bad "a gap before the slot start is not subtracted (got ${dur:-none})"; fi
 rm -f "$H"
 printf 'ts\tclass\trepo\tissue\twait_s\tduration_s\twall_s\n' >"$H"
 printf '%s\tfase\t%s\t1\t0\t1800\t72000\n' "$(date +%s)" "$me" >>"$H"

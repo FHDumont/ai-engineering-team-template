@@ -112,19 +112,20 @@ slots_trace_file() {
 
 # Seconds not spent working: phase_status "esperando" until the next event of
 # that issue, and the gap between a phase_closed and the next phase_opened. Same intervals as trace-view.py --timings. 0 when unread.
-slots_owner_wait() { # slots_owner_wait <issue>
+slots_owner_wait() { # slots_owner_wait <issue> [since epoch]
   local f out
   f="$(slots_trace_file 2>/dev/null || true)"
   [ -n "$f" ] && [ -f "$f" ] || { echo 0; return 0; }
-  out="$(jq -Rrs --arg i "$1" '
+  out="$(jq -Rrs --arg i "$1" --argjson since "${2:-0}" '
+    def clip($a; $b): ([$b - ([$a, $since] | max), 0] | max);
     [ split("\n")[] | fromjson? | select((.issue | tostring) == $i and (.ts | type) == "string") ]
     | sort_by(.ts) | . as $e
     | reduce range(0; length - 1) as $k (0;
         if ($e[$k].event == "phase_status" and ($e[$k].state | tostring | startswith("esperando")))
-        then . + (($e[$k + 1].ts | fromdateiso8601) - ($e[$k].ts | fromdateiso8601))
+        then . + clip($e[$k].ts | fromdateiso8601; $e[$k + 1].ts | fromdateiso8601)
         elif $e[$k].event == "phase_closed"
         then ([ $e[$k + 1:][] | select(.event == "phase_opened") ] | first) as $o
-          | if $o == null then . else . + (($o.ts | fromdateiso8601) - ($e[$k].ts | fromdateiso8601)) end
+          | if $o == null then . else . + clip($e[$k].ts | fromdateiso8601; $o.ts | fromdateiso8601) end
         else . end)
     | round
   ' "$f" 2>/dev/null)" || out=0
@@ -134,7 +135,7 @@ slots_owner_wait() { # slots_owner_wait <issue>
 # Wall seconds since the slot was taken, minus the wait for the owner. Never negative.
 slots_phase_duration() { # slots_phase_duration <start epoch> <issue>
   local dur own
-  own="$(slots_owner_wait "$2")"
+  own="$(slots_owner_wait "$2" "${1:-0}")"
   dur=$(( $(now_epoch) - ${1:-$(now_epoch)} - own ))
   [ "$dur" -ge 0 ] || dur=0
   echo "$dur"
