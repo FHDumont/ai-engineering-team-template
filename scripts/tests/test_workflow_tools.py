@@ -301,6 +301,8 @@ def app_filter_sample():
     """A path the app filter of this repo's ci.yml matches, read from the filter itself."""
     text = open(os.path.join(ROOT, ".github", "workflows", "ci.yml"), encoding="utf-8").read()
     m = re.search(r"echo \"app=\$\(has '\^\(([^)]*)\)'\)\"", text)
+    if m is None:  # a repo that adopts the method has its own ci.yml, maybe without this line
+        return "app/README.md"
     first = m.group(1).split("|")[0].replace("\\.", ".")
     return first + ("README.md" if first.endswith("/") else "")
 

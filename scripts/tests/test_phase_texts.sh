@@ -178,6 +178,11 @@ old_interval_in() {
   # is scanned whole, still skipping the generated files.
   if [ -e "$root/scripts" ] || [ -e "$root/AGENTS.md" ]; then
     scope="$(method_existing "$root" | tr '\n' ' ') :!scripts/tests/template"
+    # The ADRs of the repo are its own text, not the method's, unless the manifest lists them.
+    local adr
+    for adr in $(cd "$root" && git ls-files --cached --others --exclude-standard 'docs/adr/ADR-[0-9][0-9][0-9]*.md'); do
+      grep -qxF "$adr" "$root/.github/method-files.txt" 2>/dev/null || scope="$scope :!$adr"
+    done
   fi
   # shellcheck disable=SC2086
   (cd "$root" && git grep -n -I --untracked -E "$was min|$was minutes|[*]/$was|every $was" -- $scope ':!ROADMAP.md' ':!CHANGELOG.md' || true)
