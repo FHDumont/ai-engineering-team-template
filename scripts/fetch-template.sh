@@ -49,30 +49,32 @@ git -C "$dir" checkout --quiet --force --detach "$dest"
 info "template $dest extracted in .process/template"
 [ "$apply" = 1 ] || exit 0
 
-paths="$(git -C "$dir" show "$dest:.github/method-files.txt" 2>/dev/null | grep -vE '^[[:space:]]*(#|$)' || true)"
-[ -n "$paths" ] || die "$dest has no .github/method-files.txt" 1
-dirs="$(printf '%s\n' "$paths" | awk -F/ 'NF>1 { print $1 }' | sort -u)"
 origin_ref=""
 git -C "$dir" rev-parse --verify --quiet refs/heads/origin >/dev/null && origin_ref=refs/heads/origin
-while read -r f; do
-  [ -n "$f" ] || continue
-  case "$f" in scripts/tests/template/*|docs/specs/*) continue ;; esac
-  is_method_doc "$f" || { printf '%s\n' "$dirs" | stdin_grep -qx "${f%%/*}" || continue; }
-  if [ -e "$root/$f" ]; then
-    # Present: only an outdated file (repository = origin, destination differs); adapted stays.
-    [ -n "$origin_ref" ] || continue
-    ob="$(git -C "$dir" rev-parse --verify --quiet "$origin_ref:$f" 2>/dev/null)" || continue
-    [ "$(git -C "$root" hash-object "$root/$f")" = "$ob" ] || continue
-  fi
-  paths="$paths
-$f"
-done < <(git -C "$dir" ls-tree -r --name-only "$dest")
+md="$dir/scripts/method-diff.sh"
+[ -f "$md" ] || die "$dest has no scripts/method-diff.sh" 1
+# The method-diff.sh and the lib of the destination decide, not the ones of this repository (which may be old).
+run_diff() { (cd "$root" && REPO_ROOT="$root" bash "$md" --template "$dir" --to "$dest" "$@"); }
+diff_args=()
+[ -n "$origin_ref" ] || diff_args=(--from "$dest")
+report="$(run_diff ${diff_args[@]+"${diff_args[@]}"})"
 n=0
-while read -r f; do
-  [ -n "$f" ] || continue
+while read -r class f; do
+  case "$class" in outdated|missing) ;; *) continue ;; esac
   [ -f "$dir/$f" ] || continue
   mkdir -p "$root/$(dirname "$f")"
   cp -p "$dir/$f" "$root/$f"
   n=$((n + 1))
-done < <(printf '%s\n' "$paths" | awk 'NF && !seen[$0]++')
+done <<<"$report"
+# A method label the repository lacks goes to the end of its labels.tsv, with the destination row.
+while read -r class name; do
+  [ "$class" = missing-label ] || continue
+  row="$(git -C "$dir" show "$dest:.github/labels.tsv" | awk -F'\t' -v n="$name" '$1 == n { print; exit }')"
+  [ -n "$row" ] || continue
+  mkdir -p "$root/.github"
+  [ -f "$root/.github/labels.tsv" ] && [ -n "$(tail -c1 "$root/.github/labels.tsv")" ] && echo >>"$root/.github/labels.tsv"
+  printf '%s\n' "$row" >>"$root/.github/labels.tsv"
+done <<<"$report"
+run_diff ${diff_args[@]+"${diff_args[@]}"} --remove >/dev/null
 info "applied $n method files from $dest"
+run_diff ${diff_args[@]+"${diff_args[@]}"} --notice
