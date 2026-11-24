@@ -624,7 +624,7 @@ O `issues-label.yml` roda em `opened` e em `edited` só quando o corpo mudou, co
 
 O registro é só `scripts/setup-runner.sh --register`. Ele recusa repo público e repo de visibilidade ilegível, porque o runner rodaria o código de qualquer PR. Um runner recusado no setup só volta a ser oferecido pelo gatilho da triagem (`triage.sh --runner-offer`): média de run acima de 5 minutos ou cota acima de 50%.
 
-Num runner próprio sem `actions/*` e sem `gh` (FHDumont/ai-engineering-team-template#247): defina `CI_RUNS_ON` e, se o runner não baixa actions, `CI_CHECKOUT_CMD` antes de abrir o PR de adoção. O `runs-on` padrão fica `ubuntu-latest` no template; o repositório não o troca no arquivo. Job extra de `.github/ci-extra-jobs` que precisa de outro runner tem `runs-on` próprio e roda sempre, porque o `ci-gate.sh` reprova job extra `skipped`: em PR só de doc (`docs_only`), são os passos do job que pulam, não o job.
+Num runner próprio sem `actions/*` e sem `gh` (FHDumont/ai-engineering-team-template#247): defina `CI_RUNS_ON` e, se o runner não baixa actions, `CI_CHECKOUT_CMD` antes de abrir o PR de adoção. O `runs-on` padrão fica `ubuntu-latest` no template; o repositório não o troca no arquivo. Job extra de `.github/ci-extra-jobs` que precisa de outro runner tem `runs-on` próprio e roda sempre, porque o `ci-gate.sh` reprova job extra `skipped`: em PR só de doc (`docs_only`), são os passos do job que pulam, não o job. `CI_CHECKOUT_CMD` é código executado na CI, definido só pelo dono do repositório; com `CI_CHECKOUT_FULL=true` o checkout traz o histórico completo, que inclui o commit base.
 
 ### 9.4 Deploy (regra-base 3)
 
