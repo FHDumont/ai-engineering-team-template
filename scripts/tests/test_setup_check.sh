@@ -18,7 +18,13 @@ assert_eq "" "$(gh_calls | grep -E 'label (create|edit|delete)|-X (PUT|PATCH)|va
 # #190: a private repository that has not recorded the CI mode is not configured, with the
 # text phase-start.sh refuses with; recording it (variable) makes --check pass again.
 fake_setup nocimode
-assert_status 7 "check exits 7 when the CI mode is not recorded" env -u PROCESS_CI_MODE "$SETUP" --check
+# An updated repository has .github/ci-mode: run in a copy without it (FHDumont/ai-engineering-team-template#207).
+nocm="$(make_repo)"
+copy_scripts "$nocm"
+mkdir -p "$nocm/.github"
+cp "$REPO"/.github/labels.tsv "$REPO"/.github/bots.tsv "$nocm/.github/"
+rm -f "$nocm/.github/ci-mode"
+assert_status 7 "check exits 7 when the CI mode is not recorded" env -u PROCESS_CI_MODE "$nocm/scripts/setup-repo.sh" --check
 assert_contains "$(last_output)" "missing: CI mode" "check names the missing CI mode"
 assert_contains "$(last_output)" "PROCESS_CI_MODE" "check cites the variable"
 assert_contains "$(last_output)" "setup-repo.sh --ci-mode" "check cites the setup step that records it"
