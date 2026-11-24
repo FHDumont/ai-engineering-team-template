@@ -756,11 +756,24 @@ refuse_pending_notes() {
   fi
 }
 
+# Creates a label the repository lacks (a repo updated from before the class) from its row in
+# .github/labels.tsv of the PR HEAD, so putting it on the PR does not stop the merge.
+ensure_repo_label() { # ensure_repo_label <label> <sha>
+  local name="$1" sha="$2" row color desc
+  gh label list --repo "$repo" --limit 500 --json name --jq '.[].name' 2>/dev/null | stdin_grep -qxF "$name" && return 0
+  row="$(git show "$sha:.github/labels.tsv" 2>/dev/null | awk -F '\t' -v n="$name" '$1 == n { print; exit }')"
+  [ -n "$row" ] || row="$(awk -F '\t' -v n="$name" '$1 == n { print; exit }' "$ROOT/.github/labels.tsv" 2>/dev/null)"
+  [ -n "$row" ] || return 0
+  color="$(printf '%s' "$row" | cut -f2)"; desc="$(printf '%s' "$row" | cut -f3)"
+  gh label create "$name" --repo "$repo" --color "$color" --description "$desc" >/dev/null 2>&1 || true
+}
+
 # A PR that touches the gate needs a published second review (--publish-review --gate)
 # of this HEAD with verdict success: the saved opinion and its gate_review event.
 gate_review_required() { # gate_review_required <pr> <sha> <labels> <gate paths>
   local n="$1" sha="$2" labels="$3" paths="$4" events saved ok=0 got=""
   if ! echo "$labels" | stdin_grep -qxF needs-gate-review; then
+    ensure_repo_label needs-gate-review "$sha"
     "$HERE/label-issue.sh" "$n" --add needs-gate-review >/dev/null ||
       die "PR #$n needs a gate review, but needs-gate-review could not be put on it"
     echo "needs-gate-review is now on PR #$n (read back)"
