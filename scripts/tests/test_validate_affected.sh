@@ -72,5 +72,9 @@ git -C "$repo" add docs
 git -C "$repo" commit --quiet -m "docs(specs): add"
 assert_eq "alpha gamma_gate " "$(run --tests)" "a spec under docs/ does not widen the selection"
 
-# A partial green run is recorded for --prepare (scope=affected), a full one as full.
-assert_status 0 "the partial run is green" env -u CI -u PROCESS_VALIDATE_RUNNING bash -c 'cd "$1" && scripts/validate.sh --lint --tests' _ "$repo"
+# A partial green run is recorded for --prepare: phase_validate on HEAD with scope=affected.
+ev="$TMP/events.jsonl"
+assert_status 0 "the partial run is green" env -u CI -u PROCESS_VALIDATE_RUNNING PROCESS_EVENTS_FILE="$ev" bash -c 'cd "$1" && scripts/validate.sh --lint --tests' _ "$repo"
+assert_eq "affected $(git -C "$repo" rev-parse HEAD)" "$(jq -rs '[.[] | select(.event == "phase_validate")] | last | "\(.scope) \(.sha)"' "$ev")" "the partial green run is recorded on HEAD with scope=affected"
+assert_status 0 "--full is green" env -u CI -u PROCESS_VALIDATE_RUNNING PROCESS_EVENTS_FILE="$ev" bash -c 'cd "$1" && scripts/validate.sh --lint --tests --full' _ "$repo"
+assert_eq "full" "$(jq -rs '[.[] | select(.event == "phase_validate")] | last | .scope' "$ev")" "a full run is recorded with scope=full"
