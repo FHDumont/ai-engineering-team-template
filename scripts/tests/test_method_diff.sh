@@ -58,7 +58,7 @@ assert_eq "yes" "$([ -f "$repo/scripts/gone.sh" ] && echo yes)" "the diverged fi
 found="$(cd "$repo" && "$DIFF" --find-base --template "$template")"
 assert_contains "$found" "$origin" "find-base names the template commit the repo came from"
 
-# #181: no commit of the repo has .github/method-origin; find-base falls back to the first commit.
+# Cause one: no commit of the repo has .github/method-origin; find-base falls back to the first commit.
 t2="$(make_repo)"
 mkdir -p "$t2/scripts"
 echo one >"$t2/scripts/a.sh"
@@ -78,7 +78,7 @@ found="$(cd "$r2" && "$DIFF" --find-base --template "$t2" 2>&1)" || rc=$?
 assert_eq "0" "$rc" "find-base without .github/method-origin exits 0"
 assert_contains "$found" "$base1" "find-base without .github/method-origin names the matching commit"
 
-# #179: the repo's first commit has a file the oldest template commits lack (absent on one side differs).
+# Cause two: the repo's first commit has a file the oldest template commits lack (absent on one side differs).
 t3="$(make_repo)"
 echo seed >"$t3/seed.txt"
 git -C "$t3" add seed.txt
