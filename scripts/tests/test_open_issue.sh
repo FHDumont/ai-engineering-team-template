@@ -4,8 +4,14 @@
 source "$(dirname "$0")/lib.sh"
 OPEN="$SCRIPTS/open-issue.sh"
 
-area="$(grep -m1 '^area:' "$REPO/.github/labels.tsv" | cut -f1)"
-group_label="$(grep -m1 '^group:' "$REPO/.github/labels.tsv" | cut -f1)"
+area="$(grep -m1 '^area:' "$REPO/.github/labels.tsv" | cut -f1 || true)"
+[ -n "$area" ] || { echo "FAIL: .github/labels.tsv has no area:* label; the test needs one" >&2; exit 1; }
+group_label="$(grep -m1 '^group:' "$REPO/.github/labels.tsv" | cut -f1 || true)"
+known_group=1
+if [ -z "$group_label" ]; then # an adopter without group:* in labels.tsv
+  group_label="group:teste"
+  known_group=0
+fi
 group="${group_label#group:}"
 full=(--section "Objetivo" "Corrigir o fuso." --section "Pronto quando" "- [ ] teste"
       --section "Arquivos ou áreas afetadas" "$area" --section "Prioridade sugerida" "média"
@@ -57,7 +63,7 @@ out="$("$OPEN" --type feature --title "Filtro" --section Objetivo "Filtrar." --s
   --section "Arquivos ou áreas afetadas" "$area" --section "Prioridade sugerida" "média" --group "$group" --group novo)"
 assert_eq "https://github.com/owner/repo/issues/9" "$out" "prints the issue URL"
 calls="$(gh_calls)"
-assert_not_contains "$calls" "label create $group_label" "known group label is never recreated"
+[ "$known_group" = 0 ] || assert_not_contains "$calls" "label create $group_label" "known group label is never recreated"
 assert_not_contains "$calls" "--force" "never overwrites labels"
 assert_contains "$calls" "--label type:feature --label roadmap" "applies template labels"
 assert_contains "$calls" "--label $group_label" "applies group label"

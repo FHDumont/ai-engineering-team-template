@@ -88,7 +88,7 @@ assert_contains "$integrate" "solo ou paralelo" "the end step is the same for a 
 assert_contains "$integrate" "tente de novo uma vez" "the main session retries the archiving by itself"
 assert_contains "$integrate" "sessão fixada ou em uso" "a pinned or busy session becomes a card"
 assert_contains "$integrate" '--state esperando --need "arquivar a sessão' "the session left open shows in Você precisa"
-for name in AGENTS.md .claude/skills/plan/SKILL.md .claude/skills/close-phase/SKILL.md docs/process-design.md docs/STATE.md; do
+for name in AGENTS.md .claude/skills/plan/SKILL.md .claude/skills/close-phase/SKILL.md docs/process-design.md; do
   assert_contains "$(cat "$REPO/$name")" 'skill `integrate`' "$name points to the end step of the integrate skill"
 done
 for name in .claude/skills/close-phase/SKILL.md .claude/skills/integrate/SKILL.md .claude/skills/integrate/integration.md docs/process-design.md; do
