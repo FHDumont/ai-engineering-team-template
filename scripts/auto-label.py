@@ -26,6 +26,8 @@ sys.path.insert(0, os.path.join(HERE, "lib"))
 import issue_template as it  # noqa: E402
 
 ROOT = os.path.dirname(HERE)
+# Note between repos: "**De:** … **Para:** …" header (scripts/lib/author.sh).
+RELAY_NOTE = re.compile(r"\*\*De:\*\* .+ · \*\*Para:\*\* ")
 COMMENT_MARK = "<!-- auto-label:needs-context -->"
 
 TYPE_LABELS = {"feature": ["type:feature"], "bug": ["type:bug"],
@@ -122,6 +124,8 @@ def compute(body, labels):
     known = known_labels()
     add = {l for l in add if l in known or l.startswith("group:")}
     remove = set()
+    if RELAY_NOTE.match(body.lstrip()):
+        missing = []  # a note between repos is not a template issue
     if missing:
         add.add("needs-context")
     elif "needs-context" in labels:
