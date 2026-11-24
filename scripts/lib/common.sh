@@ -301,6 +301,15 @@ append_event() { # append_event <json-line> [directory]
 
 # Event recorded by a script (bot_ask, bot_reply, review_round, phase_closed).
 # Extra fields as key=value.
+# sha256 of an opinion text (stdin) without its trailing newlines: the hash the trace hook records
+# for the close-reviewer output and close-phase.sh checks against the saved file.
+opinion_sha() {
+  local text
+  text="$(cat)"
+  if command -v sha256sum >/dev/null 2>&1; then printf '%s' "$text" | sha256sum | cut -d' ' -f1
+  else printf '%s' "$text" | shasum -a 256 | cut -d' ' -f1; fi
+}
+
 trace_event() { # trace_event <event> [key=value...]
   local ev="$1" branch line
   shift

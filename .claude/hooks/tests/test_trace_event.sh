@@ -125,4 +125,12 @@ assert_eq claude-sub-1 "$(fill '{hook_event_name: "SubagentStop", agent_id: "b1"
 assert_eq given "$(fill '{hook_event_name: "Stop", model: "given"}')" "a model in the hook input is kept"
 assert_eq "" "$(fill '{hook_event_name: "SubagentStop", agent_id: "none"}')" "no transcript, no model"
 assert_eq asked "$(fill '{hook_event_name: "PreToolUse", tool_name: "Agent", tool_input: {model: "asked", effort: "low"}}')" "PreToolUse keeps the requested model"
+# #219: the close-reviewer stop records the hash of its output (not the text); other agents do not.
+: >"$TMP/fill.jsonl"
+jq -cn --arg d "$repo" '{hook_event_name: "SubagentStop", session_id: "s9", cwd: $d, agent_type: "close-reviewer", last_assistant_message: "Veredito: aprovado\n"}' | PROCESS_EVENTS_FILE="$TMP/fill.jsonl" "$HOOK"
+jq -cn --arg d "$repo" '{hook_event_name: "SubagentStop", session_id: "s9", cwd: $d, agent_type: "general-purpose", last_assistant_message: "x"}' | PROCESS_EVENTS_FILE="$TMP/fill.jsonl" "$HOOK"
+assert_eq "$(printf 'Veredito: aprovado' | shasum -a 256 | cut -d' ' -f1)" "$(sed -n 1p "$TMP/fill.jsonl" | jq -r '.output_sha // ""')" "close-reviewer stop records the sha of its output"
+assert_eq "" "$(sed -n 2p "$TMP/fill.jsonl" | jq -r '.output_sha // ""')" "another agent records no hash"
+assert_not_contains "$(cat "$TMP/fill.jsonl")" "Veredito" "the text itself never reaches the trace"
+
 finish

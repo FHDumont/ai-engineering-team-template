@@ -12,6 +12,7 @@
 # the request to the right SubagentStart/Stop when several subagents start together.
 # When the hook input has no model, the model comes from the transcript: the session's
 # for a session event, the subagent's for SubagentStop.
+# SubagentStop of the close-reviewer also records output_sha (opinion_sha of its last message).
 # Never blocks: always exits 0, even on error.
 here="$(cd "$(dirname "$0")" && pwd)"
 # shellcheck source=scripts/lib/common.sh
@@ -58,5 +59,12 @@ line="$(printf '%s' "$input" | jq -c --arg fill_model "$fill_model" \
        {tool_use_id: (.tool_use_id // ""), model: "", effort: "",
         subagent_id: ((.tool_response | tostring | capture("agentId[^a-z0-9]+(?<id>[a-z0-9]+)").id) // "")}
      else {} end)' 2>/dev/null)" || exit 0
+# The close-reviewer output is hashed here, when the subagent stops, so close-phase.sh can refuse
+# an opinion edited after it was saved. Only the hash goes to the trace, never the text.
+if [ -n "$line" ] && printf '%s' "$line" | jq -e '.event == "SubagentStop" and .agent_type == "close-reviewer"' >/dev/null 2>&1; then
+  out_sha="$(printf '%s' "$input" | jq -r '.last_assistant_message // empty' 2>/dev/null | opinion_sha)"
+  [ "$out_sha" = "$(printf '' | opinion_sha)" ] ||
+    line="$(printf '%s' "$line" | jq -c --arg h "$out_sha" '. + {output_sha: $h}' 2>/dev/null || printf '%s' "$line")"
+fi
 [ -n "$line" ] && append_event "$line" "$cwd"
 exit 0
