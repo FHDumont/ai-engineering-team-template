@@ -34,14 +34,14 @@ done
 root="${REPO_ROOT:-$PWD}"
 # rev-parse prints the spec itself when the path is absent. Only a real blob counts.
 blob_at() { # blob_at <repo> <rev> <path>
-  git -C "$1" cat-file -e "$2:$3" 2>/dev/null || return 0
-  git -C "$1" rev-parse "$2:$3"
+  git -C "$1" rev-parse --verify --quiet "$2:$3" 2>/dev/null || true
 }
 
-to="${to:-$(git -C "$template" rev-parse HEAD)}"
 if [ "$find" = 1 ]; then
+  git -C "$template" rev-parse --verify --quiet HEAD >/dev/null 2>&1 || die "no template commit to compare: $template"
+  git -C "$root" rev-parse --verify --quiet HEAD >/dev/null 2>&1 || die "this repository has no commit"
   first="$(git -C "$root" rev-list --reverse HEAD | while read -r c; do
-    # An if, not an && list: a missing file must not leak cat-file's 128 as the loop status.
+    # An if, not an && list: a missing file must not leak the 128 of cat-file as the loop status.
     if git -C "$root" cat-file -e "$c:.github/method-origin" 2>/dev/null; then echo "$c"; break; fi
   done)"
   [ -n "$first" ] || first="$(git -C "$root" rev-list --max-parents=0 HEAD | tail -1)"
@@ -61,6 +61,7 @@ if [ "$find" = 1 ]; then
   echo "$best"
   exit 0
 fi
+to="${to:-$(git -C "$template" rev-parse HEAD)}"
 
 if [ -z "$from" ]; then
   [ -f "$root/.github/method-origin" ] || die "no .github/method-origin: record it with setup-repo.sh --record-origin <sha>, or pass --from" 2
