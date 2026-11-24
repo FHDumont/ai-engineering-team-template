@@ -38,7 +38,8 @@
 #:   writes only that .md. The script reads its "Veredito:" line (aprovado = success,
 #:   mudanças pedidas = failure; no line: refused), writes .process/reviewer-<sha>.verdict
 #:   and refuses a --verdict that differs from it (--verdict is optional); a rewrite is
-#:   refused. --gate publishes the second review of a PR that touches the gate
+#:   refused, and so is an opinion whose sha256 differs from the one the trace hook recorded
+#:   when the close-reviewer stopped (run the close-reviewer again; never edit the opinion). --gate publishes the second review of a PR that touches the gate
 #:   (.process/reviewer-gate-<sha>.md): comment and gate_review in the trace, no
 #:   review/independent status. Refuses an
 #:   opinion without a reviewer round after the last push: the trace of the main
@@ -591,7 +592,7 @@ opinion_verdict() { # opinion_verdict <saved opinion>
   case "$v" in
     aprovado) echo success ;;
     "mudanças pedidas") echo failure ;;
-    *) die "the Veredito line of $1 is neither 'aprovado' nor 'mudanças pedidas': $line" ;;
+    *) die "the Veredito line of $1 is neither 'aprovado' nor 'mudanças pedidas': $line: run the close-reviewer again; never edit the opinion" ;;
   esac
 }
 
@@ -603,6 +604,18 @@ save_opinion_verdict() { # save_opinion_verdict <saved .md> <.verdict file> [<gi
   [ -z "${3:-}" ] || [ "$3" = "$got" ] || die "review --verdict $3 does not match the Veredito of the saved opinion ($got)"
   printf '%s\n' "$got" >"$2"
   printf '%s' "$got"
+}
+
+# An opinion saved after the close-reviewer stopped must be its output as the trace hook hashed it:
+# a text edited after it was saved is refused. A trace without the hash (an older hook) is not checked.
+require_unedited_opinion() { # require_unedited_opinion <saved .md> <events file>
+  local want got
+  [ -f "$2" ] || return 0
+  want="$(jq -rs '[.[] | select(type == "object" and .event == "SubagentStop" and .agent_type == "close-reviewer")] | last | .output_sha // ""' "$2" 2>/dev/null || true)"
+  [ -n "$want" ] || return 0
+  got="$(opinion_sha <"$1")"
+  [ "$got" = "$want" ] ||
+    die "the saved opinion $1 does not match the close-reviewer output recorded in the trace: run the close-reviewer again; never edit the opinion"
 }
 
 # Where the phase session saved the close-reviewer output <name> (.md): the .process/ of the main
@@ -637,6 +650,7 @@ publish_review() {
   savedv="$(dirname "$saved")/$prefix-$sha.verdict"
   [ -f "$saved" ] || die "$(missing_opinion_msg "$sha" "$saved")"
   cmp -s "$saved" "$review_file" || die "review file differs from the saved close-reviewer output"
+  require_unedited_opinion "$saved" "$events"
   got="$(save_opinion_verdict "$saved" "$savedv" "$verdict")" || exit $?
   verdict="$got"
   local body
@@ -1105,6 +1119,7 @@ require_saved_review() { # require_saved_review <sha> <verdict>
   saved="$(opinion_dir "reviewer-$sha")/reviewer-$sha.md"
   savedv="$(dirname "$saved")/reviewer-$sha.verdict"
   [ -f "$saved" ] || die "$(missing_opinion_msg "$sha" "$saved")"
+  require_unedited_opinion "$saved" "$events"
   got="$(save_opinion_verdict "$saved" "$savedv")" || exit $?
   [ "$got" = "$want" ] || die "saved reviewer verdict $got is not $want for ${sha:0:12}"
   if [ -n "$review_file" ]; then
