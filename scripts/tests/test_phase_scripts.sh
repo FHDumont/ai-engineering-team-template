@@ -68,8 +68,8 @@ rm -rf "$TMP/nosc"
 mkdir -p "$path/app"
 printf 'no-such-package-xyz==1.0\n' >"$path/app/requirements.txt"
 git -C "$path" add app/requirements.txt
-assert_status 1 "check-env names a missing python package" sh -c "cd '$path' && scripts/check-env.sh"
-assert_contains "$(last_output)" "missing dependency: no-such-package-xyz (folder app): declared in app/requirements.txt" "names package, folder and the requirements file"
+assert_status 0 "check-env only warns on a missing python package (#191: validate.sh may use its own venv)" sh -c "cd '$path' && scripts/check-env.sh"
+assert_contains "$(last_output)" "warn: missing dependency: no-such-package-xyz (folder app): declared in app/requirements.txt" "names package, folder and the requirements file"
 assert_not_contains "$(last_output)" "pip install" "does not suggest pip install into the global Python"
 assert_not_contains "$(last_output)" "DeprecationWarning" "maxsplit is a keyword, so Python 3.13 stays quiet"
 git -C "$path" rm --quiet -f app/requirements.txt
@@ -128,8 +128,8 @@ assert_not_contains "$open_out" "npm install" "opening does not suggest npm inst
 assert_not_contains "$open_out" "DeprecationWarning" "opening prints no maxsplit warning"
 assert_eq "" "$(cat "$TMP/install.log")" "opening installs nothing"
 wt8="$repo/.worktrees/issue-8"
-assert_status 1 "the child check-env still fails while the product dependency is missing" sh -c "cd '$wt8' && scripts/check-env.sh"
-assert_contains "$(last_output)" "error: missing dependency: no-such-package-xyz (folder .): declared in requirements.txt" "the child still names the missing package"
+assert_status 0 "the child check-env warns, not fails, while a python dependency is missing" sh -c "cd '$wt8' && scripts/check-env.sh"
+assert_contains "$(last_output)" "warn: missing dependency: no-such-package-xyz (folder .): declared in requirements.txt" "the child still names the missing package"
 assert_not_contains "$(last_output)" "pip install" "the child does not suggest pip install"
 if [ -d "$wt8" ]; then
   git -C "$repo" worktree remove --force "$wt8"
