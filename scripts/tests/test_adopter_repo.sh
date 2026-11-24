@@ -25,6 +25,13 @@ mv "$fake/ci.yml.new" "$fake/.github/workflows/ci.yml"
 git -C "$fake" add -A
 git -C "$fake" commit -q -m "chore: adopter files"
 
+# The design of the method stays scanned: a bare #n in it is still found.
+printf 'see #12\n' >>"$fake/docs/process-design.md"
+rc=0
+(cd "$fake" && bash scripts/tests/test_issue_refs.sh >"$TMP/refs.out" 2>&1) || rc=$?
+assert_eq 1 "$rc" "a bare #n in docs/process-design.md is still found"
+git -C "$fake" checkout -q docs/process-design.md
+
 for t in test_issue_refs.sh test_phase_texts.sh test_pipefail.sh; do
   rc=0
   (cd "$fake" && bash "scripts/tests/$t" >"$TMP/$t.out" 2>&1) || rc=$?
