@@ -97,7 +97,7 @@ while read -r f; do
 $f"
 done < <(git -C "$root" ls-files)
 # Files of the destination inside the method folders, outside the manifest: new ones are missing
-# (FHDumont/ai-engineering-team-template#213), ones the repository dropped are deleted (#235).
+# (FHDumont/ai-engineering-team-template#213), ones the repository dropped are deleted (FHDumont/ai-engineering-team-template#235).
 while read -r f; do
   [ -n "$f" ] || continue
   case "$f" in scripts/tests/template/*|docs/specs/*) continue ;; esac
