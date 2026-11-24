@@ -17,6 +17,12 @@ Trazer o método do commit de destino, partindo do commit de origem gravado em `
 - [ ] O PR lista o que é idêntico, adaptado, faltante, removido e só do repo (`scripts/method-diff.sh`).
 - [ ] O que o template removeu e o repo não mudou saiu; o que é só do repo ficou.
 - [ ] `.github/method-origin` passou a ser o commit de destino.
+- [ ] O PR traz `.github/ci-mode` (`push` ou `pr`) com a escolha do dono; num repo privado sem esse arquivo (nem a variável `PROCESS_CI_MODE`) nenhuma fase abre.
+- [ ] `docs/repo-notes.md` existe (modelo do template; junte a ele as regras do projeto do `AGENTS.md` antigo).
+- [ ] Script só deste repo que o desenho cita entra em `.github/method-files.txt`.
+- [ ] `scripts/validate.sh` e `scripts/check-docs.sh` verdes, e uma prova local: a atualização a partir da versão anterior.
+
+Esta issue fecha no merge do PR. Não há fase de teste depois: a prova é a primeira fase normal, que abre e fecha pelo portão (primeira fase normal do repo).
 
 ## Arquivos ou áreas afetadas
 
@@ -31,7 +37,7 @@ alta
 O intervalo entre o commit de origem e o de destino pode exigir ok antes de executar:
 
 - Permissões novas: headless com Bash liberado, e qualquer permissão nova em `.claude/settings.json`.
-- Gasto: a CI em push na `main` consome minutos de runner.
+- Gasto: a CI em push na `main` consome minutos de runner. A escolha vai em `.github/ci-mode` no PR de atualização (ou, sem commit na `main`, `scripts/setup-repo.sh --ci-mode push|pr`).
 - Ações destrutivas: processos que o método encerra no fim da fase, e arquivos do método que o template removeu.
 
 ## Sugestão de fim
