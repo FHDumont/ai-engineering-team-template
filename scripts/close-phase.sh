@@ -16,7 +16,8 @@
 #:   close-phase.sh --cleanup
 #:   close-phase.sh --abort [--discard]
 #:
-#: --prepare: runs validate.sh (not again when the trace holds a green run of this
+#: --prepare: refuses, before anything else, when origin/main changed a gate-class path after
+#:   the base of the branch (rebase first); runs validate.sh (not again when the trace holds a green run of this
 #:   branch on the same HEAD, or on a later commit that changes nothing the suite
 #:   reads, with no change in the tree) and check-docs.sh and pushes ONCE per round; opens
 #:   the PR, or edits it only if the title or body changed; copies the issue
@@ -321,11 +322,30 @@ pre_review() {
   echo "recorded pre_review=$verdict on $(git rev-parse --short HEAD) (read back)"
 }
 
+# A gate-class path that origin/main changed after the base of this branch: the review would be of a
+# tree that is not the one that merges, and the gate review would be asked twice. Dies with the paths.
+stale_gate_base() {
+  local base globs changed hit
+  git fetch --quiet origin main 2>/dev/null || return 0
+  base="$(git merge-base HEAD origin/main 2>/dev/null)" || return 0
+  [ "$base" != "$(git rev-parse origin/main)" ] || return 0
+  [ -f "$ROOT/.github/sensitive-paths" ] || return 0
+  globs="$(mktemp)"
+  cat "$ROOT/.github/sensitive-paths" >"$globs"
+  changed="$(mktemp)"
+  git diff --name-only --no-renames -z "$base" origin/main >"$changed" 2>/dev/null || true
+  hit="$(SENSITIVE_CLASS=gate python3 "$HERE/lib/sensitive_paths.py" "$globs" <"$changed" || true)"
+  rm -f "$globs" "$changed"
+  [ -z "$hit" ] ||
+    die "origin/main changed gate path(s) after the base of this branch ($(echo "$hit" | paste -sd, -)): rebase on origin/main (git rebase origin/main), run --prepare again, then ask for the review"
+}
+
 prepare() {
   pre_reviewed_head ||
     echo "warning: no pre_review of HEAD $(git rev-parse --short HEAD) in the trace: run the close-reviewer pre-review (issue and diff only) before --prepare"
   [ -n "$body_file" ] && [ -f "$body_file" ] || die "--body-file is required (fill .github/pull_request_template.md)"
   "$HERE/check-attribution.sh" --text-file "$body_file" >/dev/null || die "PR body has AI attribution"
+  stale_gate_base
   progress_step "validate.sh"
   run_validate
   progress_step "check-docs.sh"
