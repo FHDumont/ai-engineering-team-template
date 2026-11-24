@@ -4,6 +4,7 @@
 
 ## Funcionalidades
 
+- fix: close the remaining method gaps ([#178](https://github.com/FHDumont/ai-engineering-team-template/pull/178)) · 2026-11-23
 - feat(setup): ask the time target and the machine limits in setup ([#64](https://github.com/FHDumont/ai-engineering-team-template/pull/64)) · 2026-11-21
 - feat(scripts): per-project time targets, lab-test without owner scripts, close-phase progress ([#51](https://github.com/FHDumont/ai-engineering-team-template/pull/51)) · 2026-11-21
 - feat(scripts): visible progress of long scripts, headless spec from worktree, CI read failure ([#49](https://github.com/FHDumont/ai-engineering-team-template/pull/49)) · 2026-11-21
@@ -14,12 +15,24 @@
 
 ## Correções
 
+- fix: find-base no longer dies silent with exit 128 ([#200](https://github.com/FHDumont/ai-engineering-team-template/pull/200)) · 2026-11-24
+- fix: keep the update path from stopping on missing records (#188 #190 #191 #193 #194 #195) ([#198](https://github.com/FHDumont/ai-engineering-team-template/pull/198)) · 2026-11-24
+- fix: label gate and owner paths by class and read the review verdict in the script ([#197](https://github.com/FHDumont/ai-engineering-team-template/pull/197)) · 2026-11-23
+- fix: run the method tests on any adopter and any locale ([#196](https://github.com/FHDumont/ai-engineering-team-template/pull/196)) · 2026-11-23
+- fix: stop work that proves no new fact ([#175](https://github.com/FHDumont/ai-engineering-team-template/pull/175)) · 2026-11-23
+- fix: gate a pull request that is not a phase ([#174](https://github.com/FHDumont/ai-engineering-team-template/pull/174)) · 2026-11-23
+- fix: make the suite pass on an adopted repository ([#173](https://github.com/FHDumont/ai-engineering-team-template/pull/173)) · 2026-11-22
+- fix: keep the first CI green and record a PR-only mode ([#172](https://github.com/FHDumont/ai-engineering-team-template/pull/172)) · 2026-11-22
+- fix: open a phase without installing product dependencies ([#171](https://github.com/FHDumont/ai-engineering-team-template/pull/171)) · 2026-11-22
+- fix: keep the merge gate from failing open ([#169](https://github.com/FHDumont/ai-engineering-team-template/pull/169)) · 2026-11-22
+- fix: keep adoption from widening permissions ([#168](https://github.com/FHDumont/ai-engineering-team-template/pull/168)) · 2026-11-22
 - fix(tests): the series case of test_validate.sh waits a short explicit limit ([#79](https://github.com/FHDumont/ai-engineering-team-template/pull/79)) · 2026-11-22
 - feat(ci): run CI on push to main and let phase-start wait for it ([#61](https://github.com/FHDumont/ai-engineering-team-template/pull/61)) · 2026-11-21
 - fix: accept a main base without CI when its merged PR had green CI and the same tree ([#37](https://github.com/FHDumont/ai-engineering-team-template/pull/37)) · 2026-11-21
 
 ## Manutenção
 
+- feat: extend the method without editing it by hand ([#177](https://github.com/FHDumont/ai-engineering-team-template/pull/177)) · 2026-11-23
 - perf: measure phase time and cut the CI and prepare reruns ([#48](https://github.com/FHDumont/ai-engineering-team-template/pull/48)) · 2026-11-21
 - feat: stop leftover processes and add sessions.sh at the end of a phase ([#25](https://github.com/FHDumont/ai-engineering-team-template/pull/25)) · 2026-11-21
 - feat: machine-wide slots, queue and history for validations and phases ([#15](https://github.com/FHDumont/ai-engineering-team-template/pull/15)) · 2026-11-21
@@ -27,6 +40,9 @@
 
 ## Outros
 
+- fix: correct phase time, CI reruns, and deadlines ([#176](https://github.com/FHDumont/ai-engineering-team-template/pull/176)) · 2026-11-23
+- fix(process): bind merge notes, reviewer text and phase_session ([#170](https://github.com/FHDumont/ai-engineering-team-template/pull/170)) · 2026-11-22
+- fix: keep phase cleanup inside the worktree it created ([#167](https://github.com/FHDumont/ai-engineering-team-template/pull/167)) · 2026-11-22
 - perf(tests): cut the fixed cost per test and split the largest tests ([#86](https://github.com/FHDumont/ai-engineering-team-template/pull/86)) · 2026-11-22
 - perf(tests): split phase-start and hook tests, make the headless test load-proof ([#84](https://github.com/FHDumont/ai-engineering-team-template/pull/84)) · 2026-11-22
 - perf(tests): split test_close_phase.sh into parallel files ([#82](https://github.com/FHDumont/ai-engineering-team-template/pull/82)) · 2026-11-22
