@@ -29,7 +29,7 @@ description: Fecha a fase da branch atual pelo portão — PR, revisão independ
    - critério do "Pronto quando" que não dá para cumprir ou provar na sessão atual vira **nota** no parecer, nunca bloqueio; a revisão não pede ao dono do repo nenhuma ação para gerar prova (`/compact`, `attach`, terminal);
    - a rodada N+1 olha só o diff desde a rodada N e as regressões que ele causou;
    - no máximo 2 rodadas de "mudanças pedidas": se a 3ª também pedir, pare e avise a gerenciadora por mensagem; ela pergunta ao dono (corrigir / aceitar com achado / pausar) e devolve `respondido: <decisão>`.
-6. `scripts/close-phase.sh --merge --wait`, no arquivo, nunca em pipe. O quadro do merge cita a seção "Não lido" do parecer, para o dono ver o que a revisão da atualização não leu:
+6. `scripts/close-phase.sh --merge --wait`, no arquivo, nunca em pipe, **em segundo plano** (`run_in_background`), para esta sessão seguir recebendo mensagens da gerenciadora; a saída avisa quando termina. Check `cancelled` no HEAD: ele sai na hora com `scripts/rerun-ci.sh <run>`; rode-o e repita o `--merge --wait`. O quadro do merge cita a seção "Não lido" do parecer, para o dono ver o que a revisão da atualização não leu:
 
    ```bash
    f="$(mktemp)"
