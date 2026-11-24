@@ -584,6 +584,19 @@ save_opinion_verdict() { # save_opinion_verdict <saved .md> <.verdict file> [<gi
   printf '%s' "$got"
 }
 
+# Where the phase session saved the close-reviewer output <name> (.md): the .process/ of the main
+# checkout (where the trace is) or the one of this phase worktree, whichever holds the file; with
+# neither, the main one (the path the refusal names).
+opinion_dir() { # opinion_dir <name without extension>
+  local main
+  main="$(dirname "$(phase_trace_file "$ROOT" 2>/dev/null || echo "$ROOT/.process/x")")"
+  if [ ! -f "$main/$1.md" ] && [ -f "$ROOT/.process/$1.md" ]; then
+    echo "$ROOT/.process"
+  else
+    echo "$main"
+  fi
+}
+
 missing_opinion_msg() { # missing_opinion_msg <sha> <path>
   echo "no saved reviewer output for ${1:0:12}: the phase session writes the whole close-reviewer output, literally and unchanged, to $2 (step 5 of the close-phase skill); no hook writes it, and the verdict is read from its Veredito line"
 }
@@ -599,8 +612,8 @@ publish_review() {
   [ "$sha" = "$(git rev-parse HEAD)" ] || die "local HEAD differs from PR head $sha: push or pull first"
   review_after_push "$sha"
   events="$(phase_trace_file "$ROOT")" || die "cannot locate the trace: review refused"
-  saved="$(dirname "$events")/$prefix-$sha.md"
-  savedv="$(dirname "$events")/$prefix-$sha.verdict"
+  saved="$(opinion_dir "$prefix-$sha")/$prefix-$sha.md"
+  savedv="$(dirname "$saved")/$prefix-$sha.verdict"
   [ -f "$saved" ] || die "$(missing_opinion_msg "$sha" "$saved")"
   cmp -s "$saved" "$review_file" || die "review file differs from the saved close-reviewer output"
   got="$(save_opinion_verdict "$saved" "$savedv" "$verdict")" || exit $?
@@ -733,7 +746,7 @@ gate_review_required() { # gate_review_required <pr> <sha> <labels> <gate paths>
   fi
   events="$(phase_trace_file "$ROOT" 2>/dev/null || true)"
   if [ -n "$events" ] && [ -f "$events" ]; then
-    saved="$(dirname "$events")/reviewer-gate-$sha.md"
+    saved="$(opinion_dir "reviewer-gate-$sha")/reviewer-gate-$sha.md"
     if [ -f "$saved" ]; then
       got="$(opinion_verdict "$saved" 2>/dev/null || true)"
       if [ "$got" = success ] && jq -e -s --arg sha "$sha" \
@@ -794,7 +807,7 @@ merge() {
       echo "refused: PR #$n needs the owner's ok:$reasons"
       [ "$owner_ok" = 0 ] || echo "--owner-ok does not count: needs-owner-ok was not on PR #$n before this run"
       echo "ask the repo owner with a choice question that names this SHA, then rerun with --merge --owner-ok $sha"
-      unread="$(dirname "$(phase_trace_file "$ROOT" 2>/dev/null || true)")/reviewer-$sha.md"
+      unread="$(opinion_dir "reviewer-$sha")/reviewer-$sha.md"
       if [ -f "$unread" ]; then
         awk '/^### Não lido/{p=1} p && /^### / && !/^### Não lido/{exit} p' "$unread"
       fi
@@ -1046,8 +1059,8 @@ outside_refs() { # outside_refs <pull request number>
 require_saved_review() { # require_saved_review <sha> <verdict>
   local sha="$1" want="$2" events saved savedv got
   events="$(phase_trace_file "$ROOT")" || die "cannot locate the trace: review refused"
-  saved="$(dirname "$events")/reviewer-$sha.md"
-  savedv="$(dirname "$events")/reviewer-$sha.verdict"
+  saved="$(opinion_dir "reviewer-$sha")/reviewer-$sha.md"
+  savedv="$(dirname "$saved")/reviewer-$sha.verdict"
   [ -f "$saved" ] || die "$(missing_opinion_msg "$sha" "$saved")"
   got="$(save_opinion_verdict "$saved" "$savedv")" || exit $?
   [ "$got" = "$want" ] || die "saved reviewer verdict $got is not $want for ${sha:0:12}"
@@ -1084,7 +1097,7 @@ outside_publish() {
   refs="$(outside_refs "$pr")" || exit $?
   sha="${refs%%$'\t'*}"
   if [ -z "$verdict" ]; then
-    verdict="$(opinion_verdict "$(dirname "$(phase_trace_file "$ROOT")")/reviewer-$sha.md")" || exit $?
+    verdict="$(opinion_verdict "$(opinion_dir "reviewer-$sha")/reviewer-$sha.md")" || exit $?
   fi
   require_saved_review "$sha" "$verdict"
   local body events

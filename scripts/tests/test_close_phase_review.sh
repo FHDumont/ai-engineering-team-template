@@ -49,6 +49,19 @@ assert_eq "success" "$(cat "$repo/.process/reviewer-$SHA.verdict")" "the script 
 calls="$(gh_calls)"
 assert_contains "$calls" "pr comment 12 --repo owner/repo --body-file $TMP/review.md" "posts the review comment"
 assert_contains "$calls" "api -X POST repos/owner/repo/statuses/$SHA -f state=success -f context=review/independent" "sets the status on HEAD"
+# The phase session may save the output in the .process/ of its own worktree, not the main checkout's.
+git -C "$repo" switch --quiet --detach
+git -C "$repo" worktree add --quiet "$TMP/wt" feat/issue-5-x
+rm -f "$repo/.process/reviewer-$SHA.md" "$repo/.process/reviewer-$SHA.verdict"
+mkdir -p "$TMP/wt/.process"
+cp "$TMP/review.md" "$TMP/wt/.process/reviewer-$SHA.md"
+: >"$FAKE_GH_LOG"
+assert_status 0 "publishes a review saved in the .process/ of the phase worktree" \
+  sh -c "cd '$TMP/wt' && '$TMP/wt/scripts/close-phase.sh' --publish-review '$TMP/review.md' --verdict success --round 1"
+assert_contains "$(gh_calls)" "context=review/independent" "the worktree review sets the status"
+assert_eq "success" "$(cat "$TMP/wt/.process/reviewer-$SHA.verdict")" "the .verdict goes beside the saved review"
+git -C "$repo" worktree remove --force "$TMP/wt"
+git -C "$repo" switch --quiet feat/issue-5-x
 # #192: the agent saves only the .md; the verdict comes from its Veredito line.
 reset_phase_evidence
 push_ev "$SHA"
