@@ -11,6 +11,9 @@ allow="$(jq -r '.permissions.allow[]' "$settings")"
 assert_not_contains "$allow" 'Bash(scripts/*)' "allow does not grant scripts/*"
 assert_not_contains "$allow" 'Bash(./scripts/*)' "allow does not grant ./scripts/*"
 assert_not_contains "$allow" 'Bash(git push *)' "allow does not grant a generic git push"
+# A headless child commits and brings the template without a question (#215); the hook still bars add -A and add .
+assert_contains "$allow" 'Bash(git add *)' "allow has git add (the hook bars -A and .)"
+assert_contains "$allow" 'Bash(scripts/fetch-template.sh *)' "allow has fetch-template.sh"
 # A glob that would cover every script in scripts/ is refused, even if written
 # with a different prefix or without the Bash() wrapper in a future edit.
 while IFS= read -r line; do
