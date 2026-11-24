@@ -85,4 +85,48 @@ assert_eq "adr2" "$(cat "$repo/docs/adr/ADR-002-new.md")" "--apply copies a miss
 assert_eq "rule2" "$(cat "$repo/.cursor/rules/base.mdc")" "--apply copies an outdated cursor rule"
 assert_eq "own1" "$(cat "$repo/README.md")" "--apply never touches README.md"
 assert_status 1 "unknown sha fails" bash -c "cd '$repo' && '$FETCH' deadbeefdeadbeefdeadbeefdeadbeefdeadbeef --url '$template'"
+
+# #234, #235, #236: --apply runs the method-diff.sh of the destination with the destination lib, from a repository whose own lib is old.
+t2="$(make_repo)"
+mkdir -p "$t2/scripts/lib" "$t2/.github/workflows" "$t2/docs"
+cp "$SCRIPTS/method-diff.sh" "$t2/scripts/method-diff.sh"
+cp "$SCRIPTS/lib/common.sh" "$t2/scripts/lib/common.sh"
+printf 'scripts/a.sh\nscripts/gone.sh\nscripts/method-diff.sh\nscripts/lib/common.sh\n.github/labels.tsv\n' >"$t2/.github/method-files.txt"
+echo a1 >"$t2/scripts/a.sh"
+echo gone >"$t2/scripts/gone.sh"
+echo example >"$t2/.github/workflows/deploy-example.yml"
+printf 'name\tcolor\nkeep\tfff\n' >"$t2/.github/labels.tsv"
+git -C "$t2" add .github scripts docs
+git -C "$t2" commit --quiet -m "chore: origin"
+o2="$(git -C "$t2" rev-parse HEAD)"
+echo a2 >"$t2/scripts/a.sh"
+git -C "$t2" rm --quiet scripts/gone.sh
+printf 'name\tcolor\nkeep\tfff\nnewlabel\t000\tthe new one\n' >"$t2/.github/labels.tsv"
+printf 'scripts/a.sh\nscripts/method-diff.sh\nscripts/lib/common.sh\n.github/labels.tsv\n' >"$t2/.github/method-files.txt"
+git -C "$t2" add .github scripts
+git -C "$t2" commit --quiet -m "chore: dest"
+d2="$(git -C "$t2" rev-parse HEAD)"
+r2="$(make_repo)"
+mkdir -p "$r2/scripts/lib" "$r2/.github/workflows"
+cp "$SCRIPTS/fetch-template.sh" "$r2/scripts/fetch-template.sh"
+# An old lib: the helpers the script needs, but no is_method_doc.
+sed '/^is_method_doc()/,/^}/d' "$SCRIPTS/lib/common.sh" >"$r2/scripts/lib/common.sh"
+echo a1 >"$r2/scripts/a.sh"
+echo gone >"$r2/scripts/gone.sh"
+echo mine >"$r2/.github/workflows/deploy-x.yml"
+printf 'name\tcolor\nkeep\tfff\nown\t111\n' >"$r2/.github/labels.tsv"
+printf '%s\n' "$o2" >"$r2/.github/method-origin"
+git -C "$r2" add .
+git -C "$r2" commit --quiet -m "chore: adopted"
+(cd "$r2" && env -u PROCESS_CI_MODE bash scripts/fetch-template.sh "$d2" --url "$t2" --apply) >"$TMP/apply.out" 2>&1 || bad "apply with an old lib failed: $(cat "$TMP/apply.out")"
+assert_not_contains "$(cat "$TMP/apply.out")" "command not found" "an old repository lib prints no command not found"
+assert_eq "a2" "$(cat "$r2/scripts/a.sh")" "--apply copies the outdated file"
+assert_eq "no" "$([ -e "$r2/.github/workflows/deploy-example.yml" ] && echo yes || echo no)" "--apply never recreates a deleted file"
+assert_eq "no" "$([ -e "$r2/scripts/gone.sh" ] && echo yes || echo no)" "--apply removes what the template dropped"
+assert_contains "$(cat "$r2/.github/labels.tsv")" "newlabel	000	the new one" "--apply appends the missing label with the destination line"
+assert_contains "$(cat "$r2/.github/labels.tsv")" "own	111" "--apply keeps the repository labels"
+assert_not_contains "$(cat "$TMP/apply.out")" "deploy-example.yml" "the notice at the end does not list a deleted file"
+second="$(cd "$r2" && bash "$SCRIPTS/method-diff.sh" --template .process/template --to "$d2")"
+assert_not_contains "$second" "outdated" "after --apply nothing is outdated"
+assert_not_contains "$second" "missing " "after --apply nothing is missing"
 finish
