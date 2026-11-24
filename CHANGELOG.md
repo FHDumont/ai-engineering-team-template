@@ -15,6 +15,8 @@
 
 ## Correções
 
+- fix: friction stops of the previous group (end-check skipped CI, review path, stale base, slot wait, light finding) ([#205](https://github.com/FHDumont/ai-engineering-team-template/pull/205)) · 2026-11-24
+- feat: validate.sh runs only the tests the diff reaches in a phase ([#204](https://github.com/FHDumont/ai-engineering-team-template/pull/204)) · 2026-11-24
 - fix: find-base no longer dies silent with exit 128 ([#200](https://github.com/FHDumont/ai-engineering-team-template/pull/200)) · 2026-11-24
 - fix: keep the update path from stopping on missing records (#188 #190 #191 #193 #194 #195) ([#198](https://github.com/FHDumont/ai-engineering-team-template/pull/198)) · 2026-11-24
 - fix: label gate and owner paths by class and read the review verdict in the script ([#197](https://github.com/FHDumont/ai-engineering-team-template/pull/197)) · 2026-11-23
