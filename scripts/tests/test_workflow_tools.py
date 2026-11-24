@@ -220,9 +220,11 @@ class SensitivePathsTests(unittest.TestCase):
         self.addCleanup(shutil.rmtree, d, True)
         old = os.path.join(d, "old")
         open(old, "w").write("**/auth/**\nscripts/close-phase.sh\n")
-        self.assertEqual(sp.sensitive_class(["a/auth/x", "scripts/close-phase.sh"], old, "owner-ok"),
-                         ["a/auth/x", "scripts/close-phase.sh"])
-        self.assertEqual(sp.sensitive_class(["a/auth/x", "scripts/close-phase.sh"], old, "gate"), [])
+        # The method's gate paths are gate by code, even in an old single-class list (FHDumont/ai-engineering-team-template#207).
+        self.assertEqual(sp.sensitive_class(["a/auth/x", "scripts/close-phase.sh", "package-lock.json"], old, "owner-ok"),
+                         ["a/auth/x"])
+        self.assertEqual(sp.sensitive_class(["a/auth/x", "scripts/close-phase.sh", "package-lock.json"], old, "gate"),
+                         ["scripts/close-phase.sh", "package-lock.json"])
         # A path in both classes is owner-ok (the stricter one).
         both = os.path.join(d, "both")
         open(both, "w").write("# class: gate\nx/**\n# class: owner-ok\nx/y\n")

@@ -5,7 +5,8 @@ update of the method adds new method paths without deleting repo ones.
 
 The globs file has two classes, set by comment lines `# class: owner-ok` and
 `# class: gate`. A glob before any such line is owner-ok, so a file with no
-class lines (an adopter's old list) is all owner-ok. A path in both classes,
+class lines (an adopter's old list) is all owner-ok, except the method's gate
+paths (METHOD_GATE_GLOBS), which are gate whatever the file says. A path in both classes,
 or in the method paths or a write-token workflow, is owner-ok.
 
 Usage: [SENSITIVE_CLASS=owner-ok|gate] sensitive_paths.py <globs-file> < paths
@@ -30,6 +31,30 @@ METHOD_GLOBS = (
     "scripts/sessions.sh",
     "scripts/start-headless.sh",
     "scripts/setup-repo.sh",
+)
+# The gate itself and the dependencies. Gate by code: a repository list in the old
+# single-class format that names them as owner-ok does not call the owner back (FHDumont/ai-engineering-team-template#207).
+METHOD_GATE_GLOBS = (
+    ".github/workflows/deploy-*.yml",
+    ".github/workflows/ci.yml",
+    ".github/sensitive-paths",
+    "scripts/ci-gate.sh",
+    "scripts/check-attribution.sh",
+    "scripts/check-docs.sh",
+    "scripts/close-phase.sh",
+    "scripts/lib/sensitive_paths.py",
+    "package-lock.json",
+    "**/package-lock.json",
+    "pnpm-lock.yaml",
+    "**/pnpm-lock.yaml",
+    "yarn.lock",
+    "**/yarn.lock",
+    "poetry.lock",
+    "uv.lock",
+    "requirements*.txt",
+    "Gemfile.lock",
+    "go.sum",
+    "Cargo.lock",
 )
 WRITE_PERM = re.compile(r"(?m)^\s+[A-Za-z-]+:\s+write\s*$")
 
@@ -80,22 +105,28 @@ def load_classed(path):
 
 
 def sensitive_class(paths, globs_file, cls, root="."):
-    """The sensitive paths of one class. owner-ok wins when a path is in both."""
+    """The sensitive paths of one class. owner-ok wins when a path is in both,
+    except for the method's own gate paths, which are gate whatever the file says."""
     classed = load_classed(globs_file)
-    owner_globs = [g for g, c in classed if c == "owner-ok"]
-    gate_regs = [glob_to_regex(g) for g, c in classed if c == "gate"]
-    gate_globs = [g for g, c in classed if c == "gate"]
+    owner_regs = [glob_to_regex(g) for g in METHOD_GLOBS + tuple(g for g, c in classed if c == "owner-ok")]
+    method_gate = [glob_to_regex(g) for g in METHOD_GATE_GLOBS]
+    gate_regs = method_gate + [glob_to_regex(g) for g, c in classed if c == "gate"]
+
+    def hit(regs, p):
+        return any(r.match(p) for r in regs)
+
     # A write-token workflow is owner-ok by its content, unless a gate glob names it.
-    owner = set(sensitive(paths, owner_globs, root=root, write_token=False))
-    owner |= {p for p in paths if workflow_has_write_token(p, root) and not any(r.match(p) for r in gate_regs)}
-    allhits = sensitive(paths, owner_globs + gate_globs, root=root)
+    owner = {p for p in paths
+             if (hit(owner_regs, p) and not hit(method_gate, p))
+             or (workflow_has_write_token(p, root) and not hit(gate_regs, p))}
+    allhits = [p for p in paths if p in owner or hit(gate_regs, p)]
     if cls == "owner-ok":
         return [p for p in allhits if p in owner]
     return [p for p in allhits if p not in owner]
 
 
 def merged_globs(repo_globs):
-    out = list(METHOD_GLOBS)
+    out = list(METHOD_GLOBS) + list(METHOD_GATE_GLOBS)
     for g in repo_globs:
         if g not in out:
             out.append(g)
