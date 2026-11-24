@@ -148,8 +148,10 @@ assert_contains "$integrate" "só esperam o dono" "integrate deletes the heartbe
 assert_contains "$integrate" "volta a trabalhar" "integrate recreates the heartbeat when a phase works again"
 assert_contains "$integrate" 'sem "Sem mudança."' "integrate names the minimum reply when nothing changed"
 assert_contains "$integrate" "Apague o batimento" "integrate deletes the heartbeat in the end step"
-assert_contains "$integrate" "over-expected" "integrate asks once about a performance overrun"
-assert_contains "$integrate" "não pergunte de novo" "integrate does not ask again when the issue is open"
+assert_contains "$integrate" "info: time" "integrate quotes the time lines"
+assert_contains "$integrate" "não abre quadro nem issue por tempo" "integrate never opens a board or issue for time"
+assert_not_contains "$integrate" "Combinar uma meta nova" "integrate no longer asks the owner about time"
+assert_not_contains "$integrate" "Abrir issue para cortar tempo" "integrate no longer opens an issue for time"
 assert_contains "$integrate" "Nenhum script confere" "integrate says no lock checks the heartbeat"
 hb="$(printf '%s\n' "$design" | grep -F '**batimento**')"
 assert_eq 1 "$(printf '%s\n' "$hb" | grep -c .)" "the design states the heartbeat rule in one place"
@@ -275,12 +277,11 @@ assert_not_contains "$agents" "relate." "AGENTS no longer reports a doubt only i
 
 # setup: the time target and the machine limits are explained and asked only here.
 setup="$(cat "$REPO/.claude/skills/setup/SKILL.md")"
-assert_contains "$setup" ".github/time-targets.tsv" "setup writes the time target file"
-assert_contains "$setup" "Meta de tempo" "setup asks the time target"
+assert_not_contains "$setup" "Meta de tempo" "setup no longer asks the time target"
 assert_contains "$setup" "machine-limits.env" "setup shows the machine limits"
 assert_contains "$setup" "# setup: confirmed" "setup asks the machine limits only the first time on a machine"
 assert_contains "$setup" "AI_METHOD_SLOTS_FASE" "setup explains each machine limit"
-assert_contains "$setup" "over-target" "setup says the owner is called again only on over-target"
+assert_not_contains "$setup" "over-target" "setup no longer calls the owner on over-target"
 
 # Notes to the headless child (#74) and the cheap pre-review (#75).
 execute="$(cat "$REPO/.claude/skills/execute/SKILL.md")"

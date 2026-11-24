@@ -167,13 +167,20 @@ rm -f "$H"
 printf 'ts\tclass\trepo\tissue\twait_s\tduration_s\n' >"$H"
 printf '%s\tvalidate\t%s\t1\t0\t300\n%s\tfase\t%s\t1\t0\t600\n' "$now" "$me" "$now" "$me" >>"$H"
 assert_status 0 "--report with the method default (no file)" "$repo/scripts/machine-slots.sh" --report
-assert_contains "$(last_output)" "over-target: validate median 300 s above the target 240 s" "default target: validate over"
-assert_not_contains "$(last_output)" "over-target: phase" "default target: phase within 45 min"
+assert_contains "$(last_output)" "info: time validate median 300 s, target 240 s (above)" "default target: validate above, informative"
+assert_contains "$(last_output)" "info: time phase median 600 s, target 45 min" "default target: phase within 45 min is still reported"
+assert_not_contains "$(last_output)" "over-target" "time never prints over-target"
+assert_not_contains "$(last_output)" "info: time phase median 600 s, target 45 min (above)" "within the target has no (above)"
 mkdir -p "$repo/.github"
 printf 'validate\t400\ts\nphase\t5\tmin\n' >"$repo/.github/time-targets.tsv"
 assert_status 0 "--report with the project target" "$repo/scripts/machine-slots.sh" --report
-assert_not_contains "$(last_output)" "over-target: validate" "own target: validate within 400 s"
-assert_contains "$(last_output)" "over-target: phase median 600 s above the target 5 min" "own target: phase over"
+assert_not_contains "$(last_output)" "info: time validate median 300 s, target 400 s (above)" "own target: validate within 400 s"
+assert_contains "$(last_output)" "info: time phase median 600 s, target 5 min (above)" "own target: phase above"
+printf 'ts\tclass\trepo\tissue\twait_s\tduration_s\n%s\tvalidate\t%s\t1\t0\t243\n' "$now" "$me" >"$H"
+rm -f "$repo/.github/time-targets.tsv"
+assert_status 0 "--report with a median 3 s above the target" "$repo/scripts/machine-slots.sh" --report
+assert_contains "$(last_output)" "info: time validate median 243 s, target 240 s (above)" "3 s above is informative"
+assert_not_contains "$(last_output)" "over-target" "3 s above is not over-target"
 rm -f "$repo/.github/time-targets.tsv"
 rm -f "$H"
 assert_status 0 "validate.sh records wait and duration" validate "$V" --tests
@@ -200,7 +207,7 @@ if [ -n "$dur" ] && [ "$dur" -ge 50 ] && [ "$dur" -le 80 ]; then ok; else bad "d
 mkdir -p "$repo/.github"
 printf 'phase\t1.5\tmin\n' >"$repo/.github/time-targets.tsv"
 assert_status 0 "--report reads the phase that ended" "$repo/scripts/machine-slots.sh" --report
-assert_not_contains "$(last_output)" "over-target: phase" "60s without the owner wait is inside a 90s target"
+assert_not_contains "$(last_output)" "target 1.5 min (above)" "60s without the owner wait is inside a 90s target"
 rm -f "$repo/.github/time-targets.tsv"
 
 # #221: the wait for the owner and the gap between a close and the next open of the
@@ -234,7 +241,7 @@ printf 'ts\tclass\trepo\tissue\twait_s\tduration_s\twall_s\n' >"$H"
 printf '%s\tfase\t%s\t1\t0\t1800\t72000\n' "$(date +%s)" "$me" >>"$H"
 printf 'phase\t45\tmin\n' >"$repo/.github/time-targets.tsv"
 assert_status 0 "--report with 30 min of work and 20 h of wall" "$repo/scripts/machine-slots.sh" --report
-assert_not_contains "$(last_output)" "over-target: phase" "30 min of work is inside a 45 min target"
+assert_not_contains "$(last_output)" "target 45 min (above)" "30 min of work is inside a 45 min target"
 assert_contains "$(last_output)" "wall med" "the report shows the wall time"
 assert_contains "$(last_output)" "72000" "the wall time is in the report"
 rm -f "$repo/.github/time-targets.tsv"
