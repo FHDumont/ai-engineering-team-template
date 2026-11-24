@@ -203,11 +203,28 @@ for n in "${issues[@]}"; do
 done
 
 progress_step "opening the phase(s)" 0 "${#issues[@]}"
-if [ ${#issues[@]} -eq 1 ]; then
-  "$HERE/new-phase.sh" "${issues[0]}" ${pass[@]+"${pass[@]}"}
-else
-  "$HERE/open-parallel.sh" "${issues[@]}" ${pass[@]+"${pass[@]}"}
-fi
+# No free phase slot (exit 75, nothing created): wait for one here, in the turn of the request, so the
+# child sessions open in this same turn and none becomes a card the owner has to click (a card does
+# not show in Remote Control). Deadline and poll in seconds, PHASE_START_SLOT_WAIT (default 1200)
+# and PHASE_START_SLOT_POLL (default 15).
+slot_max="${PHASE_START_SLOT_WAIT:-1200}" slot_poll="${PHASE_START_SLOT_POLL:-15}" slot_waited=0
+while :; do
+  rc=0
+  if [ ${#issues[@]} -eq 1 ]; then
+    "$HERE/new-phase.sh" "${issues[0]}" ${pass[@]+"${pass[@]}"} || rc=$?
+  else
+    "$HERE/open-parallel.sh" "${issues[@]}" ${pass[@]+"${pass[@]}"} || rc=$?
+  fi
+  [ "$rc" = 75 ] || break
+  [ "$dry" = 0 ] || break
+  if [ "$slot_waited" -ge "$slot_max" ]; then
+    echo "error: no free phase slot after ${slot_waited}s: nothing was created; wait for a phase to end and open again" >&2
+    exit 75
+  fi
+  progress_step "waiting for a phase slot" "$slot_waited" "$slot_max"
+  sleep "$slot_poll"; slot_waited=$((slot_waited + slot_poll))
+done
+[ "$rc" = 0 ] || exit "$rc"
 [ "$dry" = 0 ] || exit 0
 
 # The spec now lives on the phase branches; a loose copy in the main checkout would
