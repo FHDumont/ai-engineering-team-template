@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 #: validate.sh: lint and tests of the project and of the method's scripts.
 #:
-#: Usage: validate.sh [--lint] [--tests] [--full]   (no option: both, everything)
+#: Usage: validate.sh [--lint] [--tests] [--full]   (no option: both; tests affected in a phase)
 #:
 #: --lint: shellcheck on Bash scripts and a Python syntax check. Alone, during a
 #:         phase, it looks only at the files changed against the merge-base with the
@@ -11,8 +11,19 @@
 #:          .claude/hooks/tests/test_*.sh. When .github/validate-repo.sh exists,
 #:          it runs after those tests and its exit code counts: that is where
 #:          the repository puts its own checks, without editing this file.
-#: --full: forces everything: the whole lint, never the incremental one. The CI
-#:         (CI=true in the environment) and a run without options are always full.
+#: --full: forces everything: the whole lint, never the incremental one, and every
+#:         test. The CI (CI=true in the environment) and a run outside a phase are
+#:         always full.
+#:
+#: Affected tests: in a phase (branch with issue-<n>, outside the CI) the tests run are
+#: the ones the diff against the merge-base with AI_METHOD_LINT_BASE reaches, plus the
+#: gate tests (file names with "gate"). The map is read from the tests themselves: a
+#: test is affected when its text mentions a changed file; for a file in scripts/lib,
+#: also when it mentions a script that mentions the library. Docs and root .md
+#: files the suite does not read (the rule of ci.yml) need no test. A changed file
+#: that no test reaches means there is no map: everything runs. The output says
+#: "tests: affected only (n of m)". A green partial run is recorded as phase_validate
+#: with scope=affected; the merge still needs the Tests check, which runs everything.
 #:
 #: One run per worktree: a second validate.sh in the same worktree does not start
 #: another; it waits for the one running and prints its result (same options).
@@ -82,6 +93,54 @@ bash_files() {
   while read -r f; do
     [ -f "$f" ] && head -1 "$f" | stdin_grep -qE '^#!.*\bbash' && echo "$f"; true
   done
+}
+
+# Partial test run: in a phase, outside the CI, without --full.
+partial=0
+[ "$tests" = 1 ] && [ "$full" = 0 ] && [ -z "${CI:-}" ] && [ -n "$(issue_from_branch "$(current_branch)")" ] && partial=1
+
+# True for a path the suite does not read (the inert set of ci.yml).
+inert_path() {
+  case "$1" in
+    docs/process-design.md|AGENTS.md|CLAUDE.md) return 1 ;;
+    docs/*) return 0 ;;
+    */*) return 1 ;;
+    *.md) return 0 ;;
+  esac
+  return 1
+}
+
+# The tests the diff against the base reaches, one per line, from the tests on the
+# command line. Exit 1: a changed file no test reaches (no map), run all.
+select_tests() {
+  local base files f names r hit sel names_file="$RDIR/names"
+  base="$(git merge-base HEAD "$AI_METHOD_LINT_BASE" 2>/dev/null || true)"
+  [ -n "$base" ] || return 1
+  files="$({ git diff --name-only --no-renames -z "$base" | tr '\0' '\n'; git ls-files -z -o --exclude-standard | tr '\0' '\n'; } | sort -u)"
+  sel="$(printf '%s\n' "$@" | grep gate || true)"
+  while IFS= read -r f; do
+    [ -n "$f" ] || continue
+    inert_path "$f" && continue
+    case "$f" in
+      scripts/tests/test_*|.claude/hooks/tests/test_*)
+        [ ! -e "$f" ] || sel="$sel"$'\n'"$f"
+        continue ;;
+    esac
+    # The tests read the files they exercise; a shared library (scripts/lib) is
+    # exercised through the scripts that load it, so their tests count too.
+    names="$(basename "$f")"
+    case "$f" in
+      scripts/lib/*)
+        for r in $(git grep -lF -e "$names" -- scripts .claude .github ':(exclude)scripts/tests' ':(exclude).claude/hooks/tests' 2>/dev/null || true); do
+          names="$names $(basename "$r")"
+        done ;;
+    esac
+    printf '%s\n' $names >"$names_file"
+    hit="$(grep -lFf "$names_file" "$@" 2>/dev/null || true)"
+    [ -n "$hit" ] || return 1
+    sel="$sel"$'\n'"$hit"
+  done <<<"$files"
+  printf '%s\n' "$sel" | grep . | sort -u || true
 }
 
 # Candidate files of the lint: all of them, or only the ones this phase changed.
@@ -160,6 +219,19 @@ for f in sys.argv[1:]:
       [ -e "$t" ] && list+=("$t")
     done
     n_total=${#list[@]}
+    echo full >"$RDIR/scope"
+    if [ "$partial" = 1 ] && [ "$n_total" -gt 0 ]; then
+      if sel="$(select_tests "${list[@]}")"; then
+        local all_n=$n_total
+        list=()
+        while IFS= read -r t; do [ -z "$t" ] || list+=("$t"); done <<<"$sel"
+        n_total=${#list[@]}
+        echo affected >"$RDIR/scope"
+        echo "tests: affected only ($n_total of $all_n): the diff and the gate tests; --full runs all"
+      else
+        echo "tests: a changed file has no test map: running all"
+      fi
+    fi
     passed=0 failed=0
     # bash 3.2 with set -u rejects "${list[@]}" when the list is empty (FHDumont/ai-engineering-team-template#110).
     # Skip the runner entirely; there is no test file to hand to xargs.
@@ -332,7 +404,7 @@ fi
 # The local cache: a full green run on a clean tree is the result --prepare reuses.
 if [ "$rc" = 0 ] && [ "$lint" = 1 ] && [ "$tests" = 1 ] && [ "$incremental" = 0 ]; then
   if git diff --quiet && git diff --cached --quiet; then
-    trace_event phase_validate sha="$(git rev-parse HEAD)" secs="$(( $(now_epoch) - t0 ))"
+    trace_event phase_validate sha="$(git rev-parse HEAD)" secs="$(( $(now_epoch) - t0 ))" scope="$(cat "$RDIR/scope" 2>/dev/null || echo full)"
   fi
 fi
 exit "$rc"
