@@ -299,8 +299,8 @@ Todo script tem `--help`, um teste em `scripts/tests/` e saída curta em inglês
 | `scripts/summarize-thread.sh` | Mantém o comentário de resumo de um fio longo (§5.1) | agentes |
 | `scripts/trace-view.py` | Lê o trace (§6.3): árvore de agentes, tabela de pares do PR e tempo por fase | `close-phase.sh --prepare`, agentes |
 | `scripts/measure-session.py` | Mede palavras lidas, toques do dono e acerto da triagem de uma sessão | sessão principal, sob pedido |
-| `scripts/method-diff.sh` | Compara o repo com o commit do template em `.github/method-origin`: idêntico, desatualizado (`outdated`), adaptado, faltante (também arquivo novo do destino fora do manifest), removido e só do repo; `--notice` gera a lista do intervalo | atualização do método, `close-reviewer` |
-| `scripts/fetch-template.sh` | Traz o commit de destino do template para `.process/template` do worktree (sem worktree extra nem clone); `--apply` copia os caminhos do método | atualização do método, filha headless |
+| `scripts/method-diff.sh` | Compara o repo com o commit do template em `.github/method-origin`: idêntico, desatualizado (`outdated`), adaptado, faltante (também arquivo novo do destino fora do manifest), `deleted` (o repo apagou de propósito: nunca volta), removido e só do repo; `--notice` lista só o `adapted` que o template mudou no intervalo | atualização do método, `close-reviewer` |
+| `scripts/fetch-template.sh` | Traz o commit de destino do template para `.process/template` do worktree (sem worktree extra nem clone); `--apply` roda o `method-diff.sh` do destino, copia só `outdated` e `missing`, acrescenta `missing-label`, roda `--remove` e imprime o `--notice` | atualização do método, filha headless |
 | `scripts/CLAUDE.md` | Regras da pasta `scripts/` | lido ao tocar a pasta |
 
 ### 6.1 `close-phase.sh`
