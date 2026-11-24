@@ -13,6 +13,7 @@ scripts/CLAUDE.md
 scripts/close-phase.sh
 scripts/deploy.sh
 scripts/end-check.sh
+scripts/fetch-template.sh
 scripts/gen-changelog.py
 scripts/gen-docs.sh
 scripts/gen-roadmap.py
