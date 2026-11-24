@@ -22,11 +22,11 @@ done <<<"$allow"
 
 # Every method script is listed by name so adoption does not widen to app scripts.
 missing=""
-for f in "$REPO"/scripts/*.sh "$REPO"/scripts/*.py; do
-  [ -f "$f" ] || continue
-  name="${f#"$REPO"/}"
+# The list is the manifest, not scripts/*: a script only of the repository is not the method's (FHDumont/ai-engineering-team-template#207).
+while IFS= read -r name; do
+  case "$name" in scripts/*.sh|scripts/*.py) ;; *) continue ;; esac
   echo "$allow" | grep -qxF "Bash($name *)" || missing="$missing $name"
-done
+done < <(grep -vE '^[[:space:]]*(#|$)' "$REPO/.github/method-files.txt")
 assert_eq "" "$missing" "allow lists every method script by name"
 
 adopt="$(awk '$0 == "## Adotar num repositório que já existe" {on=1; next} /^## / {on=0} on' "$REPO/README.md")"
