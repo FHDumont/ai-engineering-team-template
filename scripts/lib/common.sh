@@ -313,3 +313,31 @@ trace_event() { # trace_event <event> [key=value...]
     --args "$@" 2>/dev/null)" || return 0
   append_event "$line"
 }
+
+# Prints the number of the merged PR whose head had CI green and the same tree as commit $1
+# (returns 0), or the reason (returns 1).
+base_pr_vouches() {
+  local sha="$1" slug prs n head tree htree ci
+  slug="$(repo_slug)"
+  prs="$(gh api "repos/$slug/commits/$sha/pulls" 2>/dev/null |
+    jq -r '.[]? | select(.merged_at != null) | "\(.number) \(.head.sha)"' 2>/dev/null || true)"
+  [ -n "$prs" ] || { echo "no merged PR holds it"; return 1; }
+  tree="$(git rev-parse "$sha^{tree}")"
+  while read -r n head; do
+    [ -n "$n" ] || continue
+    ci="$(gh api "repos/$slug/commits/$head/check-runs?per_page=100" 2>/dev/null |
+      jq -r '[.check_runs[]? | select(.name == "CI")] | sort_by(.started_at // "") | last
+        | if . == null then "absent" else "\(.status)/\(.conclusion // "none")" end' 2>/dev/null || true)"
+    [ "$ci" = "completed/success" ] || { echo "the CI of its PR #$n is ${ci:-absent}"; return 1; }
+    htree="$(gh api "repos/$slug/git/commits/$head" 2>/dev/null | jq -r '.tree.sha // empty' 2>/dev/null || true)"
+    [ -n "$htree" ] || { echo "the tree of its PR #$n was not read"; return 1; }
+    [ "$htree" = "$tree" ] || {
+      if [ "${2:-}" = pr ]; then echo "$n differ"; return 0; fi
+      echo "the tree of its PR #$n differs from the commit of main"; return 1
+    }
+    echo "$n"; return 0
+  done <<EOF2
+$prs
+EOF2
+  echo "no merged PR holds it"; return 1
+}
