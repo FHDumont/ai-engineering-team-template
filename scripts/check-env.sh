@@ -109,7 +109,7 @@ PY
     if [ -n "$missing" ]; then
       names="$(echo "$missing" | paste -sd' ' -)"
       # Only a warning: validate.sh may run the tests in a throwaway venv, so the system
-      # python3 lacking the package is not a block. Nothing is installed (#191).
+      # python3 lacking the package is not a block. Nothing is installed.
       echo "warn: missing dependency: $names (folder $dir): declared in $f"
       warned=1
     fi
