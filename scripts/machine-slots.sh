@@ -78,7 +78,8 @@ with open(path, encoding="utf-8") as fh:
     for r in csv.DictReader(fh, delimiter="\t"):
         try:
             if float(r["ts"]) >= since:
-                rows.append((r["class"], r["repo"], float(r["wait_s"]), float(r["duration_s"])))
+                d = float(r["duration_s"])
+                rows.append((r["class"], r["repo"], float(r["wait_s"]), d, float(r.get("wall_s") or d)))
         except (ValueError, KeyError, TypeError):
             continue
 # Time targets: method default, overridden per measure by the project file.
@@ -96,14 +97,14 @@ except (OSError, ValueError):
 print(f"history of the last {days} days: {len(rows)} runs")
 if not rows:
     sys.exit(0)
-print(f"{'class':<10}{'repo':<28}{'runs':>5}  {'wait med':>9}{'wait p90':>9}  {'dur med':>9}{'dur p90':>9}   (seconds)")
+print(f"{'class':<10}{'repo':<28}{'runs':>5}  {'wait med':>9}{'wait p90':>9}  {'dur med':>9}{'dur p90':>9}{'wall med':>10}{'wall p90':>10}   (seconds)")
 groups = {}
-for c, repo, w, d in rows:
-    groups.setdefault((c, "(all)"), []).append((w, d))
-    groups.setdefault((c, repo), []).append((w, d))
+for c, repo, w, d, wl in rows:
+    groups.setdefault((c, "(all)"), []).append((w, d, wl))
+    groups.setdefault((c, repo), []).append((w, d, wl))
 for (c, repo), v in sorted(groups.items()):
-    ws, ds = [x[0] for x in v], [x[1] for x in v]
-    print(f"{c:<10}{repo:<28}{len(v):>5}  {med(ws):>9.0f}{pct(ws, .9):>9.0f}  {med(ds):>9.0f}{pct(ds, .9):>9.0f}")
+    ws, ds, wls = [x[0] for x in v], [x[1] for x in v], [x[2] for x in v]
+    print(f"{c:<10}{repo:<28}{len(v):>5}  {med(ws):>9.0f}{pct(ws, .9):>9.0f}  {med(ds):>9.0f}{pct(ds, .9):>9.0f}{med(wls):>10.0f}{pct(wls, .9):>10.0f}")
 for c, key in (("fase", "phase"), ("validate", "validate")):
     v = groups.get((c, me))
     if not v:
