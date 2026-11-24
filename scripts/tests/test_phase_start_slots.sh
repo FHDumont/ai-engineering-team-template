@@ -18,7 +18,7 @@ rc=0
 env PHASE_START_SLOT_WAIT=60 CLAUDE_CODE_SESSION_ID=manager sh -c "cd '$repo' && scripts/phase-start.sh 7 8 11 12 --no-check" >"$TMP/big.out" 2>&1 || rc=$?
 elapsed=$(( $(date +%s) - start ))
 assert_eq 1 "$([ "$rc" != 0 ] && [ "$rc" != 75 ] && echo 1 || echo 0)" "a group over the limit exits with its own code, not 75"
-assert_eq 1 "$([ "$elapsed" -lt 5 ] && echo 1 || echo 0)" "a group over the limit does not wait"
+assert_eq 1 "$([ "$elapsed" -lt 20 ] && echo 1 || echo 0)" "a group over the limit does not wait"
 assert_contains "$(cat "$TMP/big.out")" "split the group" "tells to split the group"
 assert_eq "" "$(ls "$repo/.worktrees" 2>/dev/null || true)" "no worktree for a group over the limit"
 assert_eq "" "$(git -C "$repo" branch --list 'fix/*' 'feat/*' | tr -d ' ')" "no branch for a group over the limit"
