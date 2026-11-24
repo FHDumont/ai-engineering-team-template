@@ -136,6 +136,7 @@ done <<<"$paths"
 if git -C "$template" cat-file -e "$to:.github/labels.tsv" 2>/dev/null; then
   have=""
   [ -f "$root/.github/labels.tsv" ] && have="$(cut -f1 "$root/.github/labels.tsv")"
+  # The example area:* and group:* labels and the <slug> bot rows are replaced per repository: skipped.
   while IFS=$'\t' read -r name _; do
     case "$name" in ""|\#*|*"<"*|area:*|group:*|name) continue ;; esac
     printf '%s\n' "$have" | stdin_grep -qxF "$name" || echo "missing-label $name"
