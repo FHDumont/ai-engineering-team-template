@@ -300,6 +300,7 @@ Todo script tem `--help`, um teste em `scripts/tests/` e saída curta em inglês
 | `scripts/trace-view.py` | Lê o trace (§6.3): árvore de agentes, tabela de pares do PR e tempo por fase | `close-phase.sh --prepare`, agentes |
 | `scripts/measure-session.py` | Mede palavras lidas, toques do dono e acerto da triagem de uma sessão | sessão principal, sob pedido |
 | `scripts/method-diff.sh` | Compara o repo com o commit do template em `.github/method-origin`: idêntico, desatualizado (`outdated`), adaptado, faltante (também arquivo novo do destino fora do manifest), removido e só do repo; `--notice` gera a lista do intervalo | atualização do método, `close-reviewer` |
+| `scripts/fetch-template.sh` | Traz o commit de destino do template para `.process/template` do worktree (sem worktree extra nem clone); `--apply` copia os caminhos do método | atualização do método, filha headless |
 | `scripts/CLAUDE.md` | Regras da pasta `scripts/` | lido ao tocar a pasta |
 
 ### 6.1 `close-phase.sh`

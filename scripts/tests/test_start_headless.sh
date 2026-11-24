@@ -48,6 +48,7 @@ assert_not_contains "$(events)" "phase_headless" "no event without claude"
 
 assert_status 0 "--dry-run starts nothing" sh -c "cd '$repo' && PATH='$bin:$PATH' scripts/start-headless.sh 7 --dry-run"
 assert_contains "$(last_output)" "--model sonnet" "dry-run shows the model of the spec"
+assert_contains "$(last_output)" "fetch-template.sh" "dry-run prompt says where the template checkout is (#215)"
 assert_not_contains "$(last_output)" "--allowedTools" "no extra Bash allow beyond the app child"
 assert_not_contains "$(events)" "phase_headless" "dry-run records nothing"
 
