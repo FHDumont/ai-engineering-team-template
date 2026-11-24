@@ -183,16 +183,14 @@ if [ -f "$root/docs/STATE.md" ] && grep -qF 'o job `tests` roda em todo PR' "$ro
   echo "- [ ] A frase antiga do \`docs/STATE.md\` (\"o job \`tests\` roda em todo PR\") saiu na revisão do STATE."
 fi
 # The label the update PR gets depends on the verifier of the origin (the base of the PR runs it).
-if :; then
-  if git -C "$template" show "$from:scripts/lib/sensitive_paths.py" 2>/dev/null | grep -q SENSITIVE_CLASS; then
-    label=needs-gate-review
-  else
-    label=needs-owner-ok
-  fi
-  echo "- [ ] O verificador da origem põe \`$label\` neste PR. A label nova do portão entra no merge pelo \`close-phase.sh\` (FHDumont/ai-engineering-team-template#220), sem passo manual."
-  # The base of the PR runs its own check-docs.sh: lower limits there fail a doc the new one accepts (FHDumont/ai-engineering-team-template#216).
-  if ! diff <(git -C "$template" show "$from:scripts/check-docs.sh" 2>/dev/null | grep '^limit ') \
-    <(git -C "$template" show "$to:scripts/check-docs.sh" 2>/dev/null | grep '^limit ') >/dev/null; then
-    echo "- [ ] Confira os docs também com o \`check-docs.sh\` da origem, que tem limites menores (o Policy da CI usa o da base): \`git -C $template show $from:scripts/check-docs.sh >scripts/.check-docs-origin.sh && bash scripts/.check-docs-origin.sh; rm -f scripts/.check-docs-origin.sh\`"
-  fi
+origin_verifier="$(git -C "$template" show "$from:scripts/lib/sensitive_paths.py" 2>/dev/null || true)"
+case "$origin_verifier" in
+  *SENSITIVE_CLASS*) label=needs-gate-review ;;
+  *) label=needs-owner-ok ;;
+esac
+echo "- [ ] O verificador da origem põe \`$label\` neste PR. A label nova do portão entra no merge pelo \`close-phase.sh\` (FHDumont/ai-engineering-team-template#220), sem passo manual."
+# The base of the PR runs its own check-docs.sh: lower limits there fail a doc the new one accepts (FHDumont/ai-engineering-team-template#216).
+if ! diff <(git -C "$template" show "$from:scripts/check-docs.sh" 2>/dev/null | grep '^limit ') \
+  <(git -C "$template" show "$to:scripts/check-docs.sh" 2>/dev/null | grep '^limit ') >/dev/null; then
+  echo "- [ ] Confira os docs também com o \`check-docs.sh\` da origem, que tem limites menores (o Policy da CI usa o da base): \`git -C $template show $from:scripts/check-docs.sh >scripts/.check-docs-origin.sh && bash scripts/.check-docs-origin.sh; rm -f scripts/.check-docs-origin.sh\`"
 fi
