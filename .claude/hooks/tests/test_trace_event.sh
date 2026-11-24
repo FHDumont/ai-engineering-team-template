@@ -133,4 +133,26 @@ assert_eq "$(printf 'Veredito: aprovado' | shasum -a 256 | cut -d' ' -f1)" "$(se
 assert_eq "" "$(sed -n 2p "$TMP/fill.jsonl" | jq -r '.output_sha // ""')" "another agent records no hash"
 assert_not_contains "$(cat "$TMP/fill.jsonl")" "Veredito" "the text itself never reaches the trace"
 
+# #241: the hash is of the last text with a "Veredito:" line in the subagent transcript (a text block or the
+# message of a tool), not of a short sentence that came after it; without such a text, last_assistant_message.
+rev() { # rev <transcript lines file or "">: SubagentStop of the close-reviewer; prints its output_sha
+  : >"$TMP/fill.jsonl"
+  jq -cn --arg d "$repo" --arg t "$TMP/tr/s9.jsonl" '{hook_event_name: "SubagentStop", session_id: "s9", cwd: $d, transcript_path: $t, agent_id: "r1", agent_type: "close-reviewer", last_assistant_message: "Parecer salvo."}' | PROCESS_EVENTS_FILE="$TMP/fill.jsonl" "$HOOK"
+  jq -r '.output_sha // ""' "$TMP/fill.jsonl"
+}
+sha_of() { printf '%s' "$1" | shasum -a 256 | cut -d' ' -f1; }
+opinion=$'## Revisão independente\n\nVeredito: aprovado\nRodada: 1'
+{
+  jq -cn --arg t "$opinion" '{type:"assistant",message:{content:[{type:"text",text:$t}]}}'
+  jq -cn '{type:"assistant",message:{content:[{type:"text",text:"Parecer salvo."}]}}'
+} >"$TMP/tr/s9/subagents/agent-r1.jsonl"
+assert_eq "$(sha_of "$opinion")" "$(rev)" "the hash is of the opinion, not of the sentence after it"
+{
+  jq -cn --arg t "$opinion" '{type:"assistant",message:{content:[{type:"tool_use",name:"SendMessage",input:{message:$t}}]}}'
+  jq -cn '{type:"assistant",message:{content:[{type:"text",text:"Enviado."}]}}'
+} >"$TMP/tr/s9/subagents/agent-r1.jsonl"
+assert_eq "$(sha_of "$opinion")" "$(rev)" "the message field of a tool counts as the opinion"
+echo '{"type":"assistant","message":{"content":[{"type":"text","text":"sem veredito"}]}}' >"$TMP/tr/s9/subagents/agent-r1.jsonl"
+assert_eq "$(sha_of "Parecer salvo.")" "$(rev)" "no opinion in the transcript: last_assistant_message"
+
 finish
