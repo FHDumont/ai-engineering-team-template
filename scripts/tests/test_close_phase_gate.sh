@@ -107,4 +107,12 @@ assert_status 0 "unprotected mode: CI and review success merge" env FAKE_PROTECT
 assert_contains "$(last_output)" "unprotected mode: CI and review/independent are success" "unprotected mode: says what it read"
 assert_contains "$(gh_calls)" "pr merge" "unprotected mode: merges when both are green"
 
+# A check cancelled on HEAD (issue #209): --merge --wait leaves at once with the rerun command.
+handler "type:feature" success
+: >"$FAKE_GH_LOG"
+assert_status 1 "--merge --wait leaves at once when a check on HEAD was cancelled" \
+  env FAKE_CANCELLED_URL="https://github.com/owner/repo/actions/runs/777/job/9" CLOSE_PHASE_MERGE_POLL=0 sh -c "cd '$repo' && '$CLOSE' --merge --wait"
+assert_contains "$(last_output)" "scripts/rerun-ci.sh 777" "names the rerun command with the run id"
+assert_contains "$(last_output)" "cancelled" "names the cause"
+
 finish

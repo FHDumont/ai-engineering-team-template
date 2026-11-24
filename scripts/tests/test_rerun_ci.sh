@@ -59,4 +59,10 @@ assert_contains "$(last_output)" "offer:" "offers an issue for the intermittent 
 assert_contains "$(last_output)" "open-issue.sh --type finding" "names how to open the issue"
 assert_not_contains "$(gh_calls)" "run rerun" "does not rerun after the limit"
 
+# A job cancelled by a network failure (issue #209) counts as failed for the rerun.
+export FAKE_JOBS='{"jobs":[{"name":"CI","conclusion":"cancelled"}]}'
+: >"$FAKE_GH_LOG"
+assert_status 0 "reruns a run whose job CI was cancelled" "$R" 11
+assert_contains "$(gh_calls)" "run rerun 11 --failed" "asks gh to rerun the cancelled job"
+
 finish

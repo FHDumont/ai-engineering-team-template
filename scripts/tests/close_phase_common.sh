@@ -94,6 +94,7 @@ case "\$*" in
     m="\${FAKE_MERGEABLE:-MERGEABLE}"; s="\${FAKE_MERGE_STATE:-CLEAN}"
     [ "\$reads" -gt "\${FAKE_UNKNOWN_READS:-0}" ] || { m=UNKNOWN; s=UNKNOWN; }
     jq -cn --arg m "\$m" --arg s "\$s" --arg h "$SHA" '{mergeable: \$m, mergeStateStatus: \$s, headRefOid: \$h}' ;;
+  "api repos/owner/repo/commits/$SHA/check-runs"*cancelled*) echo "\${FAKE_CANCELLED_URL:-}" ;;
   "api repos/owner/repo/commits/$SHA/check-runs"*) echo "\${FAKE_HEAD_CHECKS:-1}" ;;
   "api repos/owner/repo/commits/"*"/check-runs"*) echo 3 ;;
 esac
