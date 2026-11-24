@@ -1183,7 +1183,7 @@ class GhPinTests(unittest.TestCase):
     def test_first_ci_uses_the_pin_of_the_pull_request_when_the_base_has_no_method(self):
         # #248: adoption PR on a runner with no gh. The base has neither .github/gh-pin
         # nor .github/method-files.txt; the PR brings the pin.
-        bindir = self.bindir(["awk", "curl", "tar", "shasum"])
+        bindir = self.bindir(["awk", "curl", "tar", "shasum", "cp", "mkdir", "cat", "sed", "grep", "gzip", "uname"])
         os.makedirs(os.path.join(self.repo, "base"))
         os.makedirs(os.path.join(self.repo, ".github"))
         payload = os.path.join(self.tmp, "payload")
@@ -1198,7 +1198,8 @@ class GhPinTests(unittest.TestCase):
         open(curl, "w").write("#!/bin/sh\nout=\nwhile [ $# -gt 0 ]; do case \"$1\" in -o) out=\"$2\"; shift 2 ;; *) shift ;; esac; done\ncp '%s' \"$out\"\n" % archive)
         os.chmod(curl, 0o755)
         open(os.path.join(self.repo, ".github", "gh-pin"), "w").write("2.105.0\nlinux-amd64 %s tar.gz\n" % digest)
-        env = {"PATH": bindir + os.pathsep + "/usr/bin:/bin"}
+        # Only bindir: a real gh in /usr/bin (hosted runners) would end the step before the new branch.
+        env = {"PATH": bindir}
         r = self.run_install(env)
         self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
         self.assertIn("::notice::", r.stdout)
