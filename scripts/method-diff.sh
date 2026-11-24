@@ -10,7 +10,7 @@
 #: adapted (repository differs from both), missing (also a file new in the
 #: destination inside the method folders, outside the manifest, and a method doc: AGENTS.md, CLAUDE.md,
 #: docs/process-design.md, docs/adr/{TEMPLATE,INDEX,ADR-*}.md, .cursor/rules/*), removed, kept,
-#: repo-owned (a repository file with a template default) or repo-only. template-only marks a test of
+#: repo-owned (a repository file with a template default), deleted (both ends have it, the repository dropped it, the manifest does not name it: never brought back) or repo-only. template-only marks a test of
 #: scripts/tests/template/ that a repository must not have (--remove deletes
 #: it); missing-label names a method label absent from .github/labels.tsv. --remove
 #: deletes a file the template dropped since that commit when this repository
@@ -19,7 +19,7 @@
 #: .github/method-origin (or the first commit), for a repository that does
 #: not have the file yet. --notice prints the update checklist with only the items
 #: that apply to the interval (settings.json, ci-mode, missing files and labels,
-#: removed files, adapted files (merge by hand), the old STATE sentence, the gate label by the origin verifier,
+#: removed files, adapted files the template changed in the interval (merge by hand; never method-origin), the old STATE sentence, the gate label by the origin verifier,
 #: and the check-docs.sh of the origin).
 set -euo pipefail
 HERE="$(cd "$(dirname "$0")" && pwd)"
@@ -96,7 +96,8 @@ while read -r f; do
   paths="$paths
 $f"
 done < <(git -C "$root" ls-files)
-# Files new in the destination inside the method folders, outside the manifest (FHDumont/ai-engineering-team-template#213).
+# Files of the destination inside the method folders, outside the manifest: new ones are missing
+# (FHDumont/ai-engineering-team-template#213), ones the repository dropped are deleted (#235).
 while read -r f; do
   [ -n "$f" ] || continue
   case "$f" in scripts/tests/template/*|docs/specs/*) continue ;; esac
@@ -104,7 +105,7 @@ while read -r f; do
   [ "$f" != "${f#*/}" ] || continue
   paths="$paths
 $f"
-done < <(comm -13 <(git -C "$template" ls-tree -r --name-only "$from" 2>/dev/null | sort) <(git -C "$template" ls-tree -r --name-only "$to" | sort))
+done < <(git -C "$template" ls-tree -r --name-only "$to" | sort)
 # Method docs outside the method folders: the template's at both ends and the repository's own (a repo-only ADR).
 while read -r f; do
   [ -n "$f" ] || continue
@@ -139,7 +140,12 @@ while read -r path; do
   elif [ -n "$rb" ] && [ -z "$fb" ] && [ -z "$tb" ]; then
     echo "repo-only $path"
   elif [ -n "$tb" ] && [ -z "$rb" ]; then
-    echo "missing $path"
+    # Both ends have it, the repository does not, and the manifest does not name it: dropped on purpose.
+    if [ -n "$fb" ] && ! printf '%s\n%s\n' "$from_list" "$to_list" | stdin_grep -qxF "$path"; then
+      echo "deleted $path"
+    else
+      echo "missing $path"
+    fi
   elif [ -n "$fb" ] && [ -z "$tb" ] && [ -n "$rb" ]; then
     if [ "$rb" = "$fb" ]; then
       echo "removed $path"
@@ -174,7 +180,14 @@ items() { grep "^$1 " "$report" | cut -d' ' -f2- || true; }
 echo "Itens da atualização $from → $to (gerado por scripts/method-diff.sh --notice):"
 echo
 for c in missing missing-label removed adapted; do
-  for f in $(items "$c"); do echo "- [ ] \`$c\`: \`$f\`"; done
+  for f in $(items "$c"); do
+    # An adapted file is listed only when the template changed it in the interval; method-origin is never merged by hand.
+    if [ "$c" = adapted ]; then
+      [ "$f" != .github/method-origin ] || continue
+      [ "$(blob_at "$template" "$from" "$f")" != "$(blob_at "$template" "$to" "$f")" ] || continue
+    fi
+    echo "- [ ] \`$c\`: \`$f\`"
+  done
 done
 sb="$(blob_at "$template" "$to" .claude/settings.json)"
 sf="$(blob_at "$template" "$from" .claude/settings.json)"
