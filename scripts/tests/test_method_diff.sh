@@ -57,4 +57,53 @@ assert_eq "yes" "$([ -f "$repo/scripts/gone.sh" ] && echo yes)" "the diverged fi
 
 found="$(cd "$repo" && "$DIFF" --find-base --template "$template")"
 assert_contains "$found" "$origin" "find-base names the template commit the repo came from"
+
+# #181: no commit of the repo has .github/method-origin; find-base falls back to the first commit.
+t2="$(make_repo)"
+mkdir -p "$t2/scripts"
+echo one >"$t2/scripts/a.sh"
+git -C "$t2" add scripts
+git -C "$t2" commit --quiet -m "chore: one"
+base1="$(git -C "$t2" rev-parse HEAD)"
+echo two >"$t2/scripts/a.sh"
+git -C "$t2" add scripts
+git -C "$t2" commit --quiet -m "chore: two"
+r2="$(make_repo)"
+mkdir -p "$r2/scripts"
+echo one >"$r2/scripts/a.sh"
+git -C "$r2" add scripts
+git -C "$r2" commit --quiet -m "chore: adopted"
+rc=0
+found="$(cd "$r2" && "$DIFF" --find-base --template "$t2" 2>&1)" || rc=$?
+assert_eq "0" "$rc" "find-base without .github/method-origin exits 0"
+assert_contains "$found" "$base1" "find-base without .github/method-origin names the matching commit"
+
+# #179: the repo's first commit has a file the oldest template commits lack (absent on one side differs).
+t3="$(make_repo)"
+echo seed >"$t3/seed.txt"
+git -C "$t3" add seed.txt
+git -C "$t3" commit --quiet -m "chore: seed"
+mkdir -p "$t3/scripts"
+echo late >"$t3/scripts/late.sh"
+git -C "$t3" add scripts
+git -C "$t3" commit --quiet -m "chore: late"
+late="$(git -C "$t3" rev-parse HEAD)"
+r3="$(make_repo)"
+mkdir -p "$r3/scripts" "$r3/.github"
+echo late >"$r3/scripts/late.sh"
+echo "$late" >"$r3/.github/method-origin"
+git -C "$r3" add scripts .github
+git -C "$r3" commit --quiet -m "chore: adopted"
+rc=0
+found="$(cd "$r3" && "$DIFF" --find-base --template "$t3" 2>&1)" || rc=$?
+assert_eq "0" "$rc" "find-base with a file absent in old template commits exits 0"
+assert_contains "$found" "$late" "find-base skips template commits lacking the file"
+
+# A template with no commits is a real failure: a message, never a silent 128.
+t4="$(mktemp -d)"
+git -C "$t4" init --quiet
+rc=0
+found="$(cd "$r3" && "$DIFF" --find-base --template "$t4" 2>&1)" || rc=$?
+assert_eq "1" "$rc" "find-base on an empty template fails with exit 1"
+assert_contains "$found" "no template commit" "find-base on an empty template says why"
 finish
