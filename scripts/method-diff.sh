@@ -46,17 +46,18 @@ if [ "$find" = 1 ]; then
   done)"
   [ -n "$first" ] || first="$(git -C "$root" rev-list --max-parents=0 HEAD | tail -1)"
   best="" bestn=-1
+  # One ls-tree per side and one awk per template commit: a git call per file and commit took minutes.
+  firsttree="$(mktemp)"
+  git -C "$root" ls-tree -r "$first" | awk -F'\t' '{ split($1, m, " "); print m[3] "\t" $2 }' >"$firsttree"
   while read -r rev; do
     [ -n "$rev" ] || continue
-    n=0
-    while read -r path; do
-      [ -n "$path" ] || continue
-      a="$(blob_at "$root" "$first" "$path")"
-      b="$(blob_at "$template" "$rev" "$path")"
-      [ -n "$a" ] && [ "$a" = "$b" ] && n=$((n + 1))
-    done < <(git -C "$root" ls-tree -r --name-only "$first")
+    n="$(git -C "$template" ls-tree -r "$rev" | awk -F'\t' -v ft="$firsttree" '
+      BEGIN { while ((getline l < ft) > 0) seen[l] = 1 }
+      { split($1, m, " "); if ((m[3] "\t" $2) in seen) n++ }
+      END { print n + 0 }')"
     if [ "$n" -gt "$bestn" ]; then bestn=$n; best=$rev; fi
   done < <(git -C "$template" rev-list --reverse HEAD)
+  rm -f "$firsttree"
   [ -n "$best" ] || die "no template commit to compare"
   echo "$best"
   exit 0
@@ -85,6 +86,10 @@ while read -r f; do
   paths="$paths
 $f"
 done < <(git -C "$root" ls-files)
+# Repository files that start from a template default: brought when missing, never overwritten.
+seeded=".github/required-checks .github/headless .github/update-notice.md .github/label-areas.tsv .github/ci-extra-jobs"
+paths="$paths
+$(printf '%s\n' $seeded)"
 paths="$(printf '%s\n' "$paths" | awk 'NF && !seen[$0]++')"
 
 while read -r path; do
@@ -96,7 +101,9 @@ while read -r path; do
   else
     rb=""
   fi
-  if [ -n "$rb" ] && [ -z "$fb" ] && [ -z "$tb" ]; then
+  if printf '%s\n' $seeded | stdin_grep -qx "$path"; then
+    if [ -n "$rb" ]; then echo "repo-owned $path"; elif [ -n "$tb" ]; then echo "missing $path"; fi
+  elif [ -n "$rb" ] && [ -z "$fb" ] && [ -z "$tb" ]; then
     echo "repo-only $path"
   elif [ -n "$tb" ] && [ -z "$rb" ]; then
     echo "missing $path"
