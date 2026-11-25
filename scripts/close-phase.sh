@@ -3,6 +3,7 @@
 #:
 #: Usage:
 #:   close-phase.sh --prepare --title "chore: ..." --body-file F [--issue N]
+#:   close-phase.sh --save-review AGENT_ID [--gate]
 #:   close-phase.sh --publish-review F [--verdict success|failure] [--gate] [--round N]
 #:   close-phase.sh --pre-review --verdict clean|findings [--round N]
 #:   close-phase.sh --check
@@ -31,10 +32,17 @@
 #:   Writes the "## Modelo e esforço" section of the PR body from the trace
 #:   (requested x used table, scripts/trace-view.py --pairs): what the body file
 #:   has in that section is replaced.
+#: --save-review: writes the close-reviewer opinion literally to .process/reviewer-<sha>.md of HEAD
+#:   (--gate: reviewer-gate-<sha>.md), from the transcript of the subagent AGENT_ID (the agentId of
+#:   the Agent result; foreground or background): the last text with a "Veredito:" line, the same
+#:   filter the trace hook hashes. Refuses, writing nothing, when the agent has no close-reviewer
+#:   stop in the trace or its sha256 is not the output_sha the hook recorded. The transcript is
+#:   found under ~/.claude/projects/*/*/subagents/ (CLOSE_PHASE_SUBAGENTS_ROOT replaces ~/.claude/projects).
+#:   Never write the opinion by hand.
 #: --publish-review: posts the independent review (file, in Portuguese) as a PR
 #:   comment and sets the review/independent status on the HEAD SHA. The file must
 #:   be the saved close-reviewer output (.process/reviewer-<sha>.md), written whole
-#:   and literally by the phase session (step 5 of the close-phase skill); the agent
+#:   and literally by --save-review (step 5 of the close-phase skill); the agent
 #:   writes only that .md. The script reads its "Veredito:" line (aprovado = success,
 #:   mudanças pedidas = failure; no line: refused), writes .process/reviewer-<sha>.verdict
 #:   and refuses a --verdict that differs from it (--verdict is optional); a rewrite is
@@ -164,12 +172,13 @@ gh() {
   return "$rc"
 }
 
-mode="" title="" body_file="" issue="" review_file="" verdict="" round="" owner_ok=0 owner_ok_sha="" wait=0 discard=0 pr="" gate_review=0
+mode="" title="" body_file="" issue="" review_file="" verdict="" round="" owner_ok=0 owner_ok_sha="" wait=0 discard=0 pr="" gate_review=0 agent_id=""
 while [ $# -gt 0 ]; do
   case "$1" in
     -h|--help) print_help "$0"; exit 0 ;;
     --prepare) mode=prepare; shift ;;
     --pre-review) mode=prereview; shift ;;
+    --save-review) mode=save; agent_id="${2:-}"; [ -n "$agent_id" ] || die "--save-review needs the agentId of the close-reviewer" 2; shift 2 ;;
     --publish-review) mode=review; review_file="$2"; shift 2 ;;
     --verdict) verdict="$2"; shift 2 ;;
     --gate) gate_review=1; shift ;;
@@ -221,7 +230,7 @@ fi
 [ -n "$issue" ] || issue="$branch_issue"
 # The session that opened the phase (the manager) never closes it: the child session does.
 case "$mode" in
-  prepare|prereview|review|check|merge)
+  prepare|prereview|save|review|check|merge)
     if [ -z "$pr" ] && [ "$(phase_opener_state "$issue" "${CLAUDE_CODE_SESSION_ID:-}" "$ROOT")" = opener ]; then
       die "this session opened phase #$issue: forward the request to the child session (send_message) and stop" 9
     fi ;;
@@ -635,7 +644,36 @@ opinion_dir() { # opinion_dir <name without extension>
 }
 
 missing_opinion_msg() { # missing_opinion_msg <sha> <path>
-  echo "no saved reviewer output for ${1:0:12}: the phase session writes the whole close-reviewer output, literally and unchanged, to $2 (step 5 of the close-phase skill); no hook writes it, and the verdict is read from its Veredito line"
+  echo "no saved reviewer output for ${1:0:12}: the phase session writes the whole close-reviewer output, literally and unchanged, to $2 (step 5 of the close-phase skill); save it with close-phase.sh --save-review <agentId>, and the verdict is read from its Veredito line"
+}
+
+# Saves the close-reviewer opinion of subagent <agent id> from its transcript, after checking its hash
+# against the output_sha the trace hook recorded when that agent stopped.
+save_review() {
+  local events want got tr text prefix=reviewer sha dir out
+  [ "$gate_review" = 0 ] || prefix=reviewer-gate
+  events="$(phase_trace_file "$ROOT")" || die "cannot locate the trace: save refused"
+  [ -f "$events" ] || die "no trace at $events: save refused"
+  want="$(jq -rs --arg a "$agent_id" '[.[] | select(type == "object" and .event == "SubagentStop" and .agent_type == "close-reviewer" and .agent_id == $a)] | last | .output_sha // ""' "$events" 2>/dev/null || true)"
+  [ -n "$want" ] || die "the trace has no close-reviewer stop with an output_sha for agent $agent_id: wait for it to finish, or run the close-reviewer again"
+  tr=""
+  if [ -n "${CLOSE_PHASE_SUBAGENTS_ROOT:-}" ]; then
+    set -- "$CLOSE_PHASE_SUBAGENTS_ROOT"/*/subagents/agent-"$agent_id".jsonl
+  else
+    set -- "$HOME"/.claude/projects/*/*/subagents/agent-"$agent_id".jsonl
+  fi
+  [ ! -f "$1" ] || tr="$1"
+  [ -n "$tr" ] || die "no transcript subagents/agent-$agent_id.jsonl found"
+  text="$(opinion_from_transcript "$tr")"
+  [ -n "$text" ] || die "the transcript of agent $agent_id has no text with a Veredito line"
+  got="$(printf '%s' "$text" | opinion_sha)"
+  [ "$got" = "$want" ] || die "the opinion in the transcript of agent $agent_id does not match the output_sha recorded in the trace: run the close-reviewer again; never edit the opinion"
+  sha="$(git rev-parse HEAD)"
+  dir="$(dirname "$events")"
+  out="$dir/$prefix-$sha.md"
+  mkdir -p "$dir"
+  printf '%s\n' "$text" >"$out"
+  echo "saved the opinion of agent $agent_id to $out"
 }
 
 publish_review() {
@@ -807,7 +845,7 @@ gate_review_required() { # gate_review_required <pr> <sha> <labels> <gate paths>
   fi
   [ "$ok" = 1 ] && return 0
   echo "refused: PR #$n touches the gate and needs a second review (needs-gate-review)${paths:+: $(echo "$paths" | paste -sd, -)}"
-  echo "run the close-reviewer agent on HEAD $sha with the question 'does this PR weaken the gate?', save its whole output to .process/reviewer-gate-$sha.md, publish it with --publish-review <file> --gate, then rerun --merge; the owner is not asked"
+  echo "run the close-reviewer agent on HEAD $sha with the question 'does this PR weaken the gate?', save it with --save-review <agentId> --gate (.process/reviewer-gate-$sha.md), publish it with --publish-review <file> --gate, then rerun --merge; the owner is not asked"
   exit 5
 }
 
@@ -1227,6 +1265,7 @@ case "$mode" in
   abort) abort ;;
   prepare) prepare ;;
   prereview) pre_review ;;
+  save) save_review ;;
   review) if [ -n "$pr" ]; then outside_publish; else publish_review; fi ;;
   check) check_pr ;;
   merge) if [ -n "$pr" ]; then outside_merge; else merge; fi ;;
