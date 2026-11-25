@@ -42,3 +42,5 @@ assert_contains "$(cat "$REPO/.github/method-files.txt")" ".github/update-notice
 assert_contains "$notice" ".process/template" "the notice says where the template checkout is (#215)"
 assert_contains "$notice" "fetch-template.sh" "the notice names fetch-template.sh"
 finish
+assert_contains "$notice" "ci-already-green.sh" "the notice asks own deploy workflows for the CI gate (#270)"
+assert_contains "$notice" "checks: read" "the notice asks the checks: read permission (#270)"
