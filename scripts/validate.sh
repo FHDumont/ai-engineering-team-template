@@ -33,6 +33,11 @@
 #: ~/.cache/ai-method/history.tsv (see machine-slots.sh --report). The limits are in
 #: ~/.config/ai-method/machine-limits.env.
 #:
+#: At the end: the time of the lint and of the repository block, and the 5 slowest
+#: tests. The repository block time also goes to the history as the validate-repo
+#: measure. The full lint runs shellcheck in parallel too (AI_METHOD_TEST_JOBS files
+#: at once, 1 = in series; the output keeps the order of the files).
+#:
 #: Tests run in parallel, each in its own temporary folder: AI_METHOD_TEST_JOBS at once
 #: (default: CPUs divided by AI_METHOD_SLOTS_VALIDATE, at least 1; 1 = in series). The
 #: report keeps the fixed order of the tests.
@@ -186,9 +191,28 @@ missing_dep_hint() {
   done
 }
 
+# Shellcheck on the files (one per line), up to AI_METHOD_TEST_JOBS at once (1 = in
+# series). Each file's output goes to its own file and is printed in the list order;
+# fails when any file does.
+shellcheck_parallel() {
+  local files="$1" f n rc=0 d="$RDIR/lint"
+  mkdir -p "$d"
+  # shellcheck disable=SC2016  # the runner is a script for the child shell
+  printf '%s\n' "$files" | tr '\n' '\0' | xargs -0 -n1 -P "$AI_METHOD_TEST_JOBS" bash -c \
+    'n="$(printf %s "$2" | tr / _)"; shellcheck -x -S warning "$2" >"$1/$n.out" 2>&1; echo $? >"$1/$n.rc"' _ "$d" || true
+  while IFS= read -r f; do
+    n="$(printf %s "$f" | tr / _)"
+    [ "$(cat "$d/$n.rc" 2>/dev/null || echo 1)" = 0 ] || rc=1
+    cat "$d/$n.out" 2>/dev/null || true
+  done <<<"$files"
+  return "$rc"
+}
+
 run_validate() {
   local fail=0 files pyfiles passed failed t out cands scope=""
   if [ "$lint" = 1 ]; then
+    local lint_t0
+    lint_t0="$(now_epoch)"
     require_cmd shellcheck python3
     progress_step "shellcheck and python syntax"
     cands="$(lint_candidates)"
@@ -197,8 +221,7 @@ run_validate() {
     if [ -z "$files" ]; then
       echo "ok: shellcheck (0 files$scope)"
     else
-      # shellcheck disable=SC2086
-      if shellcheck -x -S warning $files; then
+      if shellcheck_parallel "$files"; then
         echo "ok: shellcheck ($(echo "$files" | wc -l | tr -d ' ') files$scope)"
       else
         fail=1
@@ -213,6 +236,7 @@ for f in sys.argv[1:]:
     else
       fail=1
     fi
+    echo "time: lint $(( $(now_epoch) - lint_t0 )) s"
   fi
 
   if [ "$tests" = 1 ]; then
@@ -245,9 +269,9 @@ for f in sys.argv[1:]:
     rdir="$RDIR"
     : >"$rdir/done.log"
     # shellcheck disable=SC2016  # the runner is a script for the child shell
-    runner='n="$(printf %s "$2" | tr / _)"
+    runner='n="$(printf %s "$2" | tr / _)"; t0=$(date +%s)
       case "$2" in *.py) python3 "$2" >"$1/$n.out" 2>&1 ;; *) bash "$2" >"$1/$n.out" 2>&1 ;; esac
-      echo $? >"$1/$n.rc"; basename "$2" >>"$1/done.log"'
+      echo $? >"$1/$n.rc"; echo $(( $(date +%s) - t0 )) >"$1/$n.secs"; basename "$2" >>"$1/done.log"'
     # Each test gets its own TMPDIR inside the folder of the run: orphan_sweep finds what it leaves.
     runner="mkdir -p \"\$1/tmp\"; export TMPDIR=\"\$1/tmp\"; $runner"
     printf '%s\0' "${list[@]}" | xargs -0 -n1 -P "$AI_METHOD_TEST_JOBS" bash -c "$runner" _ "$rdir" &
@@ -273,9 +297,19 @@ for f in sys.argv[1:]:
     done
     fi
     echo "tests: $passed passed, $failed failed"
+    if [ "$n_total" -gt 0 ]; then
+      echo "slowest tests:"
+      for t in "${list[@]}"; do
+        printf '%s %s\n' "$(cat "$rdir/$(printf %s "$t" | tr / _).secs" 2>/dev/null || echo 0)" "$t"
+      done | sort -rn -k1,1 | head -5 | while read -r secs name; do echo "  $secs s  $name"; done
+    fi
     if [ -f .github/validate-repo.sh ]; then
+      local repo_t0
       echo "repo: .github/validate-repo.sh"
+      repo_t0="$(now_epoch)"
       bash .github/validate-repo.sh || fail=1
+      echo $(( $(now_epoch) - repo_t0 )) >"$RDIR/t_repo"
+      echo "time: repository block $(cat "$RDIR/t_repo") s"
     fi
   fi
   exit "$fail"
@@ -398,6 +432,10 @@ if [ "$tests" = 1 ]; then
 fi
 set -e
 history_add validate "$(slots_repo_name)" "$(issue_from_branch "$(current_branch)")" "$SLOT_WAIT" "$(( $(now_epoch) - t0 ))"
+# The repository block is its own measure, so the repo is charged for its part only.
+if [ -s "$RDIR/t_repo" ]; then
+  history_add validate-repo "$(slots_repo_name)" "$(issue_from_branch "$(current_branch)")" 0 "$(cat "$RDIR/t_repo")"
+fi
 warn_over_expected "validate.sh" "$(( $(now_epoch) - t0 ))" 240 || true
 if [ -s "${AI_METHOD_OVER_EXPECTED:-}" ]; then
   echo "over-expected:"
