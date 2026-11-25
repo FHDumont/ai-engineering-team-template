@@ -68,11 +68,7 @@ if [ -n "$line" ] && printf '%s' "$line" | jq -e '.event == "SubagentStop" and .
   sub_tr="$(printf '%s' "$input" | jq -r '(.agent_transcript_path // (if (.transcript_path // "") != "" and (.agent_id // "") != ""
     then "\(.transcript_path | sub("\\.jsonl$"; ""))/subagents/agent-\(.agent_id).jsonl" else empty end)) // empty' 2>/dev/null)"
   opinion=""
-  if [ -n "$sub_tr" ] && [ -f "$sub_tr" ]; then
-    opinion="$(jq -rs '[.[] | select(.type == "assistant") | .message.content? | arrays | .[]
-      | (if .type == "text" then .text elif .type == "tool_use" then .input.message else empty end)
-      | strings | select(test("(^|\n)Veredito:"))] | last // empty' "$sub_tr" 2>/dev/null)"
-  fi
+  [ -z "$sub_tr" ] || opinion="$(opinion_from_transcript "$sub_tr")"
   [ -n "$opinion" ] || opinion="$(printf '%s' "$input" | jq -r '.last_assistant_message // empty' 2>/dev/null)"
   out_sha="$(printf '%s' "$opinion" | opinion_sha)"
   [ "$out_sha" = "$(printf '' | opinion_sha)" ] ||
