@@ -64,8 +64,15 @@ jobs:
     name: "Validate main"
     runs-on: ubuntu-latest
     timeout-minutes: 5
+    permissions:
+      contents: read
+      checks: read
     steps:
+      - name: "See if this tree already has green CI"
+        id: gate
+        run: scripts/ci-already-green.sh "$GITHUB_SHA" >> "$GITHUB_OUTPUT"
       - name: "Lint and tests"
+        if: steps.gate.outputs.skip != 'true'
         run: scripts/validate.sh
   build:
     name: "Build"
@@ -112,13 +119,24 @@ jobs:
         self.assertIn("deploy-paths", self.deploy_problems(self.DEPLOY.replace("# deploy-paths: app/\n", "")))
 
     def test_deploy_may_skip_a_suite_that_ci_already_ran(self):
-        gated = self.DEPLOY.replace(
-            '        run: scripts/validate.sh\n',
-            '        run: scripts/ci-already-green.sh\n'
-            '      - name: "Lint and tests"\n'
-            '        if: steps.gate.outputs.skip != \'true\'\n'
-            '        run: scripts/validate.sh\n')
-        self.assertEqual(self.deploy_problems(gated), "")
+        self.assertEqual(self.deploy_problems(self.DEPLOY), "")
+
+    def test_deploy_must_gate_the_suite_on_green_ci(self):
+        # #270: running validate.sh on every deploy is refused; the CI gate is required.
+        always = self.DEPLOY.replace("        if: steps.gate.outputs.skip != 'true'\n", "")
+        self.assertIn("scripts/validate.sh must run only when the gate says skip != true",
+                      self.deploy_problems(always))
+        no_gate = self.DEPLOY.replace("scripts/ci-already-green.sh", "echo")
+        self.assertIn("must run scripts/ci-already-green.sh", self.deploy_problems(no_gate))
+        plain = self.DEPLOY.replace(
+            '      - name: "See if this tree already has green CI"\n        id: gate\n'
+            '        run: scripts/ci-already-green.sh "$GITHUB_SHA" >> "$GITHUB_OUTPUT"\n', "").replace(
+            "        if: steps.gate.outputs.skip != 'true'\n", "")
+        self.assertIn("must run scripts/ci-already-green.sh", self.deploy_problems(plain))
+
+    def test_deploy_gate_needs_checks_read(self):
+        no_perm = self.DEPLOY.replace("      checks: read\n", "")
+        self.assertIn("needs permissions: checks: read", self.deploy_problems(no_perm))
 
     def test_good(self):
         self.assertEqual(cw.check(self.write("issues-label.yml", GOOD)), [])
