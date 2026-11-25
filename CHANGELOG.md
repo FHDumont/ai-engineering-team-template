@@ -4,6 +4,7 @@
 
 ## Funcionalidades
 
+- feat(close-phase): --save-review saves the reviewer opinion from the transcript ([#263](https://github.com/FHDumont/ai-engineering-team-template/pull/263)) · 2026-11-25
 - feat: open the phase group in waves when fewer slots are free ([#255](https://github.com/FHDumont/ai-engineering-team-template/pull/255)) · 2026-11-24
 - feat: method-diff outdated class, new destination files and --notice ([#224](https://github.com/FHDumont/ai-engineering-team-template/pull/224)) · 2026-11-24
 - fix: close the remaining method gaps ([#178](https://github.com/FHDumont/ai-engineering-team-template/pull/178)) · 2026-11-23
@@ -47,6 +48,7 @@
 
 ## Manutenção
 
+- perf(validate): show where the time goes and record validate-repo ([#260](https://github.com/FHDumont/ai-engineering-team-template/pull/260)) · 2026-11-25
 - feat: extend the method without editing it by hand ([#177](https://github.com/FHDumont/ai-engineering-team-template/pull/177)) · 2026-11-23
 - perf: measure phase time and cut the CI and prepare reruns ([#48](https://github.com/FHDumont/ai-engineering-team-template/pull/48)) · 2026-11-21
 - feat: stop leftover processes and add sessions.sh at the end of a phase ([#25](https://github.com/FHDumont/ai-engineering-team-template/pull/25)) · 2026-11-21
