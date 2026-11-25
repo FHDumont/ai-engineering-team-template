@@ -106,7 +106,7 @@ rm -f "$TMP"/started-*
 gen_pair 3   # series only proves the failure: a short explicit wait, not the parameter
 t0=$(date +%s)
 assert_status 1 "with one job the same tests run in series and fail" env -u PROCESS_VALIDATE_RUNNING AI_METHOD_TEST_JOBS=1 "$par/scripts/validate.sh" --tests
-[ $(( $(date +%s) - t0 )) -lt 30 ] && ok || bad "the series case does not wait for the parameter limit"
+[ $(( $(date +%s) - t0 )) -lt "$LIMIT" ] && ok || bad "the series case does not wait for the parameter limit"
 assert_contains "$(last_output)" "FAIL scripts/tests/test_a.sh" "a failing test is reported by name"
 
 # A waiter does not inherit a green result of a tree that changed during the run (#150).

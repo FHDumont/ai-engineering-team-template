@@ -171,10 +171,16 @@ mkdir -p "$r5/scripts"
 for i in $(seq 1 40); do echo "v0 $i" >"$r5/scripts/f$i.sh"; done
 git -C "$r5" add scripts
 git -C "$r5" commit --quiet -m "chore: adopted"
-start=$SECONDS
-found="$(cd "$r5" && "$DIFF" --find-base --template "$t5" 2>&1)"
-elapsed=$((SECONDS - start))
-assert_eq "yes" "$([ "$elapsed" -le 3 ] && echo yes || echo "no ($elapsed s)")" "find-base on 60 commits and 40 files is fast"
+# Counts the git calls instead of timing them: a count does not depend on the load of the machine.
+gitbin="$TMP/gitcount"; mkdir -p "$gitbin"
+real_git="$(command -v git)"
+printf '#!/bin/sh\necho x >>"%s/git-calls"\nexec "%s" "$@"\n' "$TMP" "$real_git" >"$gitbin/git"
+chmod +x "$gitbin/git"
+: >"$TMP/git-calls"
+found="$(cd "$r5" && PATH="$gitbin:$PATH" "$DIFF" --find-base --template "$t5" 2>&1)"
+calls="$(wc -l <"$TMP/git-calls" | tr -d ' ')"
+# 61 template commits: about one git call per commit. A call per file and commit would be over 2400.
+assert_eq "yes" "$([ "$calls" -le 200 ] && echo yes || echo "no ($calls calls)")" "find-base on 60 commits and 40 files spawns git once per commit, not per file"
 assert_eq "$(git -C "$t5" rev-list --reverse HEAD | sed -n 2p)" "$found" "find-base names the commit whose blobs match"
 
 # #213: outdated (repo = origin, destination differs) is apart from adapted (repo differs from both).
