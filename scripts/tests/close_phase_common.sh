@@ -75,9 +75,18 @@ case "\$*" in
       cat "$TMP/comments.json" 2>/dev/null || true
     fi ;;
   "issue view 5"*"labels"*) printf '%s\n' "\${FAKE_ISSUE_LABELS:-type:feature}" | tr ',' '\n' ;;
-  "api repos/owner/repo/commits/$SHA/status"*) echo "$2" ;;
+  # FAKE_REVIEW_LATE replaces the review state from the second read on (the gate reads it first).
+  "api repos/owner/repo/commits/$SHA/status"*)
+    n=\$(( \$(cat "$TMP/rv_reads" 2>/dev/null || echo 0) + 1 )); echo "\$n" >"$TMP/rv_reads"
+    if [ -n "\${FAKE_REVIEW_LATE:-}" ] && [ "\$n" -ge 2 ]; then echo "\$FAKE_REVIEW_LATE"; else echo "$2"; fi ;;
   # Unprotected mode: FAKE_MODE=1 records it; FAKE_CI is the state of the CI check run on HEAD.
   "variable list"*) [ -z "\${FAKE_MODE:-}" ] || echo PROCESS_BRANCH_MODE ;;
+  # The merge wait loop reads CI as "state<TAB>url"; FAKE_CI_LATE replaces it from read FAKE_CI_FLIP_READ on.
+  "api repos/owner/repo/commits/$SHA/check-runs"*"@tsv"*)
+    n=\$(( \$(cat "$TMP/ci_reads" 2>/dev/null || echo 0) + 1 )); echo "\$n" >"$TMP/ci_reads"
+    st="\${FAKE_CI:-success}"
+    if [ -n "\${FAKE_CI_LATE:-}" ] && [ "\$n" -ge "\${FAKE_CI_FLIP_READ:-1}" ]; then st="\$FAKE_CI_LATE"; fi
+    printf '%s\t%s\n' "\$st" "https://github.com/owner/repo/actions/runs/888/job/1" ;;
   "api repos/owner/repo/commits/$SHA/check-runs"*"select(.name"*) echo "\${FAKE_CI:-success}" ;;
   # Protection of main: FAKE_PROTECTION=none answers like an unprotected branch;
   # any other value is the list of required contexts.
@@ -108,5 +117,5 @@ case "\$*" in
 esac
 H
   use_fake_gh "$TMP/handler.sh"
-  rm -f "$TMP/reads" "$TMP/owner-label" "$TMP/gate-label" "$TMP/gate-created" "$TMP/cmt_reads"
+  rm -f "$TMP/reads" "$TMP/owner-label" "$TMP/gate-label" "$TMP/gate-created" "$TMP/cmt_reads" "$TMP/ci_reads" "$TMP/rv_reads"
 }
