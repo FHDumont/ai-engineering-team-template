@@ -5,7 +5,8 @@
 #:
 #: Reads .worktrees/parallel-active.tsv (written by open-parallel.sh;
 #: close-phase.sh --cleanup takes out the line of each phase that merges), waits
-#: until the PR of each branch is merged, updates the local main, removes the
+#: until the PR of each branch is merged (a pending line, "<issue><TAB>pending", is a
+#: phase not opened yet for lack of a slot: it counts as not merged), updates the local main, removes the
 #: worktrees that are left and clears the registry. Only then runs
 #: scripts/build.sh, if it exists. An empty registry means nothing to wait for.
 #: It never deploys: the end step belongs to the main session (gen-docs.sh,
@@ -44,6 +45,12 @@ while :; do
   pending=0
   # The registry is only read here: redo-phase.sh rewrites the line of a redone phase.
   while IFS="$(printf '\t')" read -r n branch path; do
+    # A pending line (open-parallel.sh: no free phase slot yet) has no branch: the group is not done.
+    if [ "$branch" = pending ]; then
+      pending=$((pending + 1))
+      echo "waiting: #$n is pending (not opened yet: scripts/phase-start.sh $n)"
+      continue
+    fi
     state="$(gh pr list --repo "$repo" --head "$branch" --state all --json state --jq '.[0].state // "NONE"')"
     if [ "$state" != MERGED ]; then
       pending=$((pending + 1))
