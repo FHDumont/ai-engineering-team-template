@@ -38,4 +38,28 @@ assert_status 0 "a slot freed while it waits opens the phase in the same call" e
 wait
 assert_contains "$(last_output)" "title: Fase #7" "prints the start_session arguments after the wait"
 
+# Fewer free slots than phases asked (limit 3, 1 free, 3 asked): the group opens in waves. It opens what fits,
+# registers the whole group (the rest pending), exits 0 and prints the pending ones with the command to open them.
+spec group.md 8
+printf '\n## Fase #11 — y\n\n1. Etapa. modelo: sonnet · esforço: low · motivo: leve\n' >>"$repo/docs/specs/group.md"
+printf '\n## Fase #12 — z\n\n1. Etapa. modelo: sonnet · esforço: low · motivo: leve\n' >>"$repo/docs/specs/group.md"
+AI_METHOD_SLOTS_FASE=3
+for k in 1 2; do mkdir -p "$AI_METHOD_CACHE/slots/fase/$k"; printf 'repo\t99\t%s\t%s\t%s\t0\n' "$$" "$(date +%s)" "$repo" >"$AI_METHOD_CACHE/slots/fase/$k/info"; done
+assert_status 0 "1 free slot and 3 phases open the one that fits" env PHASE_START_SLOT_WAIT=2 CLAUDE_CODE_SESSION_ID=manager sh -c "cd '$repo' && scripts/phase-start.sh 8 11 12 --no-check"
+out="$(last_output)"
+assert_contains "$out" "title: Fase #8" "arguments of the phase that opened"
+assert_eq 3 "$(cut -f1 "$repo/.worktrees/parallel-active.tsv" | grep -c .)" "the whole group is registered"
+assert_eq 2 "$(grep -c "pending$" "$repo/.worktrees/parallel-active.tsv")" "the others are pending in the registry"
+assert_contains "$out" "pending" "lists the pending phases"
+assert_contains "$out" "scripts/phase-start.sh 11" "prints the command that opens a pending phase"
+assert_eq 1 "$(ls "$repo/.worktrees" | grep -c '^issue-')" "only the phase that fits has a worktree"
+
+# A pending phase opens in the same group when a slot is free, without a "leftover" refusal.
+rm -rf "$AI_METHOD_CACHE/slots/fase/2"
+assert_status 0 "a pending phase opens when a slot is free" env CLAUDE_CODE_SESSION_ID=manager sh -c "cd '$repo' && scripts/phase-start.sh 11 --no-check"
+assert_contains "$(last_output)" "title: Fase #11" "arguments of the pending phase"
+assert_eq 3 "$(cut -f1 "$repo/.worktrees/parallel-active.tsv" | grep -c .)" "the group still has 3 lines"
+assert_eq 1 "$(grep -c "pending$" "$repo/.worktrees/parallel-active.tsv")" "one pending line left"
+assert_eq 1 "$(grep -c "^11	feat/" "$repo/.worktrees/parallel-active.tsv")" "#11 now has a branch"
+
 finish
