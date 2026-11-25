@@ -52,7 +52,7 @@ assert_eq 3 "$(cut -f1 "$repo/.worktrees/parallel-active.tsv" | grep -c .)" "the
 assert_eq 2 "$(grep -c "pending$" "$repo/.worktrees/parallel-active.tsv")" "the others are pending in the registry"
 assert_contains "$out" "pending" "lists the pending phases"
 assert_contains "$out" "scripts/phase-start.sh 11" "prints the command that opens a pending phase"
-assert_eq 1 "$(ls "$repo/.worktrees" | grep -c '^issue-')" "only the phase that fits has a worktree"
+assert_eq "issue-8" "$(ls "$repo/.worktrees" | grep -E '^issue-(8|11|12)$' | paste -sd' ' -)" "only the phase that fits has a worktree"
 
 # A pending phase opens in the same group when a slot is free, without a "leftover" refusal.
 rm -rf "$AI_METHOD_CACHE/slots/fase/2"

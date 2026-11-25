@@ -185,7 +185,11 @@ assert_status 75 "new-phase.sh exits 75 without a free slot" env AI_METHOD_SLOTS
 assert_contains "$(last_output)" "no free phase slot" "new-phase.sh says why"
 assert_contains "$(last_output)" "#7" "new-phase.sh says who holds the slot"
 assert_eq "" "$(git -C "$repo" branch --list 'fix/issue-8-*')" "no branch is created without a slot"
-assert_status 75 "open-parallel.sh exits 75 without enough slots" env AI_METHOD_SLOTS_FASE=2 sh -c "cd '$repo' && scripts/open-parallel.sh 8 9 --no-check"
+# Limit 2, both slots held (#7 and a second holder): no slot at all, exit 75 and nothing is created
+# (with one free slot the group opens in waves; see test_phase_start_slots.sh).
+mkdir -p "$AI_METHOD_CACHE/slots/fase/zz"; printf 'repo\t99\t%s\t%s\t%s\t0\n' "$$" "$(date +%s)" "$repo" >"$AI_METHOD_CACHE/slots/fase/zz/info"
+assert_status 75 "open-parallel.sh exits 75 with no free slot" env AI_METHOD_SLOTS_FASE=2 sh -c "cd '$repo' && scripts/open-parallel.sh 8 9 --no-check"
+rm -rf "$AI_METHOD_CACHE/slots/fase/zz"
 assert_eq "" "$(git -C "$repo" branch --list 'fix/issue-*')" "open-parallel.sh creates nothing without slots"
 assert_eq "no" "$([ -e "$repo/.worktrees/issue-8" ] && echo yes || echo no)" "no worktree without a slot"
 
