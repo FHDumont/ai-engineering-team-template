@@ -152,4 +152,13 @@ printf '#!/usr/bin/env bash\necho repo-check-ran\nexit 1\n' >"$repo_check/.githu
 assert_status 1 "a failing repository validate script fails the suite" env -u PROCESS_VALIDATE_RUNNING "$repo_check/scripts/validate.sh" --tests
 assert_contains "$(last_output)" "repo-check-ran" "the repository script actually ran"
 
+# The time of the repository block is its own measure in the history (#251).
+rm -f "$AI_METHOD_CACHE/history.tsv"
+printf '#!/usr/bin/env bash\necho repo-check-ok\nexit 0\n' >"$repo_check/.github/validate-repo.sh"
+printf '#!/usr/bin/env bash\nexit 0\n' >"$repo_check/scripts/tests/test_fast.sh"
+assert_status 0 "a passing repository validate script passes the suite" env -u PROCESS_VALIDATE_RUNNING "$repo_check/scripts/validate.sh" --tests
+assert_contains "$(cat "$AI_METHOD_CACHE/history.tsv")" "$(printf 'validate-repo\t')" "the time of validate-repo.sh is recorded as the validate-repo measure"
+assert_contains "$(last_output)" "slowest tests" "the end of validate.sh lists the slowest tests"
+assert_contains "$(last_output)" "time: repository block" "the end of validate.sh reports the repository block time"
+
 finish
