@@ -223,6 +223,11 @@ rm -f "$repo/.worktrees/parallel-active.tsv" "$repo/docs/specs/botnine.md"
 
 printf '7\tfeat/issue-7-listar-issues-por-area\t%s\n' "$path" >"$repo/.worktrees/parallel-active.tsv"
 assert_status 3 "integrate waits and times out while a phase is open" env FAKE_PR_STATE=OPEN sh -c "cd '$repo' && scripts/integrate-parallel.sh --timeout 0 --interval 0"
+# A pending line (phase not opened for lack of a slot) is not merged, even when every other PR is.
+printf '8\tpending\n' >>"$repo/.worktrees/parallel-active.tsv"
+assert_status 3 "integrate waits for a pending phase" env FAKE_PR_STATE=MERGED sh -c "cd '$repo' && scripts/integrate-parallel.sh --timeout 0 --interval 0 --dry-run"
+assert_contains "$(last_output)" "#8 is pending" "says which phase is pending"
+printf '7\tfeat/issue-7-listar-issues-por-area\t%s\n' "$path" >"$repo/.worktrees/parallel-active.tsv"
 assert_status 0 "integrate proceeds when all merged" sh -c "cd '$repo' && scripts/integrate-parallel.sh --dry-run --interval 0"
 assert_contains "$(last_output)" "all parallel phases merged" "reports all merged"
 # integrate never deploys: the end step (gen-docs.sh, deploy.sh, archiving,
