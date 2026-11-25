@@ -17,7 +17,7 @@
 #:
 #: Affected tests: in a phase (branch with issue-<n>, outside the CI) the tests run are
 #: the ones the diff against the merge-base with AI_METHOD_LINT_BASE reaches, plus the
-#: gate tests (file names with "gate"). The map is read from the tests themselves: a
+#: gate tests (file names with "gate") and test_pipefail.sh, which scans every script. The map is read from the tests themselves: a
 #: test is affected when its text mentions a changed file; for a file in scripts/lib,
 #: also when it mentions a script that mentions the library. Docs and root .md
 #: files the suite does not read (the rule of ci.yml) need no test. A changed file
@@ -117,7 +117,8 @@ select_tests() {
   base="$(git merge-base HEAD "$AI_METHOD_LINT_BASE" 2>/dev/null || true)"
   [ -n "$base" ] || return 1
   files="$({ git diff --name-only --no-renames -z "$base" | tr '\0' '\n'; git ls-files -z -o --exclude-standard | tr '\0' '\n'; } | sort -u)"
-  sel="$(printf '%s\n' "$@" | grep gate || true)"
+  # Gate tests and tests that scan every production script (test_pipefail.sh) always run: no changed file names them.
+  sel="$(printf '%s\n' "$@" | grep -E 'gate|test_pipefail' || true)"
   while IFS= read -r f; do
     [ -n "$f" ] || continue
     inert_path "$f" && continue
