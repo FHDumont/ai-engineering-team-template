@@ -57,6 +57,13 @@ assert_eq "" "$(git -C "$repo" branch --list 'feat/issue-7-x')" "cleanup deletes
 assert_eq 1 "$(git -C "$repo" ls-remote --heads origin feat/issue-8-x | wc -l | tr -d ' ')" "the remote branch of another phase stays"
 assert_status 0 "cleanup of the last phase" sh -c "cd '$repo/.worktrees/issue-8' && scripts/close-phase.sh --cleanup"
 assert_eq "" "$(cat "$REGISTRY")" "the registry is empty after the last cleanup"
+# A pending line (phase of the group not opened yet) survives the cleanup of another phase.
+phase 8
+printf '8\tfeat/issue-8-x\t%s\n11\tpending\n' "$repo/.worktrees/issue-8" >"$REGISTRY"
+assert_status 0 "cleanup with a pending line in the registry" sh -c "cd '$repo/.worktrees/issue-8' && scripts/close-phase.sh --cleanup"
+assert_eq "11	pending" "$(cat "$REGISTRY")" "the pending line stays in the registry"
+rm -f "$REGISTRY"
+
 
 # An untracked file of the main checkout identical to the one the merge brings (the
 # spec written by the planning on main and committed on the phase branch) does not
