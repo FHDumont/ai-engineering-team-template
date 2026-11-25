@@ -87,11 +87,12 @@ if [ "${PHASE_START_CHECKED:-}" != 1 ]; then
   done
 fi
 opened=()
+in_registry() { [ -f "$registry" ] && awk -F '\t' -v n="$1" '$1 == n { f = 1 } END { exit !f }' "$registry"; }
 # Registry helpers: a line is replaced in place (a pending one) or appended; never duplicated.
 registry_set() { # registry_set <issue> <branch> [path]
   local n="$1" b="$2" p="${3:-}" line
   line="$n	$b"; [ -z "$p" ] || line="$line	$p"
-  if [ -f "$registry" ] && cut -f1 "$registry" | grep -qx "$n"; then
+  if [ -f "$registry" ] && in_registry "$n"; then
     awk -F '\t' -v n="$n" -v l="$line" '$1 == n { print l; next } { print }' "$registry" >"$registry.tmp"
     mv "$registry.tmp" "$registry"
   else
@@ -106,13 +107,13 @@ undo() {
     (cd "$p" && "$p/scripts/close-phase.sh" --abort --discard) || echo "warn: could not undo $p" >&2
   done
   if [ "$dry" = 0 ] && [ "$all_pending" = 1 ]; then
-    for n in "${issues[@]}"; do cut -f1 "$registry" 2>/dev/null | grep -qx "$n" || registry_set "$n" pending; done
+    for n in "${issues[@]}"; do in_registry "$n" || registry_set "$n" pending; done
   fi
 }
 # The phases that do not fit now: the rest is registered as pending before the first phase opens.
 if [ "$dry" = 0 ] && [ "$free_now" -lt "${#issues[@]}" ]; then
   for n in "${issues[@]:$free_now}"; do
-    cut -f1 "$registry" 2>/dev/null | grep -qx "$n" || registry_set "$n" pending
+    in_registry "$n" || registry_set "$n" pending
   done
 fi
 wave=("${issues[@]:0:$free_now}")
