@@ -4,7 +4,11 @@
 #: Usage: phase-start.sh <issue> [<issue>...] [--no-check] [--dry-run]
 #:
 #: One issue opens a solo phase (new-phase.sh); two or more, the parallel group
-#: (open-parallel.sh). Exits non-zero, creating nothing, when an issue is not
+#: (open-parallel.sh). With fewer free "fase" slots than phases (the group within
+#: the limit) it opens in waves: it opens the ones that fit, registers the group
+#: with the others pending in .worktrees/parallel-active.tsv, exits 0 and prints the
+#: pending ones and the command to open them. Calling it with a pending issue opens
+#: it in the same group once a slot is free. With no slot at all it waits as before. Exits non-zero, creating nothing, when an issue is not
 #: open, when no docs/specs/*.md cites #<n>, or when the spec lacks the pair
 #: "modelo: ... · esforço: ...". With a spec: records phase_opened, creates the
 #: branch and the worktree, commits the spec on the branch (the session that
@@ -211,7 +215,11 @@ slot_max="${PHASE_START_SLOT_WAIT:-540}" slot_poll="${PHASE_START_SLOT_POLL:-15}
 while :; do
   rc=0
   if [ ${#issues[@]} -eq 1 ]; then
-    "$HERE/new-phase.sh" "${issues[0]}" ${pass[@]+"${pass[@]}"} || rc=$?
+    if awk -F '\t' -v n="${issues[0]}" '$1 == n && $2 == "pending" { f = 1 } END { exit !f }' "$main_root/.worktrees/parallel-active.tsv" 2>/dev/null; then
+      "$HERE/open-parallel.sh" "${issues[0]}" ${pass[@]+"${pass[@]}"} || rc=$?
+    else
+      "$HERE/new-phase.sh" "${issues[0]}" ${pass[@]+"${pass[@]}"} || rc=$?
+    fi
   else
     "$HERE/open-parallel.sh" "${issues[@]}" ${pass[@]+"${pass[@]}"} || rc=$?
   fi
@@ -259,6 +267,17 @@ for n in "${issues[@]}"; do
   done <<<"$(specs_citing "$n" "$main_root")"
 done
 
+# Waves: a phase of the call with no worktree is pending (open-parallel.sh registered it); only the
+# ones opened get a session now.
+asked=("${issues[@]}") pending=() issues=()
+for n in "${asked[@]}"; do
+  if [ -d "$main_root/.worktrees/issue-$n" ]; then issues+=("$n"); else pending+=("$n"); fi
+done
+[ ${#issues[@]} -gt 0 ] || die "no phase of the call was opened: ${asked[*]}"
+pairs_all=("${pairs[@]}") pairs=()
+for k in "${!asked[@]}"; do
+  [ -d "$main_root/.worktrees/issue-${asked[$k]}" ] && pairs+=("${pairs_all[$k]}")
+done
 i=0
 for n in "${issues[@]}"; do
   path="$main_root/.worktrees/issue-$n"
@@ -276,6 +295,15 @@ for n in "${issues[@]}"; do
   echo "  background: at least 80 characters (goal, group and end mode of the phase)"
   i=$((i + 1))
 done
+pend_text="" pend_card=""
+if [ ${#pending[@]} -gt 0 ]; then
+  plist="$(printf '#%s ' "${pending[@]}" | sed 's/ $//')"
+  echo
+  echo "pending (no free phase slot now, registered in .worktrees/parallel-active.tsv): $plist"
+  echo "open one when a slot is free (scripts/machine-slots.sh --check fase), in the same group, with: scripts/phase-start.sh ${pending[0]}"
+  pend_text=" Pending phases of the group ($plist): when scripts/machine-slots.sh --check fase exits 0, run scripts/phase-start.sh <issue> for one of them and open its session as in step 1; a phase that ends frees the slot. The group is integrated only after the pending ones open and merge."
+  pend_card="; as fases pendentes ($plist) abrem depois, quando houver vaga"
+fi
 # The manager only acts when something wakes it, and the end notice of a child
 # session does not always arrive: the heartbeat is what wakes it. No lock checks
 # that the heartbeat exists; these lines are the instruction.
@@ -288,14 +316,14 @@ else
 fi
 # The sentence of --need is for the owner (Portuguese): which card, in which
 # session, and where that session is in the sidebar.
-need="clique $cards na sessão \"TITULO\", na barra lateral, dentro do agrupamento da sessão principal; se não aparecer, abra o agrupamento"
+need="clique $cards na sessão \"TITULO\", na barra lateral, dentro do agrupamento da sessão principal; se não aparecer, abra o agrupamento${pend_card}"
 cat <<STEPS
 
 Manager steps. Do all four, in this order:
 1. Open every session above in this same turn. start_session refused (the turn was not started by an owner message): call start_session again with initiation: own_initiative and the same fields. It becomes a card that the owner clicks. Do not run scripts/start-headless.sh: headless is off by default. Only if the owner turned it on for this opening (.github/headless is on, or PROCESS_HEADLESS=on) or the app does not exist, run scripts/start-headless.sh <issue> --brief-file <file with the same background you gave start_session>. That child has no --allowedTools Bash beyond the app child.
 2. Only after step 1, read the sessions back (in Claude Code: list_sessions; get_session for the model and effort of each one) and, in the message to the owner, quote per phase the pair read back ("Fase #n: modelo/esforço"), never the one that was asked. At least one child is running (app or headless): create the manager heartbeat, one recurring agent task, every 4 minutes, with the text below (in Claude Code: the CronCreate tool, cron "*/4 * * * *", recurring). Create it once, not once per phase. Every child became a card, none running: create no heartbeat; the manager resumes when the owner writes here. The tool does not exist: write in "Você precisa" (scripts/status.sh --need) that the owner must write here when a phase ends.
    Heartbeat text, copy it as is:
-   Manager heartbeat of $label: read the state of the linked sessions and of the pull request of each open phase (scripts/status.sh --state trabalhando). A child session not started yet (its card was not clicked): nothing to do for it. Otherwise do the next step: answer a child session that asked something, or, when every pull request is MERGED, run the integrate skill. An action of the end step denied by the app (scripts/deploy.sh, archiving a session): open a choice card (AskUserQuestion) that starts with "Fase #n — título" and offers to authorize it (for example "Autorizar o deploy"), and with the ok of the owner run the action again yourself; never ask the owner to run a script or to archive in the sidebar. Write to the owner only when something changed since the last heartbeat (a session started, a child asked something, a pull request changed state, a new pending action): then write and paste the scripts/status.sh block. The same state as the last heartbeat (same phases, same states, same "Você precisa"): end the turn with no message to the owner and without the scripts/status.sh block. The only accepted reply when nothing changed is an empty turn: no characters at all, not even "Sem mudança.". When every open phase is only waiting for the owner, delete this heartbeat (CronDelete) in this same turn and do not leave it running; the owner's next message and the end of a child turn already wake the manager. When a phase is working again, create this same heartbeat if it is gone.
+   Manager heartbeat of $label: read the state of the linked sessions and of the pull request of each open phase (scripts/status.sh --state trabalhando). A child session not started yet (its card was not clicked): nothing to do for it. Otherwise do the next step: answer a child session that asked something, or, when every pull request is MERGED and no phase is pending, run the integrate skill.$pend_text An action of the end step denied by the app (scripts/deploy.sh, archiving a session): open a choice card (AskUserQuestion) that starts with "Fase #n — título" and offers to authorize it (for example "Autorizar o deploy"), and with the ok of the owner run the action again yourself; never ask the owner to run a script or to archive in the sidebar. Write to the owner only when something changed since the last heartbeat (a session started, a child asked something, a pull request changed state, a new pending action): then write and paste the scripts/status.sh block. The same state as the last heartbeat (same phases, same states, same "Você precisa"): end the turn with no message to the owner and without the scripts/status.sh block. The only accepted reply when nothing changed is an empty turn: no characters at all, not even "Sem mudança.". When every open phase is only waiting for the owner, delete this heartbeat (CronDelete) in this same turn and do not leave it running; the owner's next message and the end of a child turn already wake the manager. When a phase is working again, create this same heartbeat if it is gone.
 3. Only now, and only when a session became a card (a card that waits has no heartbeat to repeat it), stop with the command below. Replace TITULO with the title of this session read back from the app (the tool that describes the session itself; in Claude Code: get_session, or list_sessions), never a guessed one: a session opened by another session does not know its own title. No way to read it: replace na sessão "TITULO" with na sessão que abriu a fase. Change nothing else:
    scripts/status.sh --state esperando --need '$need'
 4. Delete the heartbeat, if it was created, in the single end step (integrate skill), before scripts/end-check.sh (in Claude Code: the CronDelete tool).
