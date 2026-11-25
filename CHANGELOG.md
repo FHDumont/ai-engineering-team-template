@@ -4,6 +4,7 @@
 
 ## Funcionalidades
 
+- feat: open the phase group in waves when fewer slots are free ([#255](https://github.com/FHDumont/ai-engineering-team-template/pull/255)) · 2026-11-24
 - feat: method-diff outdated class, new destination files and --notice ([#224](https://github.com/FHDumont/ai-engineering-team-template/pull/224)) · 2026-11-24
 - fix: close the remaining method gaps ([#178](https://github.com/FHDumont/ai-engineering-team-template/pull/178)) · 2026-11-23
 - feat(setup): ask the time target and the machine limits in setup ([#64](https://github.com/FHDumont/ai-engineering-team-template/pull/64)) · 2026-11-21
@@ -16,6 +17,7 @@
 
 ## Correções
 
+- fix: --merge --wait leaves when CI or the review turns red ([#257](https://github.com/FHDumont/ai-engineering-team-template/pull/257)) · 2026-11-24
 - feat(ci): runner without actions or gh via CI_CHECKOUT_CMD ([#252](https://github.com/FHDumont/ai-engineering-team-template/pull/252)) · 2026-11-24
 - fix: phase-start exits at once when the group exceeds the fase slot limit ([#253](https://github.com/FHDumont/ai-engineering-team-template/pull/253)) · 2026-11-24
 - fix(tests): scan only the files of the method ([#250](https://github.com/FHDumont/ai-engineering-team-template/pull/250)) · 2026-11-24

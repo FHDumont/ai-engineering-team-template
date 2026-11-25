@@ -4,7 +4,7 @@
 
 ## process
 
-- [#249](https://github.com/FHDumont/ai-engineering-team-template/issues/249) phase-start.sh só abre o grupo inteiro: com menos vagas livres que fases, nenhuma abre · média · end:auto-close · group:abrir-em-ondas
+- [#258](https://github.com/FHDumont/ai-engineering-team-template/issues/258) Parecer do close-reviewer em segundo plano não tem caminho para virar o arquivo literal do --publish-review · alta
 
 ## sem área
 
