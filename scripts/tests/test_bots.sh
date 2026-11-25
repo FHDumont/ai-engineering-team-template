@@ -14,7 +14,7 @@ case "$*" in
   "api repos/owner/repo/issues/comments/1"*) cat "$TMP/posted" 2>/dev/null || true ;;
   "api repos/owner/repo/issues/3/comments"*)
     if [ -f "$TMP/posted" ]; then
-      jq -c --rawfile b "$TMP/posted" '.[0] += [{created_at: "2026-01-17T11:00:00Z", html_url: "https://github.com/owner/repo/issues/3#issuecomment-1", body: $b}]' "$FAKE_COMMENTS"
+      jq -c --rawfile b "$TMP/posted" '.[0] += [{id: 1, created_at: "2026-01-17T11:00:00Z", html_url: "https://github.com/owner/repo/issues/3#issuecomment-1", body: $b}]' "$FAKE_COMMENTS"
     else
       cat "$FAKE_COMMENTS"
     fi ;;
@@ -222,15 +222,28 @@ assert_contains "$first_line" "**De:** fase #34 · **Para:** bot-a · **Pedido:*
 assert_contains "$first_line" "**Responde a:** —" "a new question replies to nothing"
 assert_contains "$(cat "$TMP/posted")" "<!-- ask:bot-a:" "question keeps the ask marker"
 : >"$FAKE_GH_LOG"; : >"$PROCESS_EVENTS_FILE"; rm -f "$FAKE_CURL_COUNT" "$TMP/posted"
-assert_status 0 "append posts, notifies and waits (the fixture has the reply)" env AUTHOR_FROM="gerenciadora" "$SCRIPTS/ask-bot.sh" --append 20260117100100-1 "Mais um detalhe" --issue 3 --timeout 0
-assert_eq "1" "$(grep -c '^issue comment' "$FAKE_GH_LOG")" "append posts one comment"
-assert_eq "1" "$(cat "$FAKE_CURL_COUNT")" "append notifies once"
-assert_contains "$(head -1 "$TMP/posted")" "**De:** gerenciadora · **Para:** bot-a" "append opens with the header"
-assert_contains "$(head -1 "$TMP/posted")" "**Responde a:** u1" "append replies to the question"
-assert_contains "$(cat "$TMP/posted")" "<!-- ask-append:bot-a:20260117100100-1 -->" "append has its own marker"
-assert_not_contains "$(cat "$TMP/posted")" "<!-- ask:bot-a:" "append never opens a second question"
-assert_contains "$(cat "$FAKE_CURL_LOG")" '"ask_id":"20260117100100-1"' "append notifies with the original ask id"
-assert_eq "1" "$(jq -s '[.[] | select(.event == "bot_append" and .ask_id == "20260117100100-1")] | length' "$PROCESS_EVENTS_FILE")" "append records bot_append"
+# The fixture only has the reply from before the append: the wait must not accept it.
+assert_status 3 "append does not accept the reply posted before it" env AUTHOR_FROM="gerenciadora" "$SCRIPTS/ask-bot.sh" --append 20260117100100-1 "Mais um detalhe" --issue 3 --timeout 0
+assert_not_contains "$(last_output)" "Texto ok" "append wait prints no old reply"
+rm -f "$TMP/posted" "$FAKE_CURL_COUNT"
+python3 - "$TMP/comments.json" "$TMP/comments-new.json" <<'PY'
+import json, sys
+d = json.load(open(sys.argv[1]))
+d[0].append({"created_at": "2026-01-17T12:00:00Z", "html_url": "u9", "body": "Resposta nova <!-- bot:bot-a reply-to:20260117100100-1 -->"})
+json.dump(d, open(sys.argv[2], "w"))
+PY
+assert_status 0 "append waits for a reply posted after it" env FAKE_COMMENTS="$TMP/comments-new.json" AUTHOR_FROM="gerenciadora" "$SCRIPTS/ask-bot.sh" --append 20260117100100-1 "Mais um detalhe" --issue 3 --timeout 0
+assert_contains "$(last_output)" "Resposta nova" "append prints the new reply"
+assert_not_contains "$(last_output)" "Texto ok" "append prints only the new reply"
+# wait-reply --after <comment id> (the posted append has id 1 in the fake); no --after: as before.
+export FAKE_COMMENTS="$TMP/comments-new.json"
+assert_status 0 "wait-reply --after takes the reply posted after that comment" "$SCRIPTS/wait-reply.sh" 3 20260117100100-1 --timeout 0 --interval 0 --after 1
+assert_not_contains "$(last_output)" "Texto ok" "--after skips the old reply"
+assert_status 0 "wait-reply without --after takes the first reply" "$SCRIPTS/wait-reply.sh" 3 20260117100100-1 --timeout 0 --interval 0
+assert_contains "$(last_output)" "Texto ok" "no --after keeps today's behavior"
+assert_status 1 "wait-reply --after fails for an unknown comment" "$SCRIPTS/wait-reply.sh" 3 20260117100100-1 --timeout 0 --interval 0 --after 999
+export FAKE_COMMENTS="$TMP/comments.json"
+rm -f "$TMP/posted"
 assert_status 1 "append without the question fails" "$SCRIPTS/ask-bot.sh" --append 20260117100177-7 "x" --issue 3 --timeout 0
 assert_contains "$(last_output)" "nothing posted" "append error is clear"
 
