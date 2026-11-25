@@ -60,8 +60,10 @@
 #:   still UNKNOWN: exit 8). Dirty/CONFLICTING: calls redo-phase.sh without
 #:   waiting for CI and without asking anyone; once redone, exits 0 with the new
 #:   PR (under --merge exits 6: the new PR has no CI and no review yet); a real
-#:   conflict in the cherry-pick exits 4. A PR that is only behind main (no
-#:   conflict) is not redone. Then requires a check on the HEAD SHA: none after
+#:   conflict in the cherry-pick exits 4. A PR with a commit that origin/main
+#:   already has under another SHA (git cherry origin/main HEAD, e.g. the spec commit
+#:   another phase of the group carried) is redone the same way. A PR that is only
+#:   behind main (no conflict, no such commit) is not redone. Then requires a check on the HEAD SHA: none after
 #:   CLOSE_PHASE_CI_TIMEOUT s (default 180, read every CLOSE_PHASE_CI_POLL,
 #:   default 15) exits 7 as CI missing; a check on an older SHA does not count.
 #:   Run it before and while waiting for CI; --merge runs it too.
@@ -527,8 +529,16 @@ check_pr() { # check_pr [PR number]
     [ "$reads" -lt "$tries" ] || die "PR #$n mergeable is still UNKNOWN after $reads reads: check the PR on GitHub" 8
     sleep "${CLOSE_PHASE_MERGEABLE_PAUSE:-10}"
   done
+  local why=""
   if [ "$m" = CONFLICTING ] || [ "$s" = DIRTY ]; then
-    echo "PR #$n conflicts with main (mergeable=$m, mergeStateStatus=$s): redoing the phase with redo-phase.sh"
+    why="conflicts with main (mergeable=$m, mergeStateStatus=$s)"
+  elif git fetch --quiet origin main 2>/dev/null && [ -n "$(git cherry origin/main HEAD 2>/dev/null | grep '^-' || true)" ]; then
+    # A commit of the branch that main has under another SHA (another phase carried it):
+    # GitHub's rebase merge refuses with "Base branch was modified" until the PR is redone.
+    why="has a commit that origin/main already has under another SHA"
+  fi
+  if [ -n "$why" ]; then
+    echo "PR #$n $why: redoing the phase with redo-phase.sh"
     local redo=0
     "$HERE/redo-phase.sh" || redo=$?
     [ "$redo" = 0 ] || exit "$redo"
