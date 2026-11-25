@@ -21,6 +21,7 @@ O checkout do template da filha é `.process/template` do worktree. O passo úni
 - [ ] O PR traz o `.claude/settings.json` novo depois do ok do dono sobre o diff das permissões; sem ele a suíte fica vermelha (`test_settings_allow`).
 - [ ] O PR traz `.github/ci-mode` (`push` ou `pr`) com a escolha do dono; sem esse arquivo nem a variável `PROCESS_CI_MODE` nenhuma fase abre.
 - [ ] `docs/repo-notes.md` existe (modelo do template; junte a ele as regras do projeto do `AGENTS.md` antigo) e a frase antiga do `docs/STATE.md` ("o job `tests` roda em todo PR") saiu.
+- [ ] Cada `deploy-*.yml` próprio (que não é o `deploy-example.yml`) tem o gate do `deploy-example.yml`: passo `scripts/ci-already-green.sh` com `id`, `permissions: checks: read` no job de validação e `if: steps.<id>.outputs.skip != 'true'` no passo do `scripts/validate.sh`. O `check-workflows.py` novo reprova o deploy sem isso.
 - [ ] Os docs também passam no `check-docs.sh` da origem quando ela tem limite menor (o `--notice` imprime o comando); o `Policy` da CI roda o da base.
 - [ ] `.github/method-origin` passou a ser o commit de destino (`scripts/setup-repo.sh --record-origin <destino>`).
 - [ ] `scripts/validate.sh --full` e `scripts/check-docs.sh` verdes, e uma prova local: a atualização a partir da versão anterior.
