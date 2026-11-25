@@ -115,4 +115,21 @@ assert_status 1 "--merge --wait leaves at once when a check on HEAD was cancelle
 assert_contains "$(last_output)" "scripts/rerun-ci.sh 777" "names the rerun command with the run id"
 assert_contains "$(last_output)" "cancelled" "names the cause"
 
+# CI or review/independent turns red while waiting for the merge (issue #256): leave at once, code 13.
+handler "type:feature" success
+for late in failure cancelled; do
+  : >"$FAKE_GH_LOG"
+  assert_status 13 "--merge --wait leaves with code 13 when CI turns $late during the wait" \
+    env FAKE_CI_LATE=$late FAKE_CI_FLIP_READ=2 CLOSE_PHASE_MERGE_POLL=0 sh -c "cd '$repo' && '$CLOSE' --merge --wait"
+  assert_contains "$(last_output)" "runs/888" "names the run that failed ($late)"
+  assert_contains "$(last_output)" "new commit" "says to fix in a new commit"
+  assert_contains "$(last_output)" "scripts/rerun-ci.sh 888" "says to rerun on a flake"
+  assert_contains "$(last_output)" "owner's ok" "says the owner ok holds only for the old SHA"
+done
+handler "type:feature" success
+: >"$FAKE_GH_LOG"
+assert_status 13 "--merge --wait leaves with code 13 when review/independent turns failure during the wait" \
+  env FAKE_REVIEW_LATE=failure CLOSE_PHASE_MERGE_POLL=0 sh -c "cd '$repo' && '$CLOSE' --merge --wait"
+handler "type:feature" success
+
 finish
