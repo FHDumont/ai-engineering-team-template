@@ -91,7 +91,10 @@
 #:   that runs --merge (CLAUDE_CODE_SESSION_ID) must be another one, with its own
 #:   phase_session (check-env.sh) and an event recorded by the hooks; --issue
 #:   different from the branch's issue is refused (exit 2). --wait waits for the merge and
-#:   runs --cleanup; it leaves at once (exit 1) when a check on HEAD was cancelled,
+#:   runs --cleanup; each round it reads CI and review/independent on HEAD and leaves at once
+#:   (exit 13) when either turned failure or cancelled, naming the failed run, the fix in a
+#:   new commit or scripts/rerun-ci.sh, and that the owner's ok holds only for the old SHA;
+#:   it leaves at once (exit 1) when a check on HEAD was cancelled,
 #:   naming scripts/rerun-ci.sh <run>. Never dispatches a deploy: scripts/deploy.sh does, run by
 #:   the main session after the last merge of the group.
 #: --pr N: a pull request whose head is not a phase branch. A phase branch is
@@ -921,6 +924,24 @@ Ok do dono do repo registrado (quadro de escolha) para:$reasons." >/dev/null
     until [ "$(gh pr view "$n" --repo "$repo" --json state --jq .state)" = MERGED ]; do
       tries=$((tries + 1))
       [ "$tries" -le 120 ] || die "PR #$n not merged after 60 minutes"
+      # CI or review/independent turned red on HEAD while waiting: leave at once (exit 13).
+      # Running or green: keep waiting. The gate is not weakened: the merge still needs both green.
+      local wci wci_state wci_url wrv
+      wci="$(gh api "repos/$repo/commits/$sha/check-runs" --jq '[.check_runs[] | select(.name == "CI")] | sort_by(.started_at) | last | [(if . == null then "missing" elif .status != "completed" then .status else .conclusion end), (.html_url // "")] | @tsv' 2>/dev/null || true)"
+      wci_state="${wci%%$'\t'*}"
+      wci_url="${wci#*$'\t'}"
+      wrv="$(gh api "repos/$repo/commits/$sha/status" --jq '[.statuses[] | select(.context == "review/independent")][0].state // "missing"' 2>/dev/null || true)"
+      local bad=""
+      case "$wci_state" in failure | cancelled) bad="CI is $wci_state" ;; esac
+      case "$wrv" in failure | error) bad="${bad:+$bad; }review/independent is $wrv" ;; esac
+      if [ -n "$bad" ]; then
+        local wrun
+        wrun="$(printf '%s' "$wci_url" | sed -n 's#.*/actions/runs/\([0-9][0-9]*\).*#\1#p')"
+        echo "PR #$n: $bad on HEAD ${sha:0:12}${wci_url:+ (failed run: $wci_url)}; the merge will not happen until it is green"
+        echo "next: fix it in a new commit, then --prepare and --merge again; if it is a flake: scripts/rerun-ci.sh ${wrun:-<run-id>}, then --merge --wait again"
+        echo "the owner's ok (--owner-ok) holds only for the old SHA ${sha:0:12}: a new commit needs a new ok"
+        exit 13
+      fi
       # A cancelled check (network failure in Checkout) never recovers by itself: leave at once.
       local cancelled run_id
       cancelled="$(gh api "repos/$repo/commits/$sha/check-runs" --jq '[.check_runs[] | select(.conclusion == "cancelled")][0].html_url // empty' 2>/dev/null || true)"
