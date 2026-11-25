@@ -1042,12 +1042,15 @@ delete_remote_branch() { # delete_remote_branch <checkout>
 }
 
 # Takes out of .worktrees/parallel-active.tsv the line of the phase and every
-# line whose worktree is gone.
+# line whose worktree is gone. A pending line (phase not opened yet, open-parallel.sh) has no
+# worktree on purpose and stays, unless it is the line of the phase itself.
 registry_drop() { # registry_drop <main checkout> [issue]
   local registry="$1/.worktrees/parallel-active.tsv" n b path
   [ -f "$registry" ] || return 0
   while IFS="$(printf '\t')" read -r n b path; do
-    [ "$n" != "${2:-}" ] && [ -d "$path" ] && printf '%s\t%s\t%s\n' "$n" "$b" "$path"
+    [ "$n" != "${2:-}" ] || continue
+    if [ "$b" = pending ]; then printf '%s\tpending\n' "$n"
+    elif [ -d "$path" ]; then printf '%s\t%s\t%s\n' "$n" "$b" "$path"; fi
   done <"$registry" >"$registry.tmp" || true
   mv "$registry.tmp" "$registry"
 }

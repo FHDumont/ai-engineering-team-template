@@ -109,7 +109,7 @@ undo() {
     for n in "${issues[@]}"; do cut -f1 "$registry" 2>/dev/null | grep -qx "$n" || registry_set "$n" pending; done
   fi
 }
-# The groups that do not fit now: the rest is registered as pending before the first phase opens.
+# The phases that do not fit now: the rest is registered as pending before the first phase opens.
 if [ "$dry" = 0 ] && [ "$free_now" -lt "${#issues[@]}" ]; then
   for n in "${issues[@]:$free_now}"; do
     cut -f1 "$registry" 2>/dev/null | grep -qx "$n" || registry_set "$n" pending
