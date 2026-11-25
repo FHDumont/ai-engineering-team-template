@@ -308,6 +308,16 @@ opinion_sha() {
   else printf '%s' "$text" | shasum -a 256 | cut -d' ' -f1; fi
 }
 
+# The opinion of a close-reviewer: the last text with a "Veredito:" line in its subagent transcript
+# (an assistant text block or the message of a tool that delivers the report). Prints it, or nothing.
+# The trace hook hashes it and close-phase.sh --save-review writes it: one filter for both.
+opinion_from_transcript() { # opinion_from_transcript <subagent transcript .jsonl>
+  [ -f "$1" ] || return 0
+  jq -rs '[.[] | select(.type == "assistant") | .message.content? | arrays | .[]
+    | (if .type == "text" then .text elif .type == "tool_use" then .input.message else empty end)
+    | strings | select(test("(^|\n)Veredito:"))] | last // empty' "$1" 2>/dev/null
+}
+
 # Event recorded by a script (bot_ask, bot_reply, review_round, phase_closed).
 # Extra fields as key=value.
 trace_event() { # trace_event <event> [key=value...]
