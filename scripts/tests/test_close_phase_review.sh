@@ -167,10 +167,11 @@ assert_status 1 "a real push after the review still asks for a new round" \
 assert_contains "$(last_output)" "no close-reviewer round after the last push" "says the round has to follow the push"
 
 # #258: --save-review writes the literal opinion from the transcript of a background subagent.
+head258="$(git -C "$repo" rev-parse HEAD)"
 reset_phase_evidence
-push_ev "$SHA"
+push_ev "$head258"
 round_ev
-rm -f "$repo/.process/reviewer-$SHA.md" "$repo/.process/reviewer-$SHA.verdict" "$repo/.process/reviewer-gate-$SHA.md"
+rm -f "$repo/.process/reviewer-$head258.md" "$repo/.process/reviewer-$head258.verdict" "$repo/.process/reviewer-gate-$head258.md"
 export CLOSE_PHASE_SUBAGENTS_ROOT="$TMP/transcripts"
 mkdir -p "$CLOSE_PHASE_SUBAGENTS_ROOT/sess/subagents"
 opinion258=$'## Revisão independente\n\nVeredito: aprovado\nRodada: 1'
@@ -180,19 +181,19 @@ opinion258=$'## Revisão independente\n\nVeredito: aprovado\nRodada: 1'
 } >"$CLOSE_PHASE_SUBAGENTS_ROOT/sess/subagents/agent-bg1.jsonl"
 sha258="$(printf '%s' "$opinion258" | shasum -a 256 | cut -d' ' -f1)"
 assert_status 1 "--save-review refuses an agent the trace never saw stop"   sh -c "cd '$repo' && '$CLOSE' --save-review bg1"
-assert_eq "no" "$([ -f "$repo/.process/reviewer-$SHA.md" ] && echo yes || echo no)" "nothing saved without the trace hash"
+assert_eq "no" "$([ -f "$repo/.process/reviewer-$head258.md" ] && echo yes || echo no)" "nothing saved without the trace hash"
 jq -cn --arg h "0000" '{event: "SubagentStop", session_id: "child", agent_id: "bg1", agent_type: "close-reviewer", output_sha: $h}' >>"$TRACE"
 assert_status 1 "--save-review refuses a hash that differs from the trace"   sh -c "cd '$repo' && '$CLOSE' --save-review bg1"
 assert_contains "$(last_output)" "does not match" "says the hash differs"
-assert_eq "no" "$([ -f "$repo/.process/reviewer-$SHA.md" ] && echo yes || echo no)" "nothing saved on a hash mismatch"
+assert_eq "no" "$([ -f "$repo/.process/reviewer-$head258.md" ] && echo yes || echo no)" "nothing saved on a hash mismatch"
 jq -cn --arg h "$sha258" '{event: "SubagentStop", session_id: "child", agent_id: "bg1", agent_type: "close-reviewer", output_sha: $h}' >>"$TRACE"
 assert_status 0 "--save-review saves the opinion of the background subagent"   sh -c "cd '$repo' && '$CLOSE' --save-review bg1"
-assert_eq "$sha258" "$(printf '%s' "$(cat "$repo/.process/reviewer-$SHA.md")" | shasum -a 256 | cut -d' ' -f1)" "the saved file holds the opinion literally"
+assert_eq "$sha258" "$(printf '%s' "$(cat "$repo/.process/reviewer-$head258.md")" | shasum -a 256 | cut -d' ' -f1)" "the saved file holds the opinion literally"
 : >"$FAKE_GH_LOG"
-assert_status 0 "--publish-review accepts the saved file"   sh -c "cd '$repo' && '$CLOSE' --publish-review '$repo/.process/reviewer-$SHA.md' --verdict success --round 1"
+assert_status 0 "--publish-review accepts the saved file"   sh -c "cd '$repo' && '$CLOSE' --publish-review '$repo/.process/reviewer-$head258.md' --verdict success --round 1"
 assert_contains "$(gh_calls)" "context=review/independent" "the saved opinion is published"
 assert_status 0 "--save-review --gate saves the second review"   sh -c "cd '$repo' && '$CLOSE' --save-review bg1 --gate"
-assert_eq "yes" "$([ -f "$repo/.process/reviewer-gate-$SHA.md" ] && echo yes || echo no)" "the gate opinion goes to reviewer-gate-<sha>.md"
+assert_eq "yes" "$([ -f "$repo/.process/reviewer-gate-$head258.md" ] && echo yes || echo no)" "the gate opinion goes to reviewer-gate-<sha>.md"
 unset CLOSE_PHASE_SUBAGENTS_ROOT
 
 finish
