@@ -84,7 +84,7 @@ with open(path, encoding="utf-8") as fh:
         except (ValueError, KeyError, TypeError):
             continue
 # Time targets: method default, overridden per measure by the project file.
-targets = {"phase": (45.0, "min"), "validate": (240.0, "s")}
+targets = {"phase": (45.0, "min"), "validate": (240.0, "s"), "validate-repo": (60.0, "s")}
 try:
     with open(tpath, encoding="utf-8") as fh:
         for line in fh:
@@ -106,7 +106,7 @@ for c, repo, w, d, wl in rows:
 for (c, repo), v in sorted(groups.items()):
     ws, ds, wls = [x[0] for x in v], [x[1] for x in v], [x[2] for x in v]
     print(f"{c:<10}{repo:<28}{len(v):>5}  {med(ws):>9.0f}{pct(ws, .9):>9.0f}  {med(ds):>9.0f}{pct(ds, .9):>9.0f}{med(wls):>10.0f}{pct(wls, .9):>10.0f}")
-for c, key in (("fase", "phase"), ("validate", "validate")):
+for c, key in (("fase", "phase"), ("validate", "validate"), ("validate-repo", "validate-repo")):
     v = groups.get((c, me))
     if not v:
         continue
