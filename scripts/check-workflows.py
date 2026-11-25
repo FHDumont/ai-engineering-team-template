@@ -17,7 +17,9 @@ recorded mode is `pr` (a `.github/ci-mode` file, else PROCESS_CI_MODE). A deploy
 (`deploy-*.yml`) runs only on `workflow_dispatch` (never `pull_request`,
 `push` or `schedule`), has a `# deploy-paths:` line (what it deploys, read by
 scripts/deploy.sh) and a job that runs `scripts/validate.sh` which every
-other job needs. Reads YAML with `yq` (or PyYAML). Exits 1 and lists the
+other job needs; that job first runs `scripts/ci-already-green.sh` (with
+`permissions: checks: read`) and runs `scripts/validate.sh` only when the gate
+says `skip != 'true'`. Reads YAML with `yq` (or PyYAML). Exits 1 and lists the
 problems.
 """
 
@@ -101,6 +103,27 @@ def check_deploy(path, wf, triggers):
     if not validators:
         problems.append("deploy workflow needs a job that runs scripts/validate.sh before the build")
         return problems
+
+    for job_id in sorted(validators):
+        job = jobs[job_id]
+        steps = job.get("steps") or []
+        gate_at = [i for i, st in enumerate(steps) if "scripts/ci-already-green.sh" in str(st.get("run") or "")]
+        if not gate_at:
+            problems.append("job %s: must run scripts/ci-already-green.sh before scripts/validate.sh" % job_id)
+        else:
+            gate_ids = [steps[i].get("id") for i in gate_at if steps[i].get("id")]
+            for i, st in enumerate(steps):
+                if "scripts/validate.sh" not in str(st.get("run") or ""):
+                    continue
+                cond = str(st.get("if") or "")
+                ok = i > gate_at[0] and any(
+                    re.search(r"steps\.%s\.outputs\.skip\s*(!=\s*'true'|==\s*'false')" % re.escape(g), cond)
+                    for g in gate_ids)
+                if not ok:
+                    problems.append("job %s: scripts/validate.sh must run only when the gate says skip != true "
+                                    "(if: steps.<gate id>.outputs.skip != 'true')" % job_id)
+        if (job.get("permissions") or {}).get("checks") != "read":
+            problems.append("job %s: needs permissions: checks: read for scripts/ci-already-green.sh" % job_id)
 
     def reaches(job_id, seen=()):
         if job_id in validators:
