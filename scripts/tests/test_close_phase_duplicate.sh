@@ -24,6 +24,7 @@ assert_eq 0 "$(redo_calls)" "a PR that is only behind is not redone"
 git -C "$other" fetch --quiet origin feat/issue-5-x
 git -C "$other" cherry-pick --quiet "$SHA"
 git -C "$other" push --quiet origin HEAD:main
+handler "type:feature" success
 assert_status 0 "--check redoes a PR whose commit the base already has" env FAKE_MERGEABLE=MERGEABLE FAKE_MERGE_STATE=BEHIND sh -c "cd '$repo' && '$CLOSE' --check"
 assert_eq 1 "$(redo_calls)" "--check calls redo-phase.sh once"
 assert_contains "$(last_output)" "already has" "says the base already has a commit"
