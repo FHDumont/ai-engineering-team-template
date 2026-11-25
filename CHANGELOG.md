@@ -18,6 +18,7 @@
 
 ## Correções
 
+- fix: close-phase --check redoes a PR with a commit the base already has ([#267](https://github.com/FHDumont/ai-engineering-team-template/pull/267)) · 2026-11-25
 - fix: --merge --wait leaves when CI or the review turns red ([#257](https://github.com/FHDumont/ai-engineering-team-template/pull/257)) · 2026-11-24
 - feat(ci): runner without actions or gh via CI_CHECKOUT_CMD ([#252](https://github.com/FHDumont/ai-engineering-team-template/pull/252)) · 2026-11-24
 - fix: phase-start exits at once when the group exceeds the fase slot limit ([#253](https://github.com/FHDumont/ai-engineering-team-template/pull/253)) · 2026-11-24

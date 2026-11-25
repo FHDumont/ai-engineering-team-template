@@ -4,4 +4,8 @@
 
 ## scripts
 
-- [#262](https://github.com/FHDumont/ai-engineering-team-template/issues/262) Rebase-merge recusa sempre o PR da segunda fase do grupo: o commit da spec já entrou pela primeira · alta
+- [#265](https://github.com/FHDumont/ai-engineering-team-template/issues/265) Testes de tempo falham com a máquina carregada: find-base, series case e template-only · média
+
+## sem área
+
+- [#266](https://github.com/FHDumont/ai-engineering-team-template/issues/266) ask-bot.sh --append aceita a resposta antiga do bot à pergunta original · sem prioridade
