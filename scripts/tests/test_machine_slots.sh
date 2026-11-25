@@ -181,6 +181,14 @@ rm -f "$repo/.github/time-targets.tsv"
 assert_status 0 "--report with a median 3 s above the target" "$repo/scripts/machine-slots.sh" --report
 assert_contains "$(last_output)" "info: time validate median 243 s, target 240 s (above)" "3 s above is informative"
 assert_not_contains "$(last_output)" "over-target" "3 s above is not over-target"
+printf 'ts\tclass\trepo\tissue\twait_s\tduration_s\n%s\tvalidate-repo\t%s\t1\t0\t90\n' "$now" "$me" >"$H"
+assert_status 0 "--report with a validate-repo measure and the default target" "$repo/scripts/machine-slots.sh" --report
+assert_contains "$(last_output)" "info: time validate-repo median 90 s, target 60 s (above)" "validate-repo has its own default target"
+mkdir -p "$repo/.github"
+printf 'validate-repo\t120\ts\n' >"$repo/.github/time-targets.tsv"
+assert_status 0 "--report with the project validate-repo target" "$repo/scripts/machine-slots.sh" --report
+assert_contains "$(last_output)" "info: time validate-repo median 90 s, target 120 s" "validate-repo is compared with the project line"
+assert_not_contains "$(last_output)" "target 120 s (above)" "within the project validate-repo target"
 rm -f "$repo/.github/time-targets.tsv"
 rm -f "$H"
 assert_status 0 "validate.sh records wait and duration" validate "$V" --tests
