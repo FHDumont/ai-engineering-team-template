@@ -20,7 +20,8 @@
 #: error, nothing is posted. The same provider check runs before notifying.
 #: --append: adds a follow-up to a question already asked (same ask id), as a new
 #: comment with the authorship header and <!-- ask-append:<bot>:<id> -->, notifies the
-#: bot with the new comment link and waits for the reply to that id. Never opens a
+#: bot with the new comment link and waits for a reply to that id posted after the follow-up
+#: (wait-reply.sh --after), never the reply the bot gave before it. Never opens a
 #: second question. Every comment this script posts starts with the authorship header
 #: (De, Para, Pedido, Responde a; scripts/lib/author.sh): without it the bot and the
 #: owner cannot tell who wrote what. A bare "gh issue comment" to a bot is never seen.
@@ -70,7 +71,7 @@ post_comment() {
   printf '%s' "$url"
 }
 
-timeout=900
+timeout=900 append_cid=""
 if [ "$1" = "--append" ]; then
   [ $# -ge 3 ] || die "usage: ask-bot.sh --append <ask_id> \"more text\" [--issue N]" 2
   id="$2" text="$3"; shift 3
@@ -95,6 +96,7 @@ if [ "$1" = "--append" ]; then
   body="$(printf '%s\n\n%s\n\n<!-- ask-append:%s:%s -->' "$(author_header "$bot" "$id" "$qurl")" "$text" "$bot" "$id")"
   url="$(post_comment "$issue" "$body")"
   cid="${url##*#issuecomment-}"
+  append_cid="$cid"
   gh api "repos/$repo/issues/comments/$cid" --jq .body 2>/dev/null | stdin_grep -qF "<!-- ask-append:$bot:$id -->" ||
     die "follow-up not confirmed on read back (comment $cid of #$issue has no marker); the bot was not notified"
   echo "appended to $bot question on #$issue (id $id): $url"
@@ -154,4 +156,7 @@ fi
 rc=0
 "$HERE/notify-bot.sh" "$bot" "$issue" "$url" --ask-id "$id" || rc=$?
 [ "$rc" = 0 ] || exit "$rc"
-"$HERE/wait-reply.sh" "$issue" "$id" --timeout "$timeout"
+wait_args=()
+# --append: only a reply posted after the follow-up counts, not the earlier one.
+[ -z "$append_cid" ] || wait_args=(--after "$append_cid")
+"$HERE/wait-reply.sh" "$issue" "$id" --timeout "$timeout" ${wait_args[@]+"${wait_args[@]}"}
