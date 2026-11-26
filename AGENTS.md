@@ -35,8 +35,9 @@ Código novo e o do método, comentários, identificadores, nomes de arquivos, l
 ## Quando perguntar
 
 - Sempre: ação destrutiva ou irreversível, gasto, dependência nova, arquitetura ou schema, segredos, cobrança, autenticação, migração, credenciais, infraestrutura de produção.
+- Fidelidade ao aprovado: nada é entregue diferente do que o dono pediu ou aprovou (mock, texto, arte, spec, código) sem antes mostrar o aprovado e o proposto lado a lado e ter o ok dele; a entrega fica parada até a resposta.
 - Nunca: passo rotineiro e reversível de spec aprovada, setup, labels, issue de achado, branch e PR.
-- Dúvida em passo reversível: siga e liste em "Decisões tomadas sem perguntar" no PR; nunca suponha em silêncio.
+- Dúvida em passo reversível que não muda o aprovado: siga e liste em "Decisões tomadas sem perguntar" no PR; nunca suponha em silêncio.
 
 ## Git
 
