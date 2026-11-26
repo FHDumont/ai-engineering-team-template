@@ -60,6 +60,7 @@
 
 ## Outros
 
+- test: build the files of three tests in a copy, never in the real scripts ([#286](https://github.com/FHDumont/ai-engineering-team-template/pull/286)) · 2026-11-26
 - fix: compare the saved review opinion with its own reviewer stop ([#284](https://github.com/FHDumont/ai-engineering-team-template/pull/284)) · 2026-11-25
 - test: stop test_setup_repo.sh writing the real required-checks ([#282](https://github.com/FHDumont/ai-engineering-team-template/pull/282)) · 2026-11-25
 - test: make the time-based tests robust under machine load ([#276](https://github.com/FHDumont/ai-engineering-team-template/pull/276)) · 2026-11-25
