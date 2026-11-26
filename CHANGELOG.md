@@ -4,6 +4,7 @@
 
 ## Funcionalidades
 
+- refactor: move the method scripts to .method/scripts behind a scripts link ([#289](https://github.com/FHDumont/ai-engineering-team-template/pull/289)) · 2026-11-26
 - feat(close-phase): --save-review saves the reviewer opinion from the transcript ([#263](https://github.com/FHDumont/ai-engineering-team-template/pull/263)) · 2026-11-25
 - feat: open the phase group in waves when fewer slots are free ([#255](https://github.com/FHDumont/ai-engineering-team-template/pull/255)) · 2026-11-24
 - feat: method-diff outdated class, new destination files and --notice ([#224](https://github.com/FHDumont/ai-engineering-team-template/pull/224)) · 2026-11-24
@@ -18,6 +19,7 @@
 
 ## Correções
 
+- fix: read files from the logical root in check-env and machine-slots ([#291](https://github.com/FHDumont/ai-engineering-team-template/pull/291)) · 2026-11-26
 - fix: require the CI gate in deploy workflows ([#274](https://github.com/FHDumont/ai-engineering-team-template/pull/274)) · 2026-11-25
 - fix: ask-bot --append waits only for replies posted after the follow-up ([#271](https://github.com/FHDumont/ai-engineering-team-template/pull/271)) · 2026-11-25
 - fix: close-phase --check redoes a PR with a commit the base already has ([#267](https://github.com/FHDumont/ai-engineering-team-template/pull/267)) · 2026-11-25
