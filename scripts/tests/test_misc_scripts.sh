@@ -4,7 +4,13 @@
 source "$(dirname "$0")/lib.sh"
 
 # A script that is not part of the method must not be executed (issue #92).
-sentinel="$SCRIPTS/zz-not-a-method-script.sh"
+# The sentinel lives in a copy: the real scripts/ is never written (#281).
+copy="$(make_repo)"
+copy_scripts "$copy"
+CSCRIPTS="$copy/scripts"
+# copy_scripts stubs these two; their --help is read from the real ones.
+cp "$SCRIPTS/validate.sh" "$SCRIPTS/check-docs.sh" "$CSCRIPTS/"
+sentinel="$CSCRIPTS/zz-not-a-method-script.sh"
 marker="$TMP/sentinel-ran"
 rm -f "$sentinel" "$marker"
 cat >"$sentinel" <<EOF
@@ -14,7 +20,6 @@ echo "usage: not a method script"
 exit 0
 EOF
 chmod +x "$sentinel"
-trap 'rm -f "$sentinel"; test_sweep; rm -rf "$TMP"' EXIT
 
 # Closed list of the method's scripts. Never a glob of scripts/: an adopted
 # repository keeps the application's scripts in that directory (issue #92).
@@ -28,7 +33,7 @@ for name in \
   setup-runner.sh start-headless.sh status.sh summarize-thread.sh \
   trace-view.py triage.sh validate.sh wait-reply.sh weights.sh
 do
-  s="$SCRIPTS/$name"
+  s="$CSCRIPTS/$name"
   out="$("$s" --help 2>&1)" && rc=0 || rc=$?
   assert_eq 0 "$rc" "$(basename "$s") --help exits 0"
   [ -n "$out" ] && ok || bad "$(basename "$s") --help prints usage"

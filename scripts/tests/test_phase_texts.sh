@@ -189,11 +189,13 @@ old_interval_in() {
 }
 assert_eq "" "$(old_interval_in "$REPO")" "no file keeps the old interval of the heartbeat"
 # An untracked file with the old interval is visible before it is committed (#117).
-printf 'a cada %s minutos\n' "$was" >"$REPO/scripts/untracked-interval.md"
-printf 'a cada %s minutos\n' "$was" >"$REPO/not-method-interval.md"
-assert_contains "$(old_interval_in "$REPO")" "scripts/untracked-interval.md" "an untracked method file with the old interval is found"
-assert_eq "" "$(old_interval_in "$REPO" | grep not-method-interval.md || true)" "a file outside the method is not scanned"
-rm -f "$REPO/scripts/untracked-interval.md" "$REPO/not-method-interval.md"
+# Built in a copy: the real scripts/ is never written (#281).
+untracked_repo="$(make_repo)"
+copy_scripts "$untracked_repo"
+printf 'a cada %s minutos\n' "$was" >"$untracked_repo/scripts/untracked-interval.md"
+printf 'a cada %s minutos\n' "$was" >"$untracked_repo/not-method-interval.md"
+assert_contains "$(old_interval_in "$untracked_repo")" "scripts/untracked-interval.md" "an untracked method file with the old interval is found"
+assert_eq "" "$(old_interval_in "$untracked_repo" | grep not-method-interval.md || true)" "a file outside the method is not scanned"
 gen_repo="$(mktemp -d)"
 git -C "$gen_repo" init -q
 printf -- '- #44 Heartbeat every %s min\n' "$was" >"$gen_repo/ROADMAP.md"
