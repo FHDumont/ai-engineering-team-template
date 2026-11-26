@@ -636,8 +636,15 @@ require_unedited_opinion() { # require_unedited_opinion <saved .md> <events file
   # The stop of this opinion's own reviewer: its agent id (written by --save-review next to the
   # opinion) or, without it, the phase session; the last stop of the shared trace is another phase's.
   [ ! -f "${1%.md}.agent" ] || agent="$(tr -d '[:space:]' <"${1%.md}.agent")"
-  want="$(jq -rs --arg a "$agent" --arg s "$sid" '[.[] | select(type == "object" and .event == "SubagentStop" and .agent_type == "close-reviewer"
-    and ($a == "" or .agent_id == $a) and ($a != "" or $s == "" or .session_id == $s))] | last | .output_sha // ""' "$2" 2>/dev/null || true)"
+  local sel='[.[] | select(type == "object" and .event == "SubagentStop" and .agent_type == "close-reviewer")]'
+  if [ -n "$agent" ]; then
+    # An agent id with no stop in the trace is refused: a forged or stale .agent file must not skip the check.
+    want="$(jq -rs --arg a "$agent" "$sel | map(select(.agent_id == \$a)) | if length == 0 then \"missing\" else last | .output_sha // \"\" end" "$2" 2>/dev/null || true)"
+    [ "$want" != missing ] || die "the trace has no close-reviewer stop for agent $agent of the saved opinion $1: run the close-reviewer again; never edit the opinion"
+  else
+    # Own session's stops; with none of them, the last stop of the trace (the former behavior).
+    want="$(jq -rs --arg s "$sid" "$sel | (if \$s == \"\" then . else (map(select(.session_id == \$s)) as \$m | if (\$m | length) == 0 then . else \$m end) end) | last | .output_sha // \"\"" "$2" 2>/dev/null || true)"
+  fi
   [ -n "$want" ] || return 0
   got="$(opinion_sha <"$1")"
   [ "$got" = "$want" ] ||
