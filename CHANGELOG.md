@@ -1,9 +1,10 @@
 # Changelog
 
-<!-- Gerado por scripts/gen-changelog.py; não editar à mão. -->
+<!-- Gerado por .method/scripts/gen-changelog.py; não editar à mão. -->
 
 ## Funcionalidades
 
+- refactor: move method script paths to .method/scripts and drop the scripts link ([#293](https://github.com/FHDumont/ai-engineering-team-template/pull/293)) · 2026-11-26
 - refactor: move the method scripts to .method/scripts behind a scripts link ([#289](https://github.com/FHDumont/ai-engineering-team-template/pull/289)) · 2026-11-26
 - feat(close-phase): --save-review saves the reviewer opinion from the transcript ([#263](https://github.com/FHDumont/ai-engineering-team-template/pull/263)) · 2026-11-25
 - feat: open the phase group in waves when fewer slots are free ([#255](https://github.com/FHDumont/ai-engineering-team-template/pull/255)) · 2026-11-24

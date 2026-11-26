@@ -1,7 +1,7 @@
 # Roadmap
 
-<!-- Gerado por scripts/gen-roadmap.py; não editar à mão. -->
+<!-- Gerado por .method/scripts/gen-roadmap.py; não editar à mão. -->
 
-## ci
+## scripts
 
-- [#288](https://github.com/FHDumont/ai-engineering-team-template/issues/288) Remover o atalho scripts/ depois da mudança para .method/scripts/ · média · end:auto-close · group:pasta-do-metodo
+- [#294](https://github.com/FHDumont/ai-engineering-team-template/issues/294) Achados leves do grupo pasta-do-metodo · baixa
