@@ -175,7 +175,8 @@ make_repo() {
 # stubs: no test reaches the real suite again through the copy (close-phase.sh
 # --prepare, check-env.sh). Every test that needs the scripts in a repo copies them here.
 copy_scripts() { # copy_scripts <repo>
-  cp -R "$SCRIPTS" "$1/scripts"
+  mkdir -p "$1/scripts"
+  cp -R "$SCRIPTS/." "$1/scripts/"
   printf '#!/usr/bin/env bash\necho "ok: stub $*"\n' >"$1/scripts/validate.sh"
   printf '#!/usr/bin/env bash\necho "ok: stub $*"\n' >"$1/scripts/check-docs.sh"
 }

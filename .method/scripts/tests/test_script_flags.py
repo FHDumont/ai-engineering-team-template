@@ -4,7 +4,7 @@ import pathlib
 import re
 import unittest
 
-ROOT = pathlib.Path(__file__).resolve().parents[2]
+ROOT = pathlib.Path(__file__).absolute().parents[2]
 
 
 def accepts(text, name):
