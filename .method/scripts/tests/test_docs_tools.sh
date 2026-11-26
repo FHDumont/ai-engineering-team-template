@@ -226,6 +226,12 @@ assert_status 0 "an application script outside the method manifest passes" env R
 printf '.method/scripts/gate.sh\n.method/scripts/missing-method.sh\n.claude/hooks/block-x.sh\n.githooks/pre-commit\n' >"$d/.github/method-files.txt"
 assert_status 1 "a manifest entry that is not on disk fails" env REPO_ROOT="$d" "$CHECK"
 assert_contains "$(last_output)" "method-files.txt lists .method/scripts/missing-method.sh, which does not exist" "names the missing manifest entry"
+# A path like xmethod/scripts/ is not a method script: the dot of the filter is literal.
+d="$(fixture)"
+mkdir -p "$d/.github" "$d/xmethod/scripts"
+: >"$d/xmethod/scripts/other.sh"
+printf '.method/scripts/gate.sh\nxmethod/scripts/other.sh\n.claude/hooks/block-x.sh\n.githooks/pre-commit\n' >"$d/.github/method-files.txt"
+assert_status 0 "a manifest path that only looks like .method/scripts/ is not counted as a method script" env REPO_ROOT="$d" "$CHECK"
 
 # ADR-NNN.md (no title in the file name) is a real ADR (#102).
 d="$(fixture)"

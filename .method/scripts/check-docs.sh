@@ -156,13 +156,13 @@ if [ -f "$design" ]; then
       [ -e "$p" ] || problem "$manifest lists $p, which does not exist"
     done <<<"$method_list"
     manifest_note="$manifest"
-    method_scripts="$(printf '%s\n' "$method_list" | grep '^.method/scripts/' || true)"
+    method_scripts="$(printf '%s\n' "$method_list" | grep '^\.method/scripts/' || true)"
     method_hooks="$(printf '%s\n' "$method_list" | grep -E '^(\.claude/hooks|\.githooks)/' || true)"
   else
     method_scripts="$(files_of .method/scripts)"
     method_hooks="$(files_of .claude/hooks; files_of .githooks)"
   fi
-  same_files scripts "$(section '## 6. Scripts' | first_column | grep '^.method/scripts/' || true)" "$method_scripts"
+  same_files scripts "$(section '## 6. Scripts' | first_column | grep '^\.method/scripts/' || true)" "$method_scripts"
   same_files hooks "$(section '### 6.2 Hooks' | first_column | grep -E '^(\.claude/hooks|\.githooks)/' || true)" \
     "$method_hooks"
   # CHANGELOG.md and ROADMAP.md are generated at the end of the first group.
