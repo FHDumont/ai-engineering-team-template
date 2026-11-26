@@ -18,6 +18,8 @@
 
 ## Correções
 
+- fix: require the CI gate in deploy workflows ([#274](https://github.com/FHDumont/ai-engineering-team-template/pull/274)) · 2026-11-25
+- fix: ask-bot --append waits only for replies posted after the follow-up ([#271](https://github.com/FHDumont/ai-engineering-team-template/pull/271)) · 2026-11-25
 - fix: close-phase --check redoes a PR with a commit the base already has ([#267](https://github.com/FHDumont/ai-engineering-team-template/pull/267)) · 2026-11-25
 - fix: --merge --wait leaves when CI or the review turns red ([#257](https://github.com/FHDumont/ai-engineering-team-template/pull/257)) · 2026-11-24
 - feat(ci): runner without actions or gh via CI_CHECKOUT_CMD ([#252](https://github.com/FHDumont/ai-engineering-team-template/pull/252)) · 2026-11-24
@@ -58,6 +60,7 @@
 
 ## Outros
 
+- test: make the time-based tests robust under machine load ([#276](https://github.com/FHDumont/ai-engineering-team-template/pull/276)) · 2026-11-25
 - fix: hash the close-reviewer opinion from its transcript ([#243](https://github.com/FHDumont/ai-engineering-team-template/pull/243)) · 2026-11-24
 - feat: time is informative, never a cut for the owner ([#240](https://github.com/FHDumont/ai-engineering-team-template/pull/240)) · 2026-11-24
 - fix: apply and notice follow the destination method-diff ([#239](https://github.com/FHDumont/ai-engineering-team-template/pull/239)) · 2026-11-24
