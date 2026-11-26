@@ -21,6 +21,8 @@
 #: scripts/lib/machine-limits.env.example on the first run); see process-design §6.
 set -euo pipefail
 HERE="$(cd "$(dirname "$0")" && pwd)"
+# Logical root: "$HERE/.." would resolve through the scripts link to .method.
+ROOT="$(cd "$HERE/.." && pwd)"
 # shellcheck source=scripts/lib/common.sh
 source "$HERE/lib/common.sh"
 # shellcheck source=scripts/lib/slots.sh
@@ -58,8 +60,8 @@ case "$1" in
     case "$days" in ''|*[!0-9]*) die "--days needs a number" 2 ;; esac
     f="$(slots_home)/history.tsv"
     [ -f "$f" ] || { echo "no history yet: $f"; exit 0; }
-    repo_name="$(basename "$(dirname "$(git -C "$HERE" rev-parse --path-format=absolute --git-common-dir 2>/dev/null || echo "$HERE/../.git")")")"
-    python3 -I - "$f" "$days" "$repo_name" "$HERE/../.github/time-targets.tsv" <<'PY'
+    repo_name="$(basename "$(dirname "$(git -C "$HERE" rev-parse --path-format=absolute --git-common-dir 2>/dev/null || echo "$ROOT/.git")")")"
+    python3 -I - "$f" "$days" "$repo_name" "$ROOT/.github/time-targets.tsv" <<'PY'
 import csv, sys, time
 
 path, days, me, tpath = sys.argv[1], int(sys.argv[2]), sys.argv[3], sys.argv[4]
