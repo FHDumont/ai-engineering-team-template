@@ -41,6 +41,6 @@ assert_not_contains "$out" "repo-owned" "the notice is text of the method, not r
 assert_contains "$(cat "$REPO/.github/method-files.txt")" ".github/update-notice.md" "the notice is in the method manifest"
 assert_contains "$notice" ".process/template" "the notice says where the template checkout is (#215)"
 assert_contains "$notice" "fetch-template.sh" "the notice names fetch-template.sh"
-finish
 assert_contains "$notice" "ci-already-green.sh" "the notice asks own deploy workflows for the CI gate (#270)"
 assert_contains "$notice" "checks: read" "the notice asks the checks: read permission (#270)"
+finish
