@@ -631,9 +631,13 @@ save_opinion_verdict() { # save_opinion_verdict <saved .md> <.verdict file> [<gi
 # An opinion saved after the close-reviewer stopped must be its output as the trace hook hashed it:
 # a text edited after it was saved is refused. A trace without the hash (an older hook) is not checked.
 require_unedited_opinion() { # require_unedited_opinion <saved .md> <events file>
-  local want got
+  local want got agent="" sid="${CLAUDE_CODE_SESSION_ID:-}"
   [ -f "$2" ] || return 0
-  want="$(jq -rs '[.[] | select(type == "object" and .event == "SubagentStop" and .agent_type == "close-reviewer")] | last | .output_sha // ""' "$2" 2>/dev/null || true)"
+  # The stop of this opinion's own reviewer: its agent id (written by --save-review next to the
+  # opinion) or, without it, the phase session; the last stop of the shared trace is another phase's.
+  [ ! -f "${1%.md}.agent" ] || agent="$(tr -d '[:space:]' <"${1%.md}.agent")"
+  want="$(jq -rs --arg a "$agent" --arg s "$sid" '[.[] | select(type == "object" and .event == "SubagentStop" and .agent_type == "close-reviewer"
+    and ($a == "" or .agent_id == $a) and ($a != "" or $s == "" or .session_id == $s))] | last | .output_sha // ""' "$2" 2>/dev/null || true)"
   [ -n "$want" ] || return 0
   got="$(opinion_sha <"$1")"
   [ "$got" = "$want" ] ||
@@ -683,6 +687,7 @@ save_review() {
   out="$dir/$prefix-$sha.md"
   mkdir -p "$dir"
   printf '%s\n' "$text" >"$out"
+  printf '%s\n' "$agent_id" >"${out%.md}.agent"
   echo "saved the opinion of agent $agent_id to $out"
 }
 
