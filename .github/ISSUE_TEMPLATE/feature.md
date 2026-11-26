@@ -15,7 +15,7 @@ labels: ["type:feature", "roadmap"]
 
 ## Arquivos ou áreas afetadas
 
-<!-- obrigatório: caminhos ou áreas (ex.: scripts/, area:app). -->
+<!-- obrigatório: caminhos ou áreas (ex.: .method/scripts/, area:app). -->
 
 ## Prioridade sugerida
 

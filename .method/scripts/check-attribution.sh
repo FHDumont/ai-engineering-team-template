@@ -12,7 +12,7 @@
 #: text in the middle of a sentence only cites the rule and passes.
 set -euo pipefail
 HERE="$(cd "$(dirname "$0")" && pwd)"
-# shellcheck source=scripts/lib/common.sh
+# shellcheck source=.method/scripts/lib/common.sh
 source "$HERE/lib/common.sh"
 
 # Patterns as extended regex, case-insensitive.

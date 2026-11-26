@@ -1,13 +1,13 @@
 #!/usr/bin/env bash
 # Tests of close-phase.sh --abort: it lists what would be lost and stops; with
 # everything pushed, or with --discard, it closes the PR and deletes the remote branch.
-# shellcheck source=scripts/tests/lib.sh
+# shellcheck source=.method/scripts/tests/lib.sh
 source "$(dirname "$0")/lib.sh"
 
 repo="$(make_repo)"
 copy_scripts "$repo"
 printf '.worktrees/\n.process/\n' >"$repo/.gitignore"
-git -C "$repo" add scripts .gitignore
+git -C "$repo" add .method .gitignore
 git -C "$repo" commit --quiet -m "chore: scripts"
 git clone --quiet --bare "$repo" "$TMP/remote.git"
 git -C "$repo" remote add origin "$TMP/remote.git"
@@ -44,7 +44,7 @@ remote_branch() { git -C "$repo" ls-remote --heads origin "$BR" | wc -l | tr -d 
 abort() { # abort <exit code> <description> [VAR=value...] [-- flags]
   local want="$1" what="$2"
   shift 2
-  assert_status "$want" "$what" env FAKE_OPEN_PR=12 FAKE_ANY_PR=12 "$@" sh -c "cd '$wt' && scripts/close-phase.sh --abort \$ABORT_FLAGS"
+  assert_status "$want" "$what" env FAKE_OPEN_PR=12 FAKE_ANY_PR=12 "$@" sh -c "cd '$wt' && .method/scripts/close-phase.sh --abort \$ABORT_FLAGS"
 }
 kept() { # kept <description>: nothing was touched
   assert_eq 1 "$([ -d "$wt" ] && echo 1 || echo 0)" "$1: the worktree stays"

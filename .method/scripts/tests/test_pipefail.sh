@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # pipefail + grep -q: a match must not look like a miss because the writer got SIGPIPE.
-# shellcheck source=scripts/tests/lib.sh
+# shellcheck source=.method/scripts/tests/lib.sh
 source "$(dirname "$0")/lib.sh"
 
 HOOK="$REPO/.claude/hooks/block-attribution.sh"
@@ -29,7 +29,7 @@ trap - PIPE
 assert_eq 2 "$rc" "the same huge commit is refused with SIGPIPE ignored"
 
 # stdin_grep always consumes stdin, so the name at the front of a large list is found.
-# shellcheck source=scripts/lib/common.sh
+# shellcheck source=.method/scripts/lib/common.sh
 source "$SCRIPTS/lib/common.sh"
 list="$(printf '%s\n' PROCESS_OFFER_PROJECT; python3 -c 'print("\n".join("VAR%05d" % i for i in range(20000)))')"
 if command -v stdin_grep >/dev/null; then
@@ -37,7 +37,7 @@ if command -v stdin_grep >/dev/null; then
   printf '%s\n' "$list" | stdin_grep -qxF PROCESS_OFFER_PROJECT || rc=$?
   assert_eq 0 "$rc" "stdin_grep finds the name at the start of a large list"
 else
-  bad "stdin_grep is missing from scripts/lib/common.sh"
+  bad "stdin_grep is missing from .method/scripts/lib/common.sh"
 fi
 
 # Static: no production script with pipefail decides with `| grep -q`.
@@ -45,12 +45,12 @@ offenders=""
 while IFS= read -r f; do
   [ -f "$f" ] || continue
   case "$f" in
-    scripts/tests/*|*/scripts/tests/*|.claude/hooks/tests/*|*/.claude/hooks/tests/*) continue ;;
+    .method/scripts/tests/*|*/.method/scripts/tests/*|.claude/hooks/tests/*|*/.claude/hooks/tests/*) continue ;;
   esac
   grep -qE 'set -euo pipefail|set -eo pipefail|pipefail' "$f" || continue
   hits="$(grep -nE '[^[:space:]] \| grep -[a-zA-Z]*q' "$f" | grep -vE '^[0-9]+:[[:space:]]*#' || true)"
   [ -z "$hits" ] || offenders="$offenders$f:"$'\n'"$hits"$'\n'
-done < <(cd "$REPO" && printf '%s\n' scripts/*.sh scripts/lib/* .claude/hooks/* .githooks/*)
+done < <(cd "$REPO" && printf '%s\n' .method/scripts/*.sh .method/scripts/lib/* .claude/hooks/* .githooks/*)
 yml="$REPO/.github/workflows/ci.yml"
 hits="$(grep -nE '[^[:space:]] \| grep -[a-zA-Z]*q' "$yml" || true)"
 [ -z "$hits" ] || offenders="$offenders$yml:"$'\n'"$hits"$'\n'

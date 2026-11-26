@@ -22,7 +22,7 @@
 #: Exits 1 on failure.
 set -euo pipefail
 HERE="$(cd "$(dirname "$0")" && pwd)"
-# shellcheck source=scripts/lib/common.sh
+# shellcheck source=.method/scripts/lib/common.sh
 source "$HERE/lib/common.sh"
 case "${1:-}" in -h|--help) print_help "$0"; exit 0 ;; esac
 

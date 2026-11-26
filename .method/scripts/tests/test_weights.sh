@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
-# Tests of the weights file (scripts/lib/weights.tsv), of scripts/weights.sh and of
+# Tests of the weights file (.method/scripts/lib/weights.tsv), of .method/scripts/weights.sh and of
 # the rule that no agent or skill names a model.
-# shellcheck source=scripts/tests/lib.sh
+# shellcheck source=.method/scripts/tests/lib.sh
 source "$(dirname "$0")/lib.sh"
 
 # Shape of a weights file, whatever models it names: the five weights, each with a
@@ -52,9 +52,9 @@ while IFS= read -r rel; do
   esac
 done < <(method_paths)
 close="$(cat "$REPO/.claude/skills/close-phase/SKILL.md")"
-assert_contains "$close" "scripts/weights.sh reviewer" "close-phase takes the reviewer pair from the file"
-assert_contains "$(cat "$REPO/.claude/skills/triage/SKILL.md")" "scripts/weights.sh triage" "triage takes its pair from the file"
-assert_contains "$(cat "$REPO/.claude/skills/plan/SKILL.md")" "scripts/weights.sh <peso>" "plan takes the pair of a step from the file"
+assert_contains "$close" ".method/scripts/weights.sh reviewer" "close-phase takes the reviewer pair from the file"
+assert_contains "$(cat "$REPO/.claude/skills/triage/SKILL.md")" ".method/scripts/weights.sh triage" "triage takes its pair from the file"
+assert_contains "$(cat "$REPO/.claude/skills/plan/SKILL.md")" ".method/scripts/weights.sh <peso>" "plan takes the pair of a step from the file"
 # The rule of the steps compares pairs, never model names.
 execute="$(cat "$REPO/.claude/skills/execute/SKILL.md")"
 assert_contains "$execute" "par igual roda nesta sessão" "execute runs a step of the session pair in the session"

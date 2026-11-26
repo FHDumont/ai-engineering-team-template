@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
 # Runs the checks that exist only in this template. An adopted repository does not
-# copy scripts/tests/template, so this file finds nothing there and passes.
-# shellcheck source=scripts/tests/lib.sh
+# copy .method/scripts/tests/template, so this file finds nothing there and passes.
+# shellcheck source=.method/scripts/tests/lib.sh
 source "$(dirname "$0")/lib.sh"
 
-dir="$REPO/scripts/tests/template"
+dir="$REPO/.method/scripts/tests/template"
 if [ -d "$dir" ]; then
   for t in "$dir"/test_*.sh "$dir"/test_*.py; do
     [ -e "$t" ] || continue

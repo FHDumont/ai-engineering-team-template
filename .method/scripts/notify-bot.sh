@@ -3,7 +3,7 @@
 #:
 #: Usage: notify-bot.sh <bot> <issue> <comment-url> [--ask-id ID] [--retry-wait seconds]
 #:
-#: The webhook URL and secret come from scripts/lib/secret.sh (variables
+#: The webhook URL and secret come from .method/scripts/lib/secret.sh (variables
 #: BOT_WEBHOOK_<SLUG>_URL and _SECRET; the .env outside the repo; or, optionally,
 #: a password manager service account, fields `url` and `secret` of the item
 #: referenced in .github/bots.tsv) at call
@@ -17,9 +17,9 @@
 #: too-open .env) it exits 1 before calling curl. Bots: .github/bots.tsv.
 set -euo pipefail
 HERE="$(cd "$(dirname "$0")" && pwd)"
-# shellcheck source=scripts/lib/common.sh
+# shellcheck source=.method/scripts/lib/common.sh
 source "$HERE/lib/common.sh"
-# shellcheck source=scripts/lib/secret.sh
+# shellcheck source=.method/scripts/lib/secret.sh
 source "$HERE/lib/secret.sh"
 
 [ $# -gt 0 ] || { print_help "$0"; exit 2; }
@@ -79,5 +79,5 @@ if gh issue view "$issue" --repo "$repo" --json labels --jq '.labels[].name' 2>/
   exit 4
 fi
 echo "error: failed to notify $bot after 3 attempts and the label ask:$bot is not on #$issue (read back): the bot will not see the question" >&2
-echo "fix: scripts/label-issue.sh $issue --add ask:$bot, or scripts/ask-bot.sh --retry <ask_id> --issue $issue" >&2
+echo "fix: .method/scripts/label-issue.sh $issue --add ask:$bot, or .method/scripts/ask-bot.sh --retry <ask_id> --issue $issue" >&2
 exit 5

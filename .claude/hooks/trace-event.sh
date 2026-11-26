@@ -16,8 +16,8 @@
 # "Veredito:" line in the subagent transcript; else of last_assistant_message).
 # Never blocks: always exits 0, even on error.
 here="$(cd "$(dirname "$0")" && pwd)"
-# shellcheck source=scripts/lib/common.sh
-source "$here/../../scripts/lib/common.sh" 2>/dev/null || exit 0
+# shellcheck source=.method/scripts/lib/common.sh
+source "$here/../../.method/scripts/lib/common.sh" 2>/dev/null || exit 0
 command -v jq >/dev/null 2>&1 || exit 0
 
 input="$(head -c 1000000)"

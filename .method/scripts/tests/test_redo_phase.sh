@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Tests of redo-phase.sh in a sandbox: a local origin, a second clone that moves
 # main, and a fake gh that keeps the state of the old and the new PR.
-# shellcheck source=scripts/tests/lib.sh
+# shellcheck source=.method/scripts/tests/lib.sh
 source "$(dirname "$0")/lib.sh"
 
 repo="$(make_repo)"
@@ -9,7 +9,7 @@ copy_scripts "$repo"
 printf '.worktrees/\n.process/\n' >"$repo/.gitignore"
 printf '# Changelog\n\n- seed\n' >"$repo/CHANGELOG.md"
 printf '# Roadmap\n' >"$repo/ROADMAP.md"
-git -C "$repo" add scripts .gitignore CHANGELOG.md ROADMAP.md
+git -C "$repo" add .method .gitignore CHANGELOG.md ROADMAP.md
 git -C "$repo" commit --quiet -m "chore: scripts"
 remote="$TMP/remote.git"
 git clone --quiet --bare "$repo" "$remote"
@@ -22,7 +22,7 @@ git -C "$other" config user.name test
 git -C "$other" config commit.gpgsign false
 mkdir -p "$repo/.worktrees"
 REGISTRY="$repo/.worktrees/parallel-active.tsv"
-REDO="$repo/scripts/redo-phase.sh"
+REDO="$repo/.method/scripts/redo-phase.sh"
 
 commit() { # commit <checkout> <file> <content> <message>
   mkdir -p "$(dirname "$1/$2")"
@@ -189,7 +189,7 @@ case "$*" in
   "pr view 95"*"mergeable,mergeStateStatus,headRefOid"*) echo '{"mergeable":"CONFLICTING","mergeStateStatus":"DIRTY","headRefOid":"abc"}' ;;
 esac
 H
-assert_status 0 "close-phase.sh --check redoes the conflicting PR and exits 0" sh -c "cd '$repo' && scripts/close-phase.sh --check"
+assert_status 0 "close-phase.sh --check redoes the conflicting PR and exits 0" sh -c "cd '$repo' && .method/scripts/close-phase.sh --check"
 out="$(last_output)"
 assert_contains "$out" "redone: PR #96 (branch feat/issue-18-e-r2) replaces PR #95" "--check ends with the new PR"
 assert_not_contains "$out" "ask the repo owner" "--check asks nobody"

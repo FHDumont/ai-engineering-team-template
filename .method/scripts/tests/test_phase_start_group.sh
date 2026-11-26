@@ -1,19 +1,19 @@
 #!/usr/bin/env bash
 # Tests of the single phase entry, check-env without a spec, phase_opened order and a group of phases.
-# shellcheck source=scripts/tests/phase_start_common.sh
+# shellcheck source=.method/scripts/tests/phase_start_common.sh
 source "$(dirname "$0")/phase_start_common.sh"
 
 # check-env: a phase branch without a spec for its issue is refused.
 git -C "$repo" fetch --quiet origin
 git -C "$repo" worktree add --quiet -b feat/issue-55-nospec "$repo/.worktrees/issue-55" origin/main
-assert_status 1 "check-env refuses a phase branch without a spec" sh -c "cd '$repo/.worktrees/issue-55' && scripts/check-env.sh"
+assert_status 1 "check-env refuses a phase branch without a spec" sh -c "cd '$repo/.worktrees/issue-55' && .method/scripts/check-env.sh"
 assert_contains "$(last_output)" "no spec" "check-env says the spec is missing"
 
 # A failed opening records no phase_opened (#124). The branch already exists,
 # so the worktree is never created and the event must not count as a start.
 spec eleven.md 11
 git -C "$repo" branch feat/issue-11-listar-issues
-rc=0; (cd "$repo" && scripts/new-phase.sh 11 --no-check) >/dev/null 2>&1 || rc=$?
+rc=0; (cd "$repo" && .method/scripts/new-phase.sh 11 --no-check) >/dev/null 2>&1 || rc=$?
 assert_eq 1 "$((rc != 0))" "worktree creation fails on an existing branch"
 assert_eq "" "$(events | jq -r 'select(.event == "phase_opened" and .issue == "11") | .issue')" "a failed opening records no phase_opened"
 rm "$repo/docs/specs/eleven.md"
@@ -21,7 +21,7 @@ rm "$repo/docs/specs/eleven.md"
 # A test issue follows the same path, and a spec of the group serves two phases.
 spec group.md 10 "modelo: fable · esforço: medium · motivo: padrão"
 printf '\n## Fase #12 — y\n\n1. Etapa.\n' >>"$repo/docs/specs/group.md"
-assert_status 0 "phase-start opens a group in parallel, test issue included" sh -c "cd '$repo' && scripts/phase-start.sh 10 12 --no-check"
+assert_status 0 "phase-start opens a group in parallel, test issue included" sh -c "cd '$repo' && .method/scripts/phase-start.sh 10 12 --no-check"
 out="$(last_output)"
 assert_contains "$out" "phase #10" "arguments for the test issue"
 assert_contains "$out" "phase #12" "arguments for the second issue"

@@ -32,16 +32,11 @@ go.sum
 Cargo.lock
 # Deploy workflows and the phase close
 .github/workflows/deploy-*.yml
-scripts/close-phase.sh
 .method/scripts/close-phase.sh
 # The CI, the verifiers it reads from the base and this list
 .github/workflows/ci.yml
-scripts/ci-gate.sh
 .method/scripts/ci-gate.sh
-scripts/check-attribution.sh
 .method/scripts/check-attribution.sh
-scripts/check-docs.sh
 .method/scripts/check-docs.sh
-scripts/lib/sensitive_paths.py
 .method/scripts/lib/sensitive_paths.py
 .github/sensitive-paths

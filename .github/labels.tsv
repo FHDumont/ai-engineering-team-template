@@ -5,7 +5,7 @@ type:docs	0075ca	Só documentação	documentation
 type:chore	c5def5	Manutenção, processo ou ferramenta	
 roadmap	5319e7	Trabalho planejado	
 debt	b60205	Débito técnico	
-area:scripts	bfdadc	Scripts em scripts/	
+area:scripts	bfdadc	Scripts em .method/scripts/	
 area:ci	bfdadc	Workflows, labels e templates do GitHub	
 area:docs	bfdadc	Docs e arquivos de IA	
 area:process	bfdadc	Skills, comandos, agentes e hooks do método	

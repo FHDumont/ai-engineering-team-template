@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Tests of close-phase.sh --merge: pre-review, owner ok, review evidence, protection, unprotected mode.
-# shellcheck source=scripts/tests/close_phase_common.sh
+# shellcheck source=.method/scripts/tests/close_phase_common.sh
 source "$(dirname "$0")/close_phase_common.sh"
 
 reset_phase_evidence
@@ -84,7 +84,7 @@ assert_status 0 "merges with the reviewer round after the push" sh -c "cd '$repo
 handler "type:feature" success
 assert_status 1 "refuses merge on an unprotected branch" env FAKE_PROTECTION=none sh -c "cd '$repo' && '$CLOSE' --merge"
 assert_contains "$(last_output)" "main is not protected" "says the branch is not protected"
-assert_contains "$(last_output)" "scripts/setup-repo.sh --only protection" "says the fix command"
+assert_contains "$(last_output)" ".method/scripts/setup-repo.sh --only protection" "says the fix command"
 assert_not_contains "$(gh_calls)" "pr merge" "never merges without protection"
 handler "type:feature" success
 assert_status 1 "refuses merge when a required check is missing" env FAKE_PROTECTION="CI" sh -c "cd '$repo' && '$CLOSE' --merge"
@@ -112,7 +112,7 @@ handler "type:feature" success
 : >"$FAKE_GH_LOG"
 assert_status 1 "--merge --wait leaves at once when a check on HEAD was cancelled" \
   env FAKE_CANCELLED_URL="https://github.com/owner/repo/actions/runs/777/job/9" CLOSE_PHASE_MERGE_POLL=0 sh -c "cd '$repo' && '$CLOSE' --merge --wait"
-assert_contains "$(last_output)" "scripts/rerun-ci.sh 777" "names the rerun command with the run id"
+assert_contains "$(last_output)" ".method/scripts/rerun-ci.sh 777" "names the rerun command with the run id"
 assert_contains "$(last_output)" "cancelled" "names the cause"
 
 # CI or review/independent turns red while waiting for the merge (issue #256): leave at once, code 13.
@@ -123,7 +123,7 @@ for late in failure cancelled; do
     env FAKE_CI_LATE=$late FAKE_CI_FLIP_READ=2 CLOSE_PHASE_MERGE_POLL=0 sh -c "cd '$repo' && '$CLOSE' --merge --wait"
   assert_contains "$(last_output)" "runs/888" "names the run that failed ($late)"
   assert_contains "$(last_output)" "new commit" "says to fix in a new commit"
-  assert_contains "$(last_output)" "scripts/rerun-ci.sh 888" "says to rerun on a flake"
+  assert_contains "$(last_output)" ".method/scripts/rerun-ci.sh 888" "says to rerun on a flake"
   assert_contains "$(last_output)" "owner's ok" "says the owner ok holds only for the old SHA"
 done
 handler "type:feature" success

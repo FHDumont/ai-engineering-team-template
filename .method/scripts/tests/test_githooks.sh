@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
 # Tests for the git hooks (.githooks/pre-commit and commit-msg).
-# shellcheck source=scripts/tests/lib.sh
+# shellcheck source=.method/scripts/tests/lib.sh
 source "$(dirname "$0")/lib.sh"
 
 repo="$(make_repo)"
-mkdir -p "$repo/scripts/lib"
-cp "$SCRIPTS/check-attribution.sh" "$repo/scripts/"
-cp "$SCRIPTS/lib/common.sh" "$repo/scripts/lib/"
+mkdir -p "$repo/.method/scripts/lib"
+cp "$SCRIPTS/check-attribution.sh" "$repo/.method/scripts/"
+cp "$SCRIPTS/lib/common.sh" "$repo/.method/scripts/lib/"
 cp -R "$REPO/.githooks" "$repo/.githooks"
 git -C "$repo" config core.hooksPath .githooks
 
@@ -25,7 +25,7 @@ Co-Authored-By: Claude <noreply@anthropic.com>"
 
 # Phase lock: the session that recorded phase_opened never writes to the phase,
 # by any git command. The hooks are tracked, so every worktree has them.
-git -C "$repo" add .githooks scripts
+git -C "$repo" add .githooks .method
 git -C "$repo" commit --quiet -m "chore: hooks"
 echo base >"$repo/base.txt"
 git -C "$repo" add base.txt
@@ -98,9 +98,9 @@ git -C "$wt" reset --quiet HEAD
 rm -f "$wt/z.txt"
 jq -cn '{event: "phase_session", session_id: "child", issue: "7"}' >>"$repo/.process/events.jsonl"
 # Updating check-env.sh mid-phase does not drop the recorded phase_session.
-mkdir -p "$wt/scripts"
-printf '#!/bin/sh\necho new\n' >"$wt/scripts/check-env.sh"
-git -C "$wt" add scripts/check-env.sh
+mkdir -p "$wt/.method/scripts"
+printf '#!/bin/sh\necho new\n' >"$wt/.method/scripts/check-env.sh"
+git -C "$wt" add .method/scripts/check-env.sh
 assert_status 0 "a commit that updates check-env.sh keeps the recorded phase_session" as child git -C "$wt" commit -m "chore: check-env"
 # The child session and a plain terminal write normally; the opener still creates and deletes branches.
 assert_status 0 "the child session cherry-picks" as child git -C "$wt" cherry-pick "$side"

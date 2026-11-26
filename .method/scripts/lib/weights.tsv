@@ -1,6 +1,6 @@
 # Weights of the method: the model and effort of each kind of work.
 # Columns, separated by a tab: weight, model, effort. Edit the model and effort
-# to fit the plan of the account; scripts/weights.sh reads this file. The
+# to fit the plan of the account; .method/scripts/weights.sh reads this file. The
 # defaults run on a plan that only has sonnet at low or medium effort.
 # light: text, docs, small or mechanical change. medium: common feature, bug
 # with a known cause. strong: architecture, security, payment, migration, repo

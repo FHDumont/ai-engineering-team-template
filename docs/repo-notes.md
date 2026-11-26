@@ -4,7 +4,7 @@ Regras do projeto que não são do método: nomes, medidas e o que vale só aqui
 
 ## Nomes só deste repositório
 
-Liste, um por linha e entre crases, os nomes que só existem neste repositório (produto, bot, serviço). O `scripts/check-docs.sh` reprova o desenho, o `AGENTS.md` e as skills que citarem algum deles. Exemplo: `- \`NomeDoProduto\``. Sem nomes, deixe a lista vazia.
+Liste, um por linha e entre crases, os nomes que só existem neste repositório (produto, bot, serviço). O `.method/scripts/check-docs.sh` reprova o desenho, o `AGENTS.md` e as skills que citarem algum deles. Exemplo: `- \`NomeDoProduto\``. Sem nomes, deixe a lista vazia.
 
 ## Regras do projeto
 

@@ -1,9 +1,9 @@
 # Example deploy workflow: copy it to deploy-<target>.yml and replace the
 # "Deploy" step with the real deploy of your project.
-# Only workflow_dispatch: the one that dispatches it is scripts/deploy.sh, run by
+# Only workflow_dispatch: the one that dispatches it is .method/scripts/deploy.sh, run by
 # the main session after the last merge of the group (once per group). Never on
 # pull_request, push or schedule. The "Validate main" job runs
-# scripts/validate.sh on main before the build, unless this SHA or the same
+# .method/scripts/validate.sh on main before the build, unless this SHA or the same
 # tree already has green CI. An API failure or an absent check still runs the
 # suite. A main that does not pass is not published.
 # The "deploy-paths" line lists what this workflow publishes. A token that
@@ -40,10 +40,10 @@ jobs:
         id: gate
         env:
           GH_TOKEN: ${{ github.token }}
-        run: scripts/ci-already-green.sh "${{ github.sha }}" >> "$GITHUB_OUTPUT"
+        run: .method/scripts/ci-already-green.sh "${{ github.sha }}" >> "$GITHUB_OUTPUT"
       - name: "Lint and tests on main"
         if: steps.gate.outputs.skip != 'true'
-        run: scripts/validate.sh
+        run: .method/scripts/validate.sh
 
   build:
     name: "Build"

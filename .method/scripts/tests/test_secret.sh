@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
-# Tests of scripts/lib/secret.sh: environment, Service Account, .env, no provider and locked credential store.
+# Tests of .method/scripts/lib/secret.sh: environment, Service Account, .env, no provider and locked credential store.
 # security and op are stubs on PATH; nothing touches the real credential store, password manager or .env.
-# shellcheck source=scripts/tests/lib.sh
+# shellcheck source=.method/scripts/tests/lib.sh
 source "$(dirname "$0")/lib.sh"
 
 mkdir -p "$TMP/bin"
@@ -39,7 +39,7 @@ export PROCESS_ENV_FILE="$TMP/none.env"
 unset OP_SERVICE_ACCOUNT_TOKEN MY_SECRET
 export USER="tester"
 
-# shellcheck source=scripts/lib/secret.sh
+# shellcheck source=.method/scripts/lib/secret.sh
 source "$SCRIPTS/lib/secret.sh"
 
 # get <expected code> <description> <name> [ref]: runs secret_get and keeps stdout/stderr/status.

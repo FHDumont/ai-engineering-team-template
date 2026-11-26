@@ -1,33 +1,33 @@
 #!/usr/bin/env bash
-# The method's allow list names each script; it never grants scripts/* or a
+# The method's allow list names each script; it never grants .method/scripts/* or a
 # generic git push. Adoption must show the permission diff before the new
 # settings are what the session uses.
-# shellcheck source=scripts/tests/lib.sh
+# shellcheck source=.method/scripts/tests/lib.sh
 source "$(dirname "$0")/lib.sh"
 
 settings="$REPO/.claude/settings.json"
 allow="$(jq -r '.permissions.allow[]' "$settings")"
 
-assert_not_contains "$allow" 'Bash(scripts/*)' "allow does not grant scripts/*"
-assert_not_contains "$allow" 'Bash(./scripts/*)' "allow does not grant ./scripts/*"
+assert_not_contains "$allow" 'Bash(.method/scripts/*)' "allow does not grant .method/scripts/*"
+assert_not_contains "$allow" 'Bash(./.method/scripts/*)' "allow does not grant ./.method/scripts/*"
 assert_not_contains "$allow" 'Bash(git push *)' "allow does not grant a generic git push"
 # A headless child commits and brings the template without a question (#215); the hook still bars add -A and add .
 assert_contains "$allow" 'Bash(git add *)' "allow has git add (the hook bars -A and .)"
-assert_contains "$allow" 'Bash(scripts/fetch-template.sh *)' "allow has fetch-template.sh"
-# A glob that would cover every script in scripts/ is refused, even if written
+assert_contains "$allow" 'Bash(.method/scripts/fetch-template.sh *)' "allow has fetch-template.sh"
+# A glob that would cover every script in .method/scripts/ is refused, even if written
 # with a different prefix or without the Bash() wrapper in a future edit.
 while IFS= read -r line; do
   case "$line" in
-    *'scripts/*'*|*'./scripts/'*)
+    *'.method/scripts/*'*|*'./.method/scripts/'*)
       bad "allow still has a scripts glob: $line" ;;
   esac
 done <<<"$allow"
 
 # Every method script is listed by name so adoption does not widen to app scripts.
 missing=""
-# The list is the manifest, not scripts/*: a script only of the repository is not the method's (FHDumont/ai-engineering-team-template#207).
+# The list is the manifest, not .method/scripts/*: a script only of the repository is not the method's (FHDumont/ai-engineering-team-template#207).
 while IFS= read -r name; do
-  case "$name" in scripts/*.sh|scripts/*.py) ;; *) continue ;; esac
+  case "$name" in .method/scripts/*.sh|.method/scripts/*.py) ;; *) continue ;; esac
   echo "$allow" | grep -qxF "Bash($name *)" || missing="$missing $name"
 done < <(grep -vE '^[[:space:]]*(#|$)' "$REPO/.github/method-files.txt")
 assert_eq "" "$missing" "allow lists every method script by name"

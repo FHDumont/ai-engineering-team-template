@@ -35,9 +35,9 @@
 #: command and starts nothing.
 set -euo pipefail
 HERE="$(cd "$(dirname "$0")" && pwd)"
-# shellcheck source=scripts/lib/common.sh
+# shellcheck source=.method/scripts/lib/common.sh
 source "$HERE/lib/common.sh"
-# shellcheck source=scripts/lib/slots.sh
+# shellcheck source=.method/scripts/lib/slots.sh
 source "$HERE/lib/slots.sh"
 
 issue="" dry=0 brief=""
@@ -69,7 +69,7 @@ command -v claude >/dev/null 2>&1 || die "claude is not installed: use the card 
 
 main_root="$(git worktree list --porcelain | sed -n '1s/^worktree //p')"
 wt="$main_root/.worktrees/issue-$issue"
-[ -d "$wt" ] || die "no worktree for #$issue: open the phase with scripts/phase-start.sh first" 2
+[ -d "$wt" ] || die "no worktree for #$issue: open the phase with .method/scripts/phase-start.sh first" 2
 # The spec lives on the branch of the phase (phase-start.sh commits it there and removes the
 # loose copy of the main checkout): read it from the worktree.
 specs="$(specs_citing "$issue" "$wt" | sed "s#^#$wt/#")"
@@ -80,7 +80,7 @@ model="${pair% *}" effort="${pair#* }"
 sid="$(python3 -c 'import uuid; print(uuid.uuid4())')"
 log="$wt/.process/headless.log"
 mode="${HEADLESS_PERMISSION_MODE:-acceptEdits}"
-prompt="Execute the phase of issue #$issue with the execute skill; work in the worktree $wt by absolute path. You run headless: there is no choice board and no one answers in this session. A question for the owner goes as a comment on issue #$issue (gh issue comment), then stop with scripts/status.sh --state esperando --need '<the question>'; the manager resumes this session with the answer. Commit with plain git add <file> from inside the worktree (no -C, no &&). A template update brings the template with scripts/fetch-template.sh <sha> into .process/template; no worktree or clone of it."
+prompt="Execute the phase of issue #$issue with the execute skill; work in the worktree $wt by absolute path. You run headless: there is no choice board and no one answers in this session. A question for the owner goes as a comment on issue #$issue (gh issue comment), then stop with .method/scripts/status.sh --state esperando --need '<the question>'; the manager resumes this session with the answer. Commit with plain git add <file> from inside the worktree (no -C, no &&). A template update brings the template with .method/scripts/fetch-template.sh <sha> into .process/template; no worktree or clone of it."
 [ -z "$brief" ] || prompt="$prompt
 
 Brief of the manager:

@@ -11,11 +11,11 @@
 #: owner pastes the values in an editor. Prints only the file path.
 set -euo pipefail
 HERE="$(cd "$(dirname "$0")" && pwd)"
-# shellcheck source=scripts/lib/common.sh
+# shellcheck source=.method/scripts/lib/common.sh
 source "$HERE/lib/common.sh"
-# shellcheck source=scripts/lib/secret.sh
+# shellcheck source=.method/scripts/lib/secret.sh
 source "$HERE/lib/secret.sh"
-# shellcheck source=scripts/lib/role.sh
+# shellcheck source=.method/scripts/lib/role.sh
 source "$HERE/lib/role.sh"
 case "${1:-}" in -h|--help) print_help "$0"; exit 0 ;; esac
 

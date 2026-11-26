@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Builds an adopted repository (no example app, no template-only tests, project
 # files that would fail a whole-repo scan) and runs the method suite there.
-# shellcheck source=scripts/tests/lib.sh
+# shellcheck source=.method/scripts/tests/lib.sh
 source "$(dirname "$0")/../lib.sh"
 
 adopt="$TMP/adopted"
@@ -13,7 +13,7 @@ tar -C "$REPO" -cf - \
   --exclude app \
   --exclude CHANGELOG.md \
   --exclude ROADMAP.md \
-  --exclude scripts/tests/template \
+  --exclude .method/scripts/tests/template \
   --exclude .github/workflows/deploy-example.yml \
   . | tar -C "$adopt" -xf -
 
@@ -38,17 +38,17 @@ git -C "$adopt" config commit.gpgsign false
 git -C "$adopt" add -A
 git -C "$adopt" commit --quiet -m "chore: adopt the method"
 
-if env REPO_ROOT="$adopt" "$adopt/scripts/check-docs.sh" >"$TMP/docs.out" 2>&1; then
+if env REPO_ROOT="$adopt" "$adopt/.method/scripts/check-docs.sh" >"$TMP/docs.out" 2>&1; then
   ok
 else
   cat "$TMP/docs.out"
   bad "the adopted repository passes check-docs"
 fi
-if bash "$adopt/scripts/tests/test_bots.sh" >"$TMP/bots.out" 2>&1; then
+if bash "$adopt/.method/scripts/tests/test_bots.sh" >"$TMP/bots.out" 2>&1; then
   ok
   suite_out="$TMP/suite.out"
   if env -u PROCESS_VALIDATE_RUNNING AI_METHOD_TEST_JOBS="${AI_METHOD_TEST_JOBS:-4}" \
-    "$adopt/scripts/validate.sh" --tests >"$suite_out" 2>&1; then
+    "$adopt/.method/scripts/validate.sh" --tests >"$suite_out" 2>&1; then
     ok
   else
     grep -E 'FAIL |not ok:' "$suite_out" | head -60

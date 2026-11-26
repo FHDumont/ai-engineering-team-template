@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Tests of close-phase.sh --merge: conflicts, CI on HEAD, no deploy from the phase, sensitive paths.
-# shellcheck source=scripts/tests/close_phase_common.sh
+# shellcheck source=.method/scripts/tests/close_phase_common.sh
 source "$(dirname "$0")/close_phase_common.sh"
 
 reset_phase_evidence
@@ -8,8 +8,8 @@ child_session 5
 # Conflicting PR: --check calls redo-phase.sh, asks nobody and exits 0 with the new PR.
 # redo-phase.sh is a stub here (its own behaviour is in test_redo_phase.sh).
 export CLOSE_PHASE_MERGEABLE_PAUSE=0 CLOSE_PHASE_CI_TIMEOUT=0 CLOSE_PHASE_CI_POLL=0
-cp "$repo/scripts/redo-phase.sh" "$TMP/redo-phase.real"
-printf '#!/usr/bin/env bash\necho "redo called" >>"%s"\necho "redone: PR #13 replaces PR #12"\nexit "${FAKE_REDO_RC:-0}"\n' "$TMP/redo.log" >"$repo/scripts/redo-phase.sh"
+cp "$repo/.method/scripts/redo-phase.sh" "$TMP/redo-phase.real"
+printf '#!/usr/bin/env bash\necho "redo called" >>"%s"\necho "redone: PR #13 replaces PR #12"\nexit "${FAKE_REDO_RC:-0}"\n' "$TMP/redo.log" >"$repo/.method/scripts/redo-phase.sh"
 redo_calls() { if [ -f "$TMP/redo.log" ]; then wc -l <"$TMP/redo.log" | tr -d ' '; else echo 0; fi; }
 handler "type:feature" success
 assert_status 0 "--check redoes a conflicting PR and exits 0" env FAKE_MERGEABLE=CONFLICTING FAKE_MERGE_STATE=DIRTY sh -c "cd '$repo' && '$CLOSE' --check"
@@ -33,7 +33,7 @@ rm -f "$TMP/redo.log"
 handler "type:feature" success
 assert_status 0 "--check passes on a PR that is only behind" env FAKE_MERGEABLE=MERGEABLE FAKE_MERGE_STATE=BEHIND sh -c "cd '$repo' && '$CLOSE' --check"
 assert_eq 0 "$(redo_calls)" "a PR that is only behind is not redone"
-cp "$TMP/redo-phase.real" "$repo/scripts/redo-phase.sh"
+cp "$TMP/redo-phase.real" "$repo/.method/scripts/redo-phase.sh"
 # No script output offers a rebase or tells anyone to ask about a conflict.
 for f in close-phase.sh redo-phase.sh integrate-parallel.sh; do
   assert_not_contains "$(grep -v '^#' "$SCRIPTS/$f")" "rebase onto" "$f offers no rebase"
@@ -57,17 +57,17 @@ assert_status 0 "--check passes when HEAD has checks" sh -c "cd '$repo' && '$CLO
 assert_contains "$(gh_calls)" "commits/$SHA/check-runs" "reads the checks of the HEAD SHA"
 
 # The phase never deploys: merged or not, solo or parallel, close-phase.sh
-# dispatches nothing and says who does (scripts/deploy.sh, by the main session).
+# dispatches nothing and says who does (.method/scripts/deploy.sh, by the main session).
 mkdir -p "$repo/.github/workflows"
 printf '# deploy-paths: app/\non:\n  workflow_dispatch:\n' >"$repo/.github/workflows/deploy-example.yml"
-printf '#!/usr/bin/env bash\necho called >>"%s"\n' "$TMP/deploy.log" >"$repo/scripts/deploy.sh"
+printf '#!/usr/bin/env bash\necho called >>"%s"\n' "$TMP/deploy.log" >"$repo/.method/scripts/deploy.sh"
 handler "type:feature" success
 assert_status 0 "merge request without the merge yet" sh -c "cd '$repo' && '$CLOSE' --merge"
 assert_not_contains "$(gh_calls)" "workflow run" "never dispatches the deploy before the merge"
 handler "type:feature" success
 assert_status 0 "solo phase merged" env FAKE_PR_STATE=MERGED sh -c "cd '$repo' && '$CLOSE' --merge"
 assert_eq 0 "$(gh_calls | grep -c 'workflow run')" "a merged solo phase dispatches no deploy"
-assert_contains "$(last_output)" "no deploy from the phase: the main session runs scripts/deploy.sh" "says who deploys"
+assert_contains "$(last_output)" "no deploy from the phase: the main session runs .method/scripts/deploy.sh" "says who deploys"
 mkdir -p "$repo/.worktrees"
 printf '5\tfeat/issue-5-x\t%s\n' "$repo" >"$repo/.worktrees/parallel-active.tsv"
 handler "type:feature" success
@@ -77,7 +77,7 @@ assert_eq "" "$(cat "$TMP/deploy.log" 2>/dev/null || true)" "close-phase.sh neve
 for word in solo_deploy dispatch_deploy "workflow run"; do
   assert_not_contains "$(cat "$SCRIPTS/close-phase.sh" "$SCRIPTS/lib/common.sh")" "$word" "close-phase.sh and common.sh have no $word"
 done
-cp "$SCRIPTS/deploy.sh" "$repo/scripts/deploy.sh"
+cp "$SCRIPTS/deploy.sh" "$repo/.method/scripts/deploy.sh"
 rm -rf "$repo/.worktrees" "$repo/.github/workflows"
 
 # Sensitive path in the diff, even without the label.
@@ -152,6 +152,6 @@ git -C "$repo" rm --quiet newzone/a.txt
 commit_push "chore: restore the list" .github/sensitive-paths
 handler "type:feature" success
 # The repo's own list covers the docs checker the CI reads from the base.
-assert_eq "scripts/check-docs.sh" "$(echo scripts/check-docs.sh | python3 "$SCRIPTS/lib/sensitive_paths.py" "$REPO/.github/sensitive-paths")" "check-docs.sh is a sensitive path"
+assert_eq ".method/scripts/check-docs.sh" "$(echo .method/scripts/check-docs.sh | python3 "$SCRIPTS/lib/sensitive_paths.py" "$REPO/.github/sensitive-paths")" "check-docs.sh is a sensitive path"
 
 finish

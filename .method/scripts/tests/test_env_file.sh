@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Tests of the .env path (secret_env_file) and of init-env.sh: default
 # ~/.<repo-slug>/.env, override through PROCESS_ENV_FILE, permissions 700/600 and empty keys.
-# shellcheck source=scripts/tests/lib.sh
+# shellcheck source=.method/scripts/tests/lib.sh
 source "$(dirname "$0")/lib.sh"
 
 export HOME="$TMP/home"

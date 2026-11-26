@@ -4,7 +4,7 @@
 #: Usage: end-check.sh [--issue N] [--offline]
 #:
 #: Read-only: it never fixes anything. Looks at the main checkout, wherever it
-#: is called from. scripts/status.sh --state pronto runs it and refuses the
+#: is called from. .method/scripts/status.sh --state pronto runs it and refuses the
 #: state when it fails.
 #:
 #: Without --issue (the end of the group, by the main session), fails with:
@@ -16,8 +16,8 @@
 #:   warn: line, not a failure. Do not delete those to make this check green.
 #:   - a remote branch with no open PR;
 #:   - a spec in docs/specs that cites no open issue;
-#:   - ROADMAP.md different from the generated one (scripts/gen-roadmap.py);
-#:   - a deploy that was not checked (scripts/deploy.sh --check).
+#:   - ROADMAP.md different from the generated one (.method/scripts/gen-roadmap.py);
+#:   - a deploy that was not checked (.method/scripts/deploy.sh --check).
 #:
 #: With --issue N (the end of one phase, by its session), fails with a worktree,
 #: a local branch, a registry line, a remote branch or an open PR of phase N.
@@ -31,7 +31,7 @@
 #: Exit: 0 clean; 1 at least one "fail:" line.
 set -euo pipefail
 HERE="$(cd "$(dirname "$0")" && pwd)"
-# shellcheck source=scripts/lib/common.sh
+# shellcheck source=.method/scripts/lib/common.sh
 source "$HERE/lib/common.sh"
 
 issue="" offline=0
@@ -72,7 +72,7 @@ if [ -n "$issue" ]; then
   # The end of one phase: nothing of phase <issue> is left.
   of_phase() { grep -E "(^|/)issue-$issue(-|\$)" || true; }
   left="$(printf '%s\n' "$worktrees" | of_phase | list)"
-  [ -z "$left" ] || fail "worktree of phase #$issue still exists ($left): the phase closes with scripts/close-phase.sh --merge --wait"
+  [ -z "$left" ] || fail "worktree of phase #$issue still exists ($left): the phase closes with .method/scripts/close-phase.sh --merge --wait"
   left="$(printf '%s\n' "$branches" | of_phase | list)"
   [ -z "$left" ] || fail "local branch of phase #$issue still exists ($left)"
   if [ -f "$registry" ] && grep -q "^$issue$TAB" "$registry"; then
@@ -98,7 +98,7 @@ else
   left="$(printf '%s\n' "$worktrees" | grep -vE 'issue-[0-9]+' | grep . | list || true)"
   [ -z "$left" ] || warn "worktree the phase did not create ($left): do not delete it to make this check green"
   if [ -s "$registry" ]; then
-    fail "$registry is not empty (#$(cut -f1 "$registry" | paste -sd' ' - | sed 's/ / #/g')): scripts/close-phase.sh --cleanup takes the lines out"
+    fail "$registry is not empty (#$(cut -f1 "$registry" | paste -sd' ' - | sed 's/ / #/g')): .method/scripts/close-phase.sh --cleanup takes the lines out"
   fi
   dirty="$(git -C "$main_root" status --porcelain --untracked-files=all)"
   left="$(printf '%s\n' "$dirty" | sed -n 's/^?? //p' | list)"
@@ -123,9 +123,9 @@ else
     done
     generated="$(cd "$main_root" && python3 "$HERE/gen-roadmap.py" --output -)" || die "ROADMAP.md not generated"
     [ -f "$main_root/ROADMAP.md" ] && [ "$generated" = "$(cat "$main_root/ROADMAP.md")" ] ||
-      fail "ROADMAP.md differs from the generated one: the main session runs scripts/gen-docs.sh"
+      fail "ROADMAP.md differs from the generated one: the main session runs .method/scripts/gen-docs.sh"
     deploy="$("$HERE/deploy.sh" --check 2>&1)" ||
-      fail "deploy not checked ($(printf '%s' "$deploy" | tail -1)): the main session runs scripts/deploy.sh"
+      fail "deploy not checked ($(printf '%s' "$deploy" | tail -1)): the main session runs .method/scripts/deploy.sh"
   fi
 fi
 

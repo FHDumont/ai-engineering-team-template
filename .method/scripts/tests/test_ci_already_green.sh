@@ -1,13 +1,13 @@
 #!/usr/bin/env bash
 # The deploy gate skips the suite only when this SHA, or the same tree, has green CI.
-# shellcheck source=scripts/tests/lib.sh
+# shellcheck source=.method/scripts/tests/lib.sh
 source "$(dirname "$0")/lib.sh"
 
 repo="$(make_repo)"
-mkdir -p "$repo/scripts/lib"
-cp "$SCRIPTS/lib/common.sh" "$repo/scripts/lib/common.sh"
-cp "$SCRIPTS/ci-already-green.sh" "$repo/scripts/ci-already-green.sh"
-chmod +x "$repo/scripts/ci-already-green.sh"
+mkdir -p "$repo/.method/scripts/lib"
+cp "$SCRIPTS/lib/common.sh" "$repo/.method/scripts/lib/common.sh"
+cp "$SCRIPTS/ci-already-green.sh" "$repo/.method/scripts/ci-already-green.sh"
+chmod +x "$repo/.method/scripts/ci-already-green.sh"
 echo x >"$repo/f"
 git -C "$repo" add f
 git -C "$repo" commit --quiet -m "chore: one"
@@ -15,7 +15,7 @@ git clone --quiet --bare "$repo" "$TMP/remote.git"
 git -C "$repo" remote add origin "$TMP/remote.git"
 git -C "$repo" push --quiet origin HEAD:main
 SHA="$(git -C "$repo" rev-parse HEAD)"
-S="$repo/scripts/ci-already-green.sh"
+S="$repo/.method/scripts/ci-already-green.sh"
 use_fake_gh "$TMP/handler.sh"
 : >"$TMP/handler.sh"
 run() { env "$@" sh -c "cd '$repo' && '$S' '$SHA'"; }

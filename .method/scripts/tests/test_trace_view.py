@@ -10,12 +10,12 @@ import sys
 import tempfile
 import unittest
 
-ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-SCRIPT = os.path.join(ROOT, "scripts", "trace-view.py")
+ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
+SCRIPT = os.path.join(ROOT, ".method", "scripts", "trace-view.py")
 
 
 def load(name):
-    spec = importlib.util.spec_from_file_location(name.replace("-", "_"), os.path.join(ROOT, "scripts", name + ".py"))
+    spec = importlib.util.spec_from_file_location(name.replace("-", "_"), os.path.join(ROOT, ".method", "scripts", name + ".py"))
     mod = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(mod)
     return mod

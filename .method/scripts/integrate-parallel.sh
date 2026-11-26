@@ -8,7 +8,7 @@
 #: until the PR of each branch is merged (a pending line, "<issue><TAB>pending", is a
 #: phase not opened yet for lack of a slot: it counts as not merged), updates the local main, removes the
 #: worktrees that are left and clears the registry. Only then runs
-#: scripts/build.sh, if it exists. An empty registry means nothing to wait for.
+#: .method/scripts/build.sh, if it exists. An empty registry means nothing to wait for.
 #: It never deploys: the end step belongs to the main session (gen-docs.sh,
 #: deploy.sh, archiving the child sessions, end-check.sh), the same for a solo
 #: and a parallel group. It only waits: a conflicting PR is redone by the phase
@@ -16,7 +16,7 @@
 #: registry line). Exits 3 on timeout.
 set -euo pipefail
 HERE="$(cd "$(dirname "$0")" && pwd)"
-# shellcheck source=scripts/lib/common.sh
+# shellcheck source=.method/scripts/lib/common.sh
 source "$HERE/lib/common.sh"
 
 timeout=7200 interval=60 dry=0
@@ -48,7 +48,7 @@ while :; do
     # A pending line (open-parallel.sh: no free phase slot yet) has no branch: the group is not done.
     if [ "$branch" = pending ]; then
       pending=$((pending + 1))
-      echo "waiting: #$n is pending (not opened yet: scripts/phase-start.sh $n)"
+      echo "waiting: #$n is pending (not opened yet: .method/scripts/phase-start.sh $n)"
       continue
     fi
     state="$(gh pr list --repo "$repo" --head "$branch" --state all --json state --jq '.[0].state // "NONE"')"
@@ -78,7 +78,7 @@ done <"$registry"
 echo "main updated, worktrees removed"
 
 # The group's single deploy: every phase is in through the gate.
-if [ -x "$main_root/scripts/build.sh" ]; then
-  "$main_root/scripts/build.sh"
+if [ -x "$main_root/.method/scripts/build.sh" ]; then
+  "$main_root/.method/scripts/build.sh"
 fi
-echo "next, by the main session, once: scripts/gen-docs.sh, scripts/deploy.sh, archive the child sessions, scripts/end-check.sh"
+echo "next, by the main session, once: .method/scripts/gen-docs.sh, .method/scripts/deploy.sh, archive the child sessions, .method/scripts/end-check.sh"

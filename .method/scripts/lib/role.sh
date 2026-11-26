@@ -3,7 +3,7 @@
 #
 # The owner creates each app. This file never creates an app, a key or a secret.
 # The token is GH_APP_<ROLE>_TOKEN in the environment or in the .env of
-# scripts/lib/secret.sh (chmod 600). The OS credential store is not opened:
+# .method/scripts/lib/secret.sh (chmod 600). The OS credential store is not opened:
 # a comment must not prompt for the keychain.
 #
 #   role_exec <role> -- <cmd...>   cmd with the app token, or as the owner's gh
@@ -13,7 +13,7 @@
 # the app exists.
 
 _ROLE_HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-# shellcheck source=scripts/lib/secret.sh
+# shellcheck source=.method/scripts/lib/secret.sh
 source "$_ROLE_HERE/secret.sh"
 
 role_token_var() { # role_token_var <role>

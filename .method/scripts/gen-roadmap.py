@@ -41,7 +41,7 @@ def render(issues):
     issues = [i for i in issues if "test" not in labels_of(i)]
     issues.sort(key=lambda i: (priority_rank(labels_of(i)), i["number"]))
     out = ["# Roadmap", "",
-           "<!-- Gerado por scripts/gen-roadmap.py; não editar à mão. -->", ""]
+           "<!-- Gerado por .method/scripts/gen-roadmap.py; não editar à mão. -->", ""]
     if not issues:
         return "\n".join(out + ["Nenhuma issue aberta.", ""])
     debt = [i for i in issues if "debt" in labels_of(i)]

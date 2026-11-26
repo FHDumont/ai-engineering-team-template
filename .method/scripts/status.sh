@@ -4,7 +4,7 @@
 #: Usage: status.sh --state trabalhando|esperando|gerenciadora|pronto [--need "exact action"] \
 #:          [--next "next step"] [--issue N] [--offline]
 #:
-#: pronto runs scripts/end-check.sh (of the phase, with an issue; of the group,
+#: pronto runs .method/scripts/end-check.sh (of the phase, with an issue; of the group,
 #: without one) and exits 1 when it fails: the state is then trabalhando or
 #: esperando. pronto with --need exits 1: an owner action pending is esperando.
 #:
@@ -21,15 +21,15 @@
 #: next step when none is given. On main it warns only when code edits are
 #: pending (outside docs/specs/ and .process/): planning and post-close do not warn.
 #: --offline does not call GitHub.
-#: When a long script of the phase is running (scripts/progress.sh), the current step
+#: When a long script of the phase is running (.method/scripts/progress.sh), the current step
 #: goes at the end of the state ("trabalhando — validate.sh: tests 23/49 ..., 3m10s")
 #: and of the phase line on main: one line, read from the progress files, never the log.
 set -euo pipefail
 trap "" PIPE
 HERE="$(cd "$(dirname "$0")" && pwd)"
-# shellcheck source=scripts/lib/common.sh
+# shellcheck source=.method/scripts/lib/common.sh
 source "$HERE/lib/common.sh"
-# shellcheck source=scripts/lib/notes.sh
+# shellcheck source=.method/scripts/lib/notes.sh
 source "$HERE/lib/notes.sh"
 
 state="" need="" next="" issue="" offline=0
@@ -63,7 +63,7 @@ if [ "$state" = pronto ]; then
   [ "$offline" = 0 ] || check_args+=(--offline)
   if ! check_out="$("$HERE/end-check.sh" ${check_args[@]+"${check_args[@]}"} 2>&1)"; then
     printf '%s\n' "$check_out" >&2
-    die "pronto refused: the end is not clean (scripts/end-check.sh above); the state is trabalhando or esperando"
+    die "pronto refused: the end is not clean (.method/scripts/end-check.sh above); the state is trabalhando or esperando"
   fi
 fi
 
@@ -160,7 +160,7 @@ if [ "$end" = "end:lab-test" ] && [ "$state" = "esperando você" ]; then
     if [ -n "$notes" ]; then
       echo "refused: issue #$issue has a note to phase #$issue with no answer:" >&2
       echo "$notes" >&2
-      echo "read it, follow it, and answer with a comment headed by scripts/lib/author.sh (De: fase #$issue) before the lab-test stop" >&2
+      echo "read it, follow it, and answer with a comment headed by .method/scripts/lib/author.sh (De: fase #$issue) before the lab-test stop" >&2
       exit 12
     fi
   fi
@@ -169,7 +169,7 @@ fi
 # The session that opened the phase does not write in the child's name.
 if [ -n "$issue" ]; then
   if [ "$(phase_opener_state "$issue" "${CLAUDE_CODE_SESSION_ID:-}")" = opener ]; then
-    die "the session that opened phase #$issue does not record phase_status from its worktree; run scripts/status.sh from the main checkout with git -C and an absolute path" 2
+    die "the session that opened phase #$issue does not record phase_status from its worktree; run .method/scripts/status.sh from the main checkout with git -C and an absolute path" 2
   fi
   trace_event phase_status "issue=$issue" "state=$state" "need=$(printf '%s' "$need" | tr '\n' ' ')"
 fi

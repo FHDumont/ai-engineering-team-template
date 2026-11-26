@@ -52,9 +52,9 @@
 #: what it would create). A second run with no difference changes nothing. Pre-approved: the agent runs it; the owner never does.
 set -euo pipefail
 HERE="$(cd "$(dirname "$0")" && pwd)"
-# shellcheck source=scripts/lib/common.sh
+# shellcheck source=.method/scripts/lib/common.sh
 source "$HERE/lib/common.sh"
-ROOT="$(cd "$HERE/.." && pwd)"
+ROOT="$(cd "$HERE/../.." && pwd)"
 
 dry=0 only="" mode="" owner_ok=0 need_owner_pending=0
 decline=""
@@ -129,7 +129,7 @@ case "$mode" in
     if [ -n "$offers_pending" ]; then printf '%s\n' $offers_pending; else echo "offers: none pending"; fi
     exit 0 ;;
   project)
-    # shellcheck source=scripts/lib/project.sh
+    # shellcheck source=.method/scripts/lib/project.sh
     source "$HERE/lib/project.sh"
     owner="${repo%%/*}"
     # 1. Scope: without it, returns the real step (the owner only logs in) and does not claim success.
@@ -469,7 +469,7 @@ if [ "$mode" = check ]; then
     exit 0
   fi
   echo "error: $repo is not configured for the method: no phase opens and no issue is created before the setup" >&2
-  echo "fix: say \"configurar o repo\" to the agent (setup skill, which runs the pre-approved scripts/setup-repo.sh)" >&2
+  echo "fix: say \"configurar o repo\" to the agent (setup skill, which runs the pre-approved .method/scripts/setup-repo.sh)" >&2
   exit 7
 fi
 
@@ -485,7 +485,7 @@ esac
 
 if [ "$need_owner_pending" -gt 0 ] && [ "$dry" = 0 ]; then
   echo "error: $repo has $need_owner_pending change(s) that need the owner's ok; nothing of that was applied" >&2
-  echo "fix: say \"configurar o repo\" to the agent (setup skill, which runs scripts/setup-repo.sh --owner-ok after the choice board)" >&2
+  echo "fix: say \"configurar o repo\" to the agent (setup skill, which runs .method/scripts/setup-repo.sh --owner-ok after the choice board)" >&2
   exit 7
 fi
 if [ "$changes" = 0 ]; then

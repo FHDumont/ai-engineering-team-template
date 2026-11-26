@@ -8,9 +8,9 @@
 #: (issues, PRs and comments). --local skips GitHub. Short list.
 set -euo pipefail
 HERE="$(cd "$(dirname "$0")" && pwd)"
-# shellcheck source=scripts/lib/common.sh
+# shellcheck source=.method/scripts/lib/common.sh
 source "$HERE/lib/common.sh"
-ROOT="${REPO_ROOT:-$(cd "$HERE/.." && pwd)}"
+ROOT="${REPO_ROOT:-$(cd "$HERE/../.." && pwd)}"
 
 [ $# -gt 0 ] || { print_help "$0"; exit 2; }
 case "$1" in -h|--help) print_help "$0"; exit 0 ;; esac

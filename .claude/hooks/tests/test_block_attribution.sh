@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Tests for the block-attribution.sh hook.
-# shellcheck source=scripts/tests/lib.sh
-source "$(dirname "$0")/../../../scripts/tests/lib.sh"
+# shellcheck source=.method/scripts/tests/lib.sh
+source "$(dirname "$0")/../../../.method/scripts/tests/lib.sh"
 HOOK="$REPO/.claude/hooks/block-attribution.sh"
 
 run() { jq -cn --arg c "$1" --arg d "$REPO" '{tool_input: {command: $c}, cwd: $d}' | "$HOOK"; }

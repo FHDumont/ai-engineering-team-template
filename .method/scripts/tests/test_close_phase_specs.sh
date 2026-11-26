@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Tests of close-phase.sh --prepare: specs that leave with the phase.
-# shellcheck source=scripts/tests/close_phase_common.sh
+# shellcheck source=.method/scripts/tests/close_phase_common.sh
 source "$(dirname "$0")/close_phase_common.sh"
 
 printf 'Resumo\n\nCloses #1\n' >"$TMP/body.md"
@@ -23,7 +23,7 @@ case "\$*" in
 esac
 H
   use_fake_gh "$TMP/handler.sh"
-  assert_status 0 "prepare with a spec ($2, open $1)" sh -c "cd '$repo' && scripts/close-phase.sh --prepare --title 'chore: x' --body-file '$TMP/body.md'"
+  assert_status 0 "prepare with a spec ($2, open $1)" sh -c "cd '$repo' && .method/scripts/close-phase.sh --prepare --title 'chore: x' --body-file '$TMP/body.md'"
 }
 # The file name has nothing of the group: it leaves because it cites #1 and no other open issue.
 spec_round '[{"number":1},{"number":40}]' 2026-01-18-plano.md 'Texto da spec da fase #1.'
@@ -54,7 +54,7 @@ git -C "$repo" fetch --quiet origin
 git -C "$repo" switch --quiet -c chore/issue-1-drops-old origin/main
 git -C "$repo" rm --quiet docs/specs/2026-01-17-old.md
 git -C "$repo" commit --quiet -m "docs: drop the old spec"
-assert_status 0 "prepare of a phase that deletes a spec of another issue" sh -c "cd '$repo' && scripts/close-phase.sh --prepare --title 'chore: x' --body-file '$TMP/body.md'"
+assert_status 0 "prepare of a phase that deletes a spec of another issue" sh -c "cd '$repo' && .method/scripts/close-phase.sh --prepare --title 'chore: x' --body-file '$TMP/body.md'"
 body_arg="$(gh_calls | sed -n 's/.*pr edit 12 --repo owner\/repo --title chore: x --body-file \([^ ]*\).*/\1/p' | tail -1)"
 assert_not_contains "$(cat "${body_arg:-$TMP/body.md}")" "2026-01-17-old.md" "PR body leaves out a deleted spec that does not cite the phase issue"
 

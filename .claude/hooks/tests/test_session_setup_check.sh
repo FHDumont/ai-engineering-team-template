@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Tests of the session-setup-check.sh hook and of the texts of the mandatory setup.
-# shellcheck source=scripts/tests/lib.sh
-source "$(dirname "$0")/../../../scripts/tests/lib.sh"
+# shellcheck source=.method/scripts/tests/lib.sh
+source "$(dirname "$0")/../../../.method/scripts/tests/lib.sh"
 HOOK="$REPO/.claude/hooks/session-setup-check.sh"
 # The cases that need an answer do not race the 5s clock: a loaded machine may
 # take longer than the hook's default, and that is not a failed check (#108).

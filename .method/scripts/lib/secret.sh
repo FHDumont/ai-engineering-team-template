@@ -72,7 +72,7 @@ _secret_empty_hint() {
   printf '%s' "the credential store item $SECRET_STORE_SERVICE is empty; store the service account token again or use the .env (see docs/BOTS.md)"
 }
 _secret_msg_none() {
-  _secret_err "no secret provider configured. Set the variable in the environment, or create $(secret_env_file) with chmod 600 (scripts/init-env.sh), or store a password manager service account token in the OS credential store under the service $SECRET_STORE_SERVICE (see docs/BOTS.md)"
+  _secret_err "no secret provider configured. Set the variable in the environment, or create $(secret_env_file) with chmod 600 (.method/scripts/init-env.sh), or store a password manager service account token in the OS credential store under the service $SECRET_STORE_SERVICE (see docs/BOTS.md)"
 }
 _secret_msg_locked() {
   _secret_err "the OS credential store is locked (User interaction is not allowed). Unlock it and run again (macOS: security unlock-keychain)"

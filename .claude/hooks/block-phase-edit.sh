@@ -27,8 +27,8 @@ case "$file" in
   */.process/events.jsonl) deny "never write .process/events.jsonl by hand: only the hooks and scripts record the trace" ;;
 esac
 
-# shellcheck source=scripts/lib/common.sh
-source "$here/../../scripts/lib/common.sh"
+# shellcheck source=.method/scripts/lib/common.sh
+source "$here/../../.method/scripts/lib/common.sh"
 phase="$(phase_of_path "$file")"
 [ -n "$phase" ] || exit 0
 issue="${phase%%	*}"

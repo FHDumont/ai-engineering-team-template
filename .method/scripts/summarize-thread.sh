@@ -10,7 +10,7 @@
 #: needed, 1 if not.
 set -euo pipefail
 HERE="$(cd "$(dirname "$0")" && pwd)"
-# shellcheck source=scripts/lib/common.sh
+# shellcheck source=.method/scripts/lib/common.sh
 source "$HERE/lib/common.sh"
 
 MARK="<!-- agreed-summary -->"

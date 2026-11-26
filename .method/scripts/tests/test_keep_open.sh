@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Lab-test criteria stay distinct, and a post-merge issue stays open (issue #114).
-# shellcheck source=scripts/tests/lib.sh
+# shellcheck source=.method/scripts/tests/lib.sh
 source "$(dirname "$0")/lib.sh"
 
 plan="$(cat "$REPO/.claude/skills/plan/SKILL.md")"
@@ -20,7 +20,7 @@ words="$(wc -w <"$REPO/.claude/skills/plan/SKILL.md" | tr -d ' ')"
 if [ ! -f "$SCRIPTS/lib/refs.sh" ]; then
   bad "refs.sh keeps a post-merge issue open"
 else
-  # shellcheck source=scripts/lib/refs.sh
+  # shellcheck source=.method/scripts/lib/refs.sh
   source "$SCRIPTS/lib/refs.sh"
   root="$TMP/specroot"
   mkdir -p "$root/docs/specs"
@@ -38,9 +38,9 @@ else
   assert_contains "$(cat "$TMP/body.md")" "Refs #9" "Refs replaces Closes"
 fi
 
-# shellcheck source=scripts/lib/common.sh
+# shellcheck source=.method/scripts/lib/common.sh
 source "$SCRIPTS/lib/common.sh"
-# shellcheck source=scripts/lib/project.sh
+# shellcheck source=.method/scripts/lib/project.sh
 source "$SCRIPTS/lib/project.sh"
 if ! declare -F project_set_done_if_closed >/dev/null; then
   bad "the board goes to Done while the issue is still open"

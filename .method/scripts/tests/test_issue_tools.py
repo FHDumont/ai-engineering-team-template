@@ -6,12 +6,12 @@ import sys
 import tempfile
 import unittest
 
-ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-sys.path.insert(0, os.path.join(ROOT, "scripts", "lib"))
+ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
+sys.path.insert(0, os.path.join(ROOT, ".method", "scripts", "lib"))
 os.environ["REPO_ROOT"] = ROOT
 import issue_template as it  # noqa: E402
 
-spec = importlib.util.spec_from_file_location("auto_label", os.path.join(ROOT, "scripts", "auto-label.py"))
+spec = importlib.util.spec_from_file_location("auto_label", os.path.join(ROOT, ".method", "scripts", "auto-label.py"))
 auto_label = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(auto_label)
 

@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # The Claude.app helper is not a second session line (issue #146).
-# shellcheck source=scripts/tests/lib.sh
+# shellcheck source=.method/scripts/tests/lib.sh
 source "$(dirname "$0")/lib.sh"
 
 repo="$(make_repo)"

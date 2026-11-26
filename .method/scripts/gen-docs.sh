@@ -33,7 +33,7 @@
 #:    fast-forwards the local main.
 set -euo pipefail
 HERE="$(cd "$(dirname "$0")" && pwd)"
-# shellcheck source=scripts/lib/common.sh
+# shellcheck source=.method/scripts/lib/common.sh
 source "$HERE/lib/common.sh"
 
 timeout=900 interval=15
@@ -52,7 +52,7 @@ ROADMAP.md'
 SPEC_PATH='^docs/specs/[^/]+\.md$'
 main_root="$(git worktree list --porcelain | sed -n '1s/^worktree //p')"
 [ -n "$main_root" ] || die "not a git checkout"
-[ "$(cd "$HERE/.." && pwd -P)" = "$(cd "$main_root" && pwd -P)" ] || die "gen-docs runs from the main checkout ($main_root), by the main session"
+[ "$(cd "$HERE/../.." && pwd -P)" = "$(cd "$main_root" && pwd -P)" ] || die "gen-docs runs from the main checkout ($main_root), by the main session"
 repo="$(repo_slug)"
 git -C "$main_root" fetch --quiet origin main
 base="$(git -C "$main_root" rev-parse origin/main)"
@@ -107,7 +107,7 @@ if [ -z "$n" ]; then
   git -C "$wt" commit --quiet -m "docs: regenerate changelog and roadmap"
   git -C "$wt" push --quiet -u origin "$branch"
   gh pr create --repo "$repo" --base main --head "$branch" --title "docs: regenerate changelog and roadmap" \
-    --body "Geração única de \`CHANGELOG.md\` e \`ROADMAP.md\` pela sessão principal (\`scripts/gen-docs.sh\`). O PR contém só esses dois arquivos gerados e a remoção das specs de \`docs/specs/\` cujas issues estão todas fechadas." >/dev/null
+    --body "Geração única de \`CHANGELOG.md\` e \`ROADMAP.md\` pela sessão principal (\`.method/scripts/gen-docs.sh\`). O PR contém só esses dois arquivos gerados e a remoção das specs de \`docs/specs/\` cujas issues estão todas fechadas." >/dev/null
   n="$(gh pr list --repo "$repo" --head "$branch" --state open --json number --jq '.[0].number // empty')"
   [ -n "$n" ] || die "PR for $branch not read back"
   echo "opened PR #$n ($branch)"

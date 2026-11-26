@@ -2,13 +2,13 @@
 # pre-push: in the unprotected mode (repository variable PROCESS_BRANCH_MODE, set by
 # setup-repo.sh on a plan with no branch protection) the server does not refuse a push
 # to main, so this hook does. Work reaches main only through the PR and
-# scripts/close-phase.sh --merge. With protection the server already refuses, so the
+# .method/scripts/close-phase.sh --merge. With protection the server already refuses, so the
 # hook does nothing; when the variable cannot be read (no gh, no network) it lets the
 # push go, because the mode is then unknown.
 set -euo pipefail
 HERE="$(cd "$(dirname "$0")" && pwd)"
-# shellcheck source=scripts/lib/common.sh
-source "$HERE/../scripts/lib/common.sh"
+# shellcheck source=.method/scripts/lib/common.sh
+source "$HERE/../.method/scripts/lib/common.sh"
 pushes_main=0
 while read -r _ _ remote_ref _; do
   [ "$remote_ref" != refs/heads/main ] || pushes_main=1
@@ -17,5 +17,5 @@ done
 command -v gh >/dev/null 2>&1 || exit 0
 names="$(gh variable list --json name --jq '.[].name' 2>/dev/null)" || exit 0
 printf '%s\n' "$names" | stdin_grep -qxF PROCESS_BRANCH_MODE || exit 0
-echo "error: this repository runs in the unprotected branch mode (no branch protection on its plan): a direct push to main is refused; open a PR and merge it with scripts/close-phase.sh --merge" >&2
+echo "error: this repository runs in the unprotected branch mode (no branch protection on its plan): a direct push to main is refused; open a PR and merge it with .method/scripts/close-phase.sh --merge" >&2
 exit 1

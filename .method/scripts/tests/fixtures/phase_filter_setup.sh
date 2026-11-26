@@ -7,7 +7,7 @@ printf '.worktrees/\n' >"$repo/.gitignore"
 # Every phase needs a spec that cites the issue (new-phase.sh refuses without it).
 mkdir -p "$repo/docs/specs"
 printf '# Spec\n\nFases #20, #21, #22 e #23.\n' >"$repo/docs/specs/base.md"
-git -C "$repo" add scripts .gitignore docs
+git -C "$repo" add .method .gitignore docs
 git -C "$repo" commit --quiet -m "chore: scripts"
 git clone --quiet --bare "$repo" "$TMP/remote.git"
 git -C "$repo" remote add origin "$TMP/remote.git"

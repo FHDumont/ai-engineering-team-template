@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # The update guide of the template README (FHDumont/ai-engineering-team-template#207); each adopter has its own README, so this stays template-only.
-# shellcheck source=scripts/tests/lib.sh
+# shellcheck source=.method/scripts/tests/lib.sh
 source "$(dirname "$0")/../lib.sh"
 readme="$(cat "$REPO/README.md")"
 assert_contains "$readme" "trazer o padrão do template quando faltar" "the guide brings the default of repository-owned files"

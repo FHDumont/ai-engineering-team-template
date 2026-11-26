@@ -15,7 +15,7 @@
 #: --frozen-lockfile) and never suggests pip install into the global Python, nor
 #: npm install when a lockfile exists. A missing tool of the method still blocks.
 #: Also checks: branch other than main, git hooks installed (core.hooksPath=.githooks;
-#: installs it if missing) and a bot secret provider (scripts/lib/secret.sh; it
+#: installs it if missing) and a bot secret provider (.method/scripts/lib/secret.sh; it
 #: only checks, prints nothing and never triggers a password manager
 #: authorization) when the phase spec cites bots. It never runs the test suite:
 #: opening a phase relies on the green "CI" check of the base commit of main
@@ -36,11 +36,11 @@
 #: or a bot slug from .github/bots.tsv as @slug. A name in backticks is not a citation.
 set -euo pipefail
 HERE="$(cd "$(dirname "$0")" && pwd)"
-# Logical root: "$HERE/.." would resolve through the scripts link to .method.
-ROOT="$(cd "$HERE/.." && pwd)"
-# shellcheck source=scripts/lib/common.sh
+# Logical root: "$HERE/../.." would be .method/scripts.
+ROOT="$(cd "$HERE/../.." && pwd)"
+# shellcheck source=.method/scripts/lib/common.sh
 source "$HERE/lib/common.sh"
-# shellcheck source=scripts/lib/secret.sh
+# shellcheck source=.method/scripts/lib/secret.sh
 source "$HERE/lib/secret.sh"
 
 while [ $# -gt 0 ]; do
@@ -134,14 +134,14 @@ check_declared_deps
 branch="$(current_branch)"
 [ -n "$branch" ] || die "detached HEAD: switch to a phase branch"
 if is_main_branch "$branch"; then
-  die "on $branch: phases never run on main (use scripts/phase-start.sh)"
+  die "on $branch: phases never run on main (use .method/scripts/phase-start.sh)"
 fi
 echo "ok: branch $branch"
 # A phase branch only works with its spec in git (phase-start.sh commits it).
 phase_issue="$(issue_from_branch "$branch")"
 if [ -n "$phase_issue" ]; then
   [ -n "$(specs_citing "$phase_issue" "$ROOT")" ] ||
-    die "no spec in docs/specs cites #$phase_issue: the phase opens only through scripts/phase-start.sh"
+    die "no spec in docs/specs cites #$phase_issue: the phase opens only through .method/scripts/phase-start.sh"
   echo "ok: spec cites #$phase_issue"
 fi
 # Real pair of this session against the pair the spec asks. Each of the two, model

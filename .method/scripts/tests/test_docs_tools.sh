@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Tests of check-docs.sh and archive-adr.sh.
-# shellcheck source=scripts/tests/lib.sh
+# shellcheck source=.method/scripts/tests/lib.sh
 source "$(dirname "$0")/lib.sh"
 
 words() { local _; for _ in $(seq 1 "$1"); do printf 'palavra '; done; echo; }
@@ -16,8 +16,8 @@ fixture() {
   echo "# ADR-001" >"$d/docs/adr/ADR-001-core.md"
   echo "# ADR-002" >"$d/docs/adr/ADR-002-next.md"
   # A design whose tables match the fixture: one script, one hook of each kind.
-  mkdir -p "$d/scripts" "$d/.claude/hooks" "$d/.githooks"
-  : >"$d/scripts/gate.sh"; : >"$d/.claude/hooks/block-x.sh"; : >"$d/.githooks/pre-commit"
+  mkdir -p "$d/.method/scripts" "$d/.claude/hooks" "$d/.githooks"
+  : >"$d/.method/scripts/gate.sh"; : >"$d/.claude/hooks/block-x.sh"; : >"$d/.githooks/pre-commit"
   design >"$d/docs/process-design.md"
   echo "$d"
 }
@@ -29,17 +29,17 @@ design() {
 
 | Regra | Script e hook que barram | Código de saída | O que o agente faz |
 |---|---|---|---|
-| 1. Plan | `scripts/gate.sh` | 1 | Escreve a spec |
+| 1. Plan | `.method/scripts/gate.sh` | 1 | Escreve a spec |
 | 2. Filha | `.claude/hooks/block-x.sh` | 2 | Repassa e para |
-| 3. Deploy | `scripts/gate.sh` | 1 | Termina sem deploy |
-| 4. Conflito | `scripts/gate.sh --check` | 4 | Resolve e roda de novo |
-| 5. Fim | `scripts/gate.sh --state pronto` | 1 | Corrige e roda de novo |
+| 3. Deploy | `.method/scripts/gate.sh` | 1 | Termina sem deploy |
+| 4. Conflito | `.method/scripts/gate.sh --check` | 4 | Resolve e roda de novo |
+| 5. Fim | `.method/scripts/gate.sh --state pronto` | 1 | Corrige e roda de novo |
 
 ## 6. Scripts
 
 | Script | O que faz | Quem chama |
 |---|---|---|
-| `scripts/gate.sh` | Barra | agentes |
+| `.method/scripts/gate.sh` | Barra | agentes |
 
 ### 6.2 Hooks
 
@@ -54,7 +54,7 @@ design() {
 |---|---|
 | `AGENTS.md` | regras |
 | `docs/specs/<grupo>.md` | spec |
-| `scripts/` | scripts |
+| `.method/scripts/` | scripts |
 DOC
 }
 # edit_design <fixture> <sed expression>: change the design of the fixture in place.
@@ -90,13 +90,13 @@ assert_status 1 "fails index line without file" env REPO_ROOT="$d" "$CHECK"
 # are five rows with a lock that exists and no second path.
 d="$(fixture)"; rm "$d/docs/process-design.md"
 assert_status 1 "fails without the design" env REPO_ROOT="$d" "$CHECK"
-d="$(fixture)"; edit_design "$d" 's#^| `scripts/gate.sh` | Barra | agentes |$#&\
-| `scripts/ghost.sh` | Nada | ninguém |#'
+d="$(fixture)"; edit_design "$d" 's#^| `.method/scripts/gate.sh` | Barra | agentes |$#&\
+| `.method/scripts/ghost.sh` | Nada | ninguém |#'
 assert_status 1 "fails a design that cites a script that does not exist" env REPO_ROOT="$d" "$CHECK"
-assert_contains "$(last_output)" "cites scripts/ghost.sh, which does not exist" "names the missing script"
-d="$(fixture)"; : >"$d/scripts/new-tool.py"
+assert_contains "$(last_output)" "cites .method/scripts/ghost.sh, which does not exist" "names the missing script"
+d="$(fixture)"; : >"$d/.method/scripts/new-tool.py"
 assert_status 1 "fails a design that omits a script that exists" env REPO_ROOT="$d" "$CHECK"
-assert_contains "$(last_output)" "omits scripts/new-tool.py" "names the omitted script"
+assert_contains "$(last_output)" "omits .method/scripts/new-tool.py" "names the omitted script"
 d="$(fixture)"; : >"$d/.claude/hooks/block-y.sh"
 assert_status 1 "fails a design that omits an agent hook" env REPO_ROOT="$d" "$CHECK"
 assert_contains "$(last_output)" "omits .claude/hooks/block-y.sh" "names the omitted hook"
@@ -118,7 +118,7 @@ assert_contains "$(last_output)" "base rule 2 names .claude/hooks/gone.sh, which
 d="$(fixture)"; edit_design "$d" 's#| 1 | Termina sem deploy |#|  | Termina sem deploy |#'
 assert_status 1 "fails a base rule without an exit code" env REPO_ROOT="$d" "$CHECK"
 # Names of one repository stay out of the method: docs/repo-notes.md lists them.
-d="$(fixture)"; printf '# Notas do repositório\n\n## Nomes só deste repositório\n\n- `AcmeBot`\n\n## Outra\n\n- `scripts/gate.sh`\n' >"$d/docs/repo-notes.md"
+d="$(fixture)"; printf '# Notas do repositório\n\n## Nomes só deste repositório\n\n- `AcmeBot`\n\n## Outra\n\n- `.method/scripts/gate.sh`\n' >"$d/docs/repo-notes.md"
 assert_status 0 "passes a design that cites no repository-only name" env REPO_ROOT="$d" "$CHECK"
 echo "Pergunte ao AcmeBot." >>"$d/docs/process-design.md"
 assert_status 1 "fails a design that cites a repository-only name" env REPO_ROOT="$d" "$CHECK"
@@ -138,12 +138,12 @@ d="$(fixture)"; mkdir -p "$d/.claude/skills/ask-bot"; echo "Pergunte ao AcmeBot.
 assert_status 0 "with no docs/repo-notes.md there is no list to check" env REPO_ROOT="$d" "$CHECK"
 
 # #188: a script that exists but is not in the manifest is not "missing": say how to fix it.
-d="$(fixture)"; mkdir -p "$d/.github"; printf 'scripts/gate.sh\n.claude/hooks/block-x.sh\n.githooks/pre-commit\n' >"$d/.github/method-files.txt"
-: >"$d/scripts/only-here.sh"
-edit_design "$d" 's#^| `scripts/gate.sh` | Barra | agentes |$#&\
-| `scripts/only-here.sh` | Do repo | ninguém |#'
+d="$(fixture)"; mkdir -p "$d/.github"; printf '.method/scripts/gate.sh\n.claude/hooks/block-x.sh\n.githooks/pre-commit\n' >"$d/.github/method-files.txt"
+: >"$d/.method/scripts/only-here.sh"
+edit_design "$d" 's#^| `.method/scripts/gate.sh` | Barra | agentes |$#&\
+| `.method/scripts/only-here.sh` | Do repo | ninguém |#'
 assert_status 1 "fails a documented script that is only in this repository and not in the manifest" env REPO_ROOT="$d" "$CHECK"
-assert_contains "$(last_output)" "scripts/only-here.sh exists but is not in .github/method-files.txt" "says the file exists and the manifest lacks it"
+assert_contains "$(last_output)" ".method/scripts/only-here.sh exists but is not in .github/method-files.txt" "says the file exists and the manifest lacks it"
 assert_contains "$(last_output)" "add it to the manifest" "says how to fix it"
 assert_not_contains "$(last_output)" "only-here.sh, which does not exist" "does not claim the file is missing"
 # #193: AGENTS.md points to docs/repo-notes.md; a repository updated from an old version lacks it.
@@ -198,7 +198,7 @@ assert_eq "yes" "$([ -f "$d/docs/adr/ADR-001-core.md" ] && echo yes)" "nothing i
 
 # CHANGELOG.md and ROADMAP.md are generated at the end of the first group (#100).
 d="$(fixture)"
-edit_design "$d" '/^| `scripts\/` | scripts |$/a\
+edit_design "$d" '/^| `\.method\/scripts\/` | scripts |$/a\
 | `CHANGELOG.md` | gerado no fim do primeiro grupo |\
 | `ROADMAP.md` | gerado no fim do primeiro grupo |'
 assert_status 0 "generated files are optional before the first group" env REPO_ROOT="$d" "$CHECK"
@@ -217,15 +217,15 @@ d="$(fixture)"
 printf '\nsetup-repo.sh saindo 6 sem proteção\n' >>"$d/docs/STATE.md"
 assert_status 1 "fails a STATE that says setup exits 6 without protection" env REPO_ROOT="$d" "$CHECK"
 
-# The design lists the method manifest, not every file an application drops in scripts/ (#101).
+# The design lists the method manifest, not every file an application drops in .method/scripts/ (#101).
 d="$(fixture)"
 mkdir -p "$d/.github"
-printf 'scripts/gate.sh\n.claude/hooks/block-x.sh\n.githooks/pre-commit\n' >"$d/.github/method-files.txt"
-: >"$d/scripts/app-only.sh"
+printf '.method/scripts/gate.sh\n.claude/hooks/block-x.sh\n.githooks/pre-commit\n' >"$d/.github/method-files.txt"
+: >"$d/.method/scripts/app-only.sh"
 assert_status 0 "an application script outside the method manifest passes" env REPO_ROOT="$d" "$CHECK"
-printf 'scripts/gate.sh\nscripts/missing-method.sh\n.claude/hooks/block-x.sh\n.githooks/pre-commit\n' >"$d/.github/method-files.txt"
+printf '.method/scripts/gate.sh\n.method/scripts/missing-method.sh\n.claude/hooks/block-x.sh\n.githooks/pre-commit\n' >"$d/.github/method-files.txt"
 assert_status 1 "a manifest entry that is not on disk fails" env REPO_ROOT="$d" "$CHECK"
-assert_contains "$(last_output)" "method-files.txt lists scripts/missing-method.sh, which does not exist" "names the missing manifest entry"
+assert_contains "$(last_output)" "method-files.txt lists .method/scripts/missing-method.sh, which does not exist" "names the missing manifest entry"
 
 # ADR-NNN.md (no title in the file name) is a real ADR (#102).
 d="$(fixture)"

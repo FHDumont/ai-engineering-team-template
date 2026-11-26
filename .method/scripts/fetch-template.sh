@@ -14,7 +14,7 @@
 #: this script is in the allow list, `git checkout <sha> -- <paths>` is not.
 set -euo pipefail
 HERE="$(cd "$(dirname "$0")" && pwd)"
-# shellcheck source=scripts/lib/common.sh
+# shellcheck source=.method/scripts/lib/common.sh
 source "$HERE/lib/common.sh"
 require_cmd git
 
@@ -51,8 +51,8 @@ info "template $dest extracted in .process/template"
 
 origin_ref=""
 git -C "$dir" rev-parse --verify --quiet refs/heads/origin >/dev/null && origin_ref=refs/heads/origin
-md="$dir/scripts/method-diff.sh"
-[ -f "$md" ] || die "$dest has no scripts/method-diff.sh" 1
+md="$dir/.method/scripts/method-diff.sh"
+[ -f "$md" ] || die "$dest has no .method/scripts/method-diff.sh" 1
 # The method-diff.sh and the lib of the destination decide, not the ones of this repository (which may be old).
 run_diff() { (cd "$root" && REPO_ROOT="$root" bash "$md" --template "$dir" --to "$dest" "$@"); }
 diff_args=()

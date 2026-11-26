@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # The update review names what it did not read (#129).
-# shellcheck source=scripts/tests/lib.sh
+# shellcheck source=.method/scripts/tests/lib.sh
 source "$(dirname "$0")/lib.sh"
 rev="$(cat "$REPO/.claude/agents/close-reviewer.md")"
 skill="$(cat "$REPO/.claude/skills/close-phase/SKILL.md")"

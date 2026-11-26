@@ -3,7 +3,7 @@
 # review/independent and merges only with --pr, --owner-ok equal to that PR
 # head, green CI and the saved independent review of that SHA. A phase branch
 # is refused on this path and keeps --merge.
-# shellcheck source=scripts/tests/close_phase_common.sh
+# shellcheck source=.method/scripts/tests/close_phase_common.sh
 source "$(dirname "$0")/close_phase_common.sh"
 
 git -C "$repo" switch --quiet -c renovate/lodash

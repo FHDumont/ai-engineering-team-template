@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Shared preparation of the test_phase_start_*.sh files (not a test itself): a repository with
 # the scripts, the git hooks, the labels, a bare remote, the fake gh and the spec helper.
-# shellcheck source=scripts/tests/lib.sh
+# shellcheck source=.method/scripts/tests/lib.sh
 source "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
 
 repo="$(make_repo)"
@@ -12,7 +12,7 @@ mkdir -p "$repo/.github" && cp "$REPO/.github/labels.tsv" "$repo/.github/labels.
 # session that opens the phase (phase_opened) cannot commit in the worktree.
 cp -R "$REPO/.githooks" "$repo/.githooks"
 printf '.worktrees/\n.process/\n' >"$repo/.gitignore"
-git -C "$repo" add scripts .githooks .gitignore .github
+git -C "$repo" add .method .githooks .gitignore .github
 git -C "$repo" commit --quiet -m "chore: scripts"
 git -C "$repo" config core.hooksPath .githooks
 export PROCESS_EVENTS_FILE="$repo/.process/events.jsonl"

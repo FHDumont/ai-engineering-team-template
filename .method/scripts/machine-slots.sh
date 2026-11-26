@@ -18,14 +18,14 @@
 #:           "info: time ..." line per measure, with (above) when it passes the
 #:           target. Time is informative only; the exit status is always 0.
 #: Limits live in ~/.config/ai-method/machine-limits.env (created from
-#: scripts/lib/machine-limits.env.example on the first run); see process-design §6.
+#: .method/scripts/lib/machine-limits.env.example on the first run); see process-design §6.
 set -euo pipefail
 HERE="$(cd "$(dirname "$0")" && pwd)"
-# Logical root: "$HERE/.." would resolve through the scripts link to .method.
-ROOT="$(cd "$HERE/.." && pwd)"
-# shellcheck source=scripts/lib/common.sh
+# Logical root: "$HERE/../.." would be .method/scripts.
+ROOT="$(cd "$HERE/../.." && pwd)"
+# shellcheck source=.method/scripts/lib/common.sh
 source "$HERE/lib/common.sh"
-# shellcheck source=scripts/lib/slots.sh
+# shellcheck source=.method/scripts/lib/slots.sh
 source "$HERE/lib/slots.sh"
 
 [ $# -gt 0 ] || { print_help "$0"; exit 2; }

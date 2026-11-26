@@ -3,7 +3,7 @@
 # close-phase.sh --cleanup takes the line out of .worktrees/parallel-active.tsv and
 # deletes the remote branch; open-parallel.sh refuses a registry with leftovers and
 # never leaves half a group.
-# shellcheck source=scripts/tests/lib.sh
+# shellcheck source=.method/scripts/tests/lib.sh
 source "$(dirname "$0")/lib.sh"
 
 repo="$(make_repo)"
@@ -11,7 +11,7 @@ copy_scripts "$repo"
 printf '.worktrees/\n.process/\n' >"$repo/.gitignore"
 mkdir -p "$repo/docs/specs"
 printf '# Spec\n\nFases #7, #8, #21 e #22.\n' >"$repo/docs/specs/base.md"
-git -C "$repo" add scripts .gitignore docs
+git -C "$repo" add .method .gitignore docs
 git -C "$repo" commit --quiet -m "chore: scripts"
 git clone --quiet --bare "$repo" "$TMP/remote.git"
 git -C "$repo" remote add origin "$TMP/remote.git"
@@ -42,7 +42,7 @@ python3 -c 'import os,sys; os.setpgid(0,0); os.chdir(sys.argv[1]); os.execvp("sl
   "$repo/.worktrees/issue-7" >/dev/null 2>&1 &
 leftover=$!
 sleep 1
-assert_status 0 "cleanup of a merged phase" sh -c "cd '$repo/.worktrees/issue-7' && scripts/close-phase.sh --cleanup"
+assert_status 0 "cleanup of a merged phase" sh -c "cd '$repo/.worktrees/issue-7' && .method/scripts/close-phase.sh --cleanup"
 assert_contains "$(last_output)" "stopped process $leftover" "cleanup stops the process left in the worktree"
 assert_contains "$(last_output)" "Archive this session in the Claude app" "the end message says to archive"
 assert_contains "$(last_output)" "Do not delete it" "the end message says not to delete"
@@ -55,12 +55,12 @@ assert_eq "" "$(git -C "$repo" ls-remote --heads origin feat/issue-7-x)" "cleanu
 assert_contains "$(last_output)" "deleted remote branch feat/issue-7-x" "says the remote branch was deleted"
 assert_eq "" "$(git -C "$repo" branch --list 'feat/issue-7-x')" "cleanup deletes the local branch"
 assert_eq 1 "$(git -C "$repo" ls-remote --heads origin feat/issue-8-x | wc -l | tr -d ' ')" "the remote branch of another phase stays"
-assert_status 0 "cleanup of the last phase" sh -c "cd '$repo/.worktrees/issue-8' && scripts/close-phase.sh --cleanup"
+assert_status 0 "cleanup of the last phase" sh -c "cd '$repo/.worktrees/issue-8' && .method/scripts/close-phase.sh --cleanup"
 assert_eq "" "$(cat "$REGISTRY")" "the registry is empty after the last cleanup"
 # A pending line (phase of the group not opened yet) survives the cleanup of another phase.
 phase 8
 printf '8\tfeat/issue-8-x\t%s\n11\tpending\n' "$repo/.worktrees/issue-8" >"$REGISTRY"
-assert_status 0 "cleanup with a pending line in the registry" sh -c "cd '$repo/.worktrees/issue-8' && scripts/close-phase.sh --cleanup"
+assert_status 0 "cleanup with a pending line in the registry" sh -c "cd '$repo/.worktrees/issue-8' && .method/scripts/close-phase.sh --cleanup"
 assert_eq "11	pending" "$(cat "$REGISTRY")" "the pending line stays in the registry"
 rm -f "$REGISTRY"
 
@@ -76,7 +76,7 @@ git -C "$repo/.worktrees/issue-9" add docs/specs/nine.md
 git -C "$repo/.worktrees/issue-9" commit --quiet -m "docs(specs): add the spec of issue #9"
 git -C "$repo/.worktrees/issue-9" push --quiet origin feat/issue-9-x:main
 : >"$REGISTRY"
-assert_status 0 "cleanup with an identical untracked spec in the main checkout" sh -c "cd '$repo/.worktrees/issue-9' && scripts/close-phase.sh --cleanup"
+assert_status 0 "cleanup with an identical untracked spec in the main checkout" sh -c "cd '$repo/.worktrees/issue-9' && .method/scripts/close-phase.sh --cleanup"
 assert_contains "$(last_output)" "removed the untracked copy of docs/specs/nine.md" "says the loose copy left"
 assert_eq "$(git -C "$repo" rev-parse origin/main)" "$(git -C "$repo" rev-parse main)" "main is updated past the loose copy"
 assert_eq "" "$(git -C "$repo" status --porcelain)" "the spec is tracked and clean after the update"
@@ -89,7 +89,7 @@ git -C "$repo/.worktrees/issue-11" add docs/specs/eleven.md
 git -C "$repo/.worktrees/issue-11" commit --quiet -m "docs(specs): amend the spec of issue #11"
 git -C "$repo/.worktrees/issue-11" push --quiet origin feat/issue-11-x:main
 : >"$REGISTRY"
-assert_status 0 "cleanup accepts a loose spec that the amendment changed" sh -c "cd '$repo/.worktrees/issue-11' && scripts/close-phase.sh --cleanup"
+assert_status 0 "cleanup accepts a loose spec that the amendment changed" sh -c "cd '$repo/.worktrees/issue-11' && .method/scripts/close-phase.sh --cleanup"
 assert_eq "amended" "$(sed -n '3p' "$repo/docs/specs/eleven.md")" "main has the amended spec"
 phase 10
 echo other >"$repo/loose.txt"
@@ -97,19 +97,19 @@ echo mine >"$repo/.worktrees/issue-10/loose.txt"
 git -C "$repo/.worktrees/issue-10" add loose.txt
 git -C "$repo/.worktrees/issue-10" commit --quiet -m "feat: loose"
 git -C "$repo/.worktrees/issue-10" push --quiet origin feat/issue-10-x:main
-assert_status 1 "cleanup keeps an untracked file that differs from main" sh -c "cd '$repo/.worktrees/issue-10' && scripts/close-phase.sh --cleanup"
+assert_status 1 "cleanup keeps an untracked file that differs from main" sh -c "cd '$repo/.worktrees/issue-10' && .method/scripts/close-phase.sh --cleanup"
 assert_eq "other" "$(cat "$repo/loose.txt")" "the different file is left as it was"
 rm "$repo/loose.txt"
-assert_status 0 "cleanup goes on once the file is out of the way" sh -c "cd '$repo/.worktrees/issue-10' && scripts/close-phase.sh --cleanup"
+assert_status 0 "cleanup goes on once the file is out of the way" sh -c "cd '$repo/.worktrees/issue-10' && .method/scripts/close-phase.sh --cleanup"
 
 # --cleanup on main: only prunes the lines whose worktree is gone.
 printf '9\tfeat/issue-9-x\t%s\n' "$repo/.worktrees/issue-9" >"$REGISTRY"
-assert_status 0 "cleanup on main" sh -c "cd '$repo' && scripts/close-phase.sh --cleanup"
+assert_status 0 "cleanup on main" sh -c "cd '$repo' && .method/scripts/close-phase.sh --cleanup"
 assert_eq "" "$(cat "$REGISTRY")" "cleanup on main drops the leftover line"
 
 # open-parallel.sh refuses a registry with a leftover line and opens nothing.
 printf '9\tfeat/issue-9-x\t%s\n' "$repo/.worktrees/issue-9" >"$REGISTRY"
-assert_status 1 "open-parallel refuses a registry with leftovers" sh -c "cd '$repo' && scripts/open-parallel.sh 21 22 --no-check"
+assert_status 1 "open-parallel refuses a registry with leftovers" sh -c "cd '$repo' && .method/scripts/open-parallel.sh 21 22 --no-check"
 assert_contains "$(last_output)" "leftover lines (#9)" "names the leftover line"
 assert_contains "$(last_output)" "close-phase.sh --cleanup" "says how to clean it"
 assert_eq "" "$(git -C "$repo" branch --list '*issue-2*')" "no branch is created with leftovers"
@@ -117,7 +117,7 @@ assert_eq "" "$(git -C "$repo" branch --list '*issue-2*')" "no branch is created
 
 # Half a group never stays: the second phase fails to open, the first is undone.
 mkdir -p "$repo/.worktrees/issue-22"
-assert_status 1 "open-parallel fails when one phase does not open" sh -c "cd '$repo' && scripts/open-parallel.sh 21 22 --no-check"
+assert_status 1 "open-parallel fails when one phase does not open" sh -c "cd '$repo' && .method/scripts/open-parallel.sh 21 22 --no-check"
 assert_contains "$(last_output)" "the group was not opened" "says the group was not opened"
 assert_eq 0 "$([ -d "$repo/.worktrees/issue-21" ] && echo 1 || echo 0)" "the phase already opened is undone"
 assert_eq "" "$(git -C "$repo" branch --list '*issue-21*')" "its branch is deleted"
@@ -125,17 +125,17 @@ assert_eq "" "$(cat "$REGISTRY")" "nothing is registered for half a group"
 rmdir "$repo/.worktrees/issue-22"
 
 # The whole group opens: one line per phase.
-assert_status 0 "open-parallel opens the group" sh -c "cd '$repo' && scripts/open-parallel.sh 21 22 --no-check"
+assert_status 0 "open-parallel opens the group" sh -c "cd '$repo' && .method/scripts/open-parallel.sh 21 22 --no-check"
 assert_eq "21 22" "$(cut -f1 "$REGISTRY" | paste -sd' ' -)" "one registry line per phase"
 # A second group while the first is open is not a leftover.
-assert_status 0 "another group opens beside an active one" sh -c "cd '$repo' && scripts/open-parallel.sh 7 8 --no-check"
+assert_status 0 "another group opens beside an active one" sh -c "cd '$repo' && .method/scripts/open-parallel.sh 7 8 --no-check"
 assert_eq "21 22 7 8" "$(cut -f1 "$REGISTRY" | paste -sd' ' -)" "the active lines stay"
 # An issue that is already registered is refused.
-assert_status 1 "open-parallel refuses an issue already registered" sh -c "cd '$repo' && scripts/open-parallel.sh 21 9 --no-check"
+assert_status 1 "open-parallel refuses an issue already registered" sh -c "cd '$repo' && .method/scripts/open-parallel.sh 21 9 --no-check"
 
 # integrate-parallel.sh with an empty registry has nothing to wait for.
 : >"$REGISTRY"
-assert_status 0 "integrate with an empty registry" sh -c "cd '$repo' && scripts/integrate-parallel.sh --dry-run --interval 0"
+assert_status 0 "integrate with an empty registry" sh -c "cd '$repo' && .method/scripts/integrate-parallel.sh --dry-run --interval 0"
 assert_contains "$(last_output)" "nothing to wait for" "says there is nothing to wait for"
 
 # --cleanup with its stdout piped to a sibling whose cwd is the worktree (issue #120).
@@ -144,7 +144,7 @@ assert_contains "$(last_output)" "nothing to wait for" "says there is nothing to
 repo120="$(make_repo)"
 copy_scripts "$repo120"
 printf '.worktrees/\n.process/\n' >"$repo120/.gitignore"
-git -C "$repo120" add scripts .gitignore
+git -C "$repo120" add .method .gitignore
 git -C "$repo120" commit --quiet -m "chore: scripts"
 git clone --quiet --bare "$repo120" "$TMP/remote120.git"
 git -C "$repo120" remote add origin "$TMP/remote120.git"
@@ -274,7 +274,7 @@ printf '%s\t%s\n' "$sib120" "$wt120" "8301" "$wt120" "8302" "$wt120" >"$TMP/lsof
 export FAKE_LSOF_TAB="$TMP/lsof120.tab"
 rc120=0
 env PATH="$TMP/bin:$PATH" BASH_ENV="$TMP/bin/disable-kill" FAKE_GH_HINT=1 \
-  bash -c 'cd "$1" && exec "$2" --cleanup' _ "$wt120" "$wt120/scripts/close-phase.sh" >"$fifo120" 2>&1 || rc120=$?
+  bash -c 'cd "$1" && exec "$2" --cleanup' _ "$wt120" "$wt120/.method/scripts/close-phase.sh" >"$fifo120" 2>&1 || rc120=$?
 wait "$sib120" 2>/dev/null || true
 assert_eq 0 "$rc120" "cleanup piped to a sibling in the worktree exits 0"
 assert_eq "" "$(git -C "$repo120" branch --list 'feat/issue-120-x')" "cleanup deletes the local branch"

@@ -9,7 +9,7 @@
 #: the suite runs. Always exits 0.
 set -euo pipefail
 HERE="$(cd "$(dirname "$0")" && pwd)"
-# shellcheck source=scripts/lib/common.sh
+# shellcheck source=.method/scripts/lib/common.sh
 source "$HERE/lib/common.sh"
 
 [ "${1:-}" != -h ] && [ "${1:-}" != --help ] || { print_help "$0"; exit 0; }

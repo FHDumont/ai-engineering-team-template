@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Tests of end-check.sh in a sandbox: one test per leftover that fails the end.
-# shellcheck source=scripts/tests/lib.sh
+# shellcheck source=.method/scripts/tests/lib.sh
 source "$(dirname "$0")/lib.sh"
 
 repo="$(make_repo)"
@@ -8,13 +8,13 @@ copy_scripts "$repo"
 printf '.worktrees/\n.process/\n' >"$repo/.gitignore"
 ISSUES='[{"number":30,"title":"Aberta","labels":[{"name":"area:scripts"}],"url":"https://x/30"}]'
 echo "$ISSUES" >"$TMP/issues.json"
-(cd "$repo" && python3 scripts/gen-roadmap.py --input "$TMP/issues.json" --output ROADMAP.md >/dev/null)
-git -C "$repo" add scripts .gitignore ROADMAP.md
+(cd "$repo" && python3 .method/scripts/gen-roadmap.py --input "$TMP/issues.json" --output ROADMAP.md >/dev/null)
+git -C "$repo" add .method .gitignore ROADMAP.md
 git -C "$repo" commit --quiet -m "chore: scripts"
 git clone --quiet --bare "$repo" "$TMP/remote.git"
 git -C "$repo" remote add origin "$TMP/remote.git"
 git -C "$repo" fetch --quiet origin
-CHECK="$repo/scripts/end-check.sh"
+CHECK="$repo/.method/scripts/end-check.sh"
 
 # Fake GitHub. FAKE_PRS: JSON of the open PRs. FAKE_ISSUES: JSON of the open issues.
 # FAKE_RUNS: JSON of the deploy runs.
@@ -137,7 +137,7 @@ git -C "$repo" commit --quiet -m "feat: app"
 git -C "$repo" push --quiet origin main
 SHA="$(git -C "$repo" rev-parse HEAD)"
 fails_with "a deploy that was not checked" "deploy not checked"
-assert_contains "$(last_output)" "scripts/deploy.sh" "says who deploys"
+assert_contains "$(last_output)" ".method/scripts/deploy.sh" "says who deploys"
 assert_eq 0 "$(gh_calls | grep -c '^workflow run' || true)" "the check dispatches nothing"
 check 0 "a deploy read back on the SHA passes" \
   FAKE_RUNS="$(jq -cn --arg s "$SHA" '[{databaseId: 70, headSha: $s, status: "completed", conclusion: "success", url: "https://x/70"}]')"

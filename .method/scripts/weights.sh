@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-#: weights.sh: reads the weights of the method (scripts/lib/weights.tsv).
+#: weights.sh: reads the weights of the method (.method/scripts/lib/weights.tsv).
 #:
 #: Usage: weights.sh [<weight> | --check]
 #:
@@ -8,11 +8,11 @@
 #: the Agent tool or to write in the spec line "modelo: ... · esforço: ...".
 #: --check: exits 1 unless the file has the five weights, each one once, with a
 #: model and an effort among low, medium, high, xhigh and max.
-#: To change a pair, edit scripts/lib/weights.tsv: no agent, skill or script
+#: To change a pair, edit .method/scripts/lib/weights.tsv: no agent, skill or script
 #: names a model.
 set -euo pipefail
 HERE="$(cd "$(dirname "$0")" && pwd)"
-# shellcheck source=scripts/lib/common.sh
+# shellcheck source=.method/scripts/lib/common.sh
 source "$HERE/lib/common.sh"
 FILE="$HERE/lib/weights.tsv"
 WEIGHTS="light medium strong reviewer triage"

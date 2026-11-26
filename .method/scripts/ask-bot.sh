@@ -5,7 +5,7 @@
 #:        ask-bot.sh --retry <ask_id> [--issue N] [--timeout seconds]
 #:        ask-bot.sh --append <ask_id> "more text" [--issue N] [--timeout seconds]
 #:
-#: 1. Checks that a secret provider exists (scripts/lib/secret.sh: environment
+#: 1. Checks that a secret provider exists (.method/scripts/lib/secret.sh: environment
 #:    variable, .env outside the repo or a password manager service account) without
 #:    triggering a desktop app authorization: with none, stops before
 #:    posting anything.
@@ -23,19 +23,19 @@
 #: bot with the new comment link and waits for a reply to that id posted after the follow-up
 #: (wait-reply.sh --after), never the reply the bot gave before it. Never opens a
 #: second question. Every comment this script posts starts with the authorship header
-#: (De, Para, Pedido, Responde a; scripts/lib/author.sh): without it the bot and the
+#: (De, Para, Pedido, Responde a; .method/scripts/lib/author.sh): without it the bot and the
 #: owner cannot tell who wrote what. A bare "gh issue comment" to a bot is never seen.
 #: Records bot_append on --append and bot_ask events (retry=1 on --retry) in the trace; wait-reply.sh records bot_reply.
 #: If the session drops, resume only the wait with: wait-reply.sh <issue> <id>.
 set -euo pipefail
 HERE="$(cd "$(dirname "$0")" && pwd)"
-# shellcheck source=scripts/lib/common.sh
+# shellcheck source=.method/scripts/lib/common.sh
 source "$HERE/lib/common.sh"
-# shellcheck source=scripts/lib/secret.sh
+# shellcheck source=.method/scripts/lib/secret.sh
 source "$HERE/lib/secret.sh"
-# shellcheck source=scripts/lib/author.sh
+# shellcheck source=.method/scripts/lib/author.sh
 source "$HERE/lib/author.sh"
-# shellcheck source=scripts/lib/role.sh
+# shellcheck source=.method/scripts/lib/role.sh
 source "$HERE/lib/role.sh"
 
 # Comment as the method app when its token is set; otherwise as the owner's gh.

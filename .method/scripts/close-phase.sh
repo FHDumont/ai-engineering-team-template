@@ -13,7 +13,7 @@
 #:
 #: Do not pipe --check or --merge (the pipe hides the exit code and the cleanup
 #: can stop the reader). Write the output to a file and read its last line:
-#:   scripts/close-phase.sh --merge --wait >file 2>&1
+#:   .method/scripts/close-phase.sh --merge --wait >file 2>&1
 #:   close-phase.sh --cleanup
 #:   close-phase.sh --abort [--discard]
 #:
@@ -30,7 +30,7 @@
 #:   that cites the phase issue, deleted or kept, goes at the end of the PR body,
 #:   in a <details>; a deleted spec that does not cite it stays out.
 #:   Writes the "## Modelo e esforço" section of the PR body from the trace
-#:   (requested x used table, scripts/trace-view.py --pairs): what the body file
+#:   (requested x used table, .method/scripts/trace-view.py --pairs): what the body file
 #:   has in that section is replaced.
 #: --save-review: writes the close-reviewer opinion literally to .process/reviewer-<sha>.md of HEAD
 #:   (--gate: reviewer-gate-<sha>.md), from the transcript of the subagent AGENT_ID (the agentId of
@@ -68,13 +68,13 @@
 #:   default 15) exits 7 as CI missing; a check on an older SHA does not count.
 #:   Run it before and while waiting for CI; --merge runs it too.
 #: --prepare, --check and --merge --wait record their steps in
-#:   ~/.cache/ai-method/progress/ (scripts/progress.sh), never in the output.
+#:   ~/.cache/ai-method/progress/ (.method/scripts/progress.sh), never in the output.
 #: --pre-review: records pre_review (sha of HEAD, verdict, round) in the trace after the
 #:   cheap review of the close-reviewer (only the issue and the diff; no tests, no push,
 #:   no status). --prepare warns, without refusing, when the trace holds no pre_review
 #:   of the HEAD it starts from.
 #: --merge: first refuses (exit 12) while the issue holds a comment headed "Para: fase #n"
-#:   (scripts/lib/author.sh) after the last comment of the phase itself; then refuses with needs-owner-ok, a sensitive area label or a diff in
+#:   (.method/scripts/lib/author.sh) after the last comment of the phase itself; then refuses with needs-owner-ok, a sensitive area label or a diff in
 #:   .github/sensitive-paths in the class owner-ok (union of the base's list and the PR's;
 #:   no readable list on the base: refused; a list with no `# class:` line is all owner-ok),
 #:   unless --owner-ok SHA (only after the owner's ok in a
@@ -103,9 +103,9 @@
 #:   different from the branch's issue is refused (exit 2). --wait waits for the merge and
 #:   runs --cleanup; each round it reads CI and review/independent on HEAD and leaves at once
 #:   (exit 13) when either turned failure or cancelled, naming the failed run, the fix in a
-#:   new commit or scripts/rerun-ci.sh, and that the owner's ok holds only for the old SHA;
+#:   new commit or .method/scripts/rerun-ci.sh, and that the owner's ok holds only for the old SHA;
 #:   it leaves at once (exit 1) when a check on HEAD was cancelled,
-#:   naming scripts/rerun-ci.sh <run>. Never dispatches a deploy: scripts/deploy.sh does, run by
+#:   naming .method/scripts/rerun-ci.sh <run>. Never dispatches a deploy: .method/scripts/deploy.sh does, run by
 #:   the main session after the last merge of the group.
 #: --pr N: a pull request whose head is not a phase branch. A phase branch is
 #:   <type>/issue-<n>-* with type feat, fix, docs or chore (new-phase.sh),
@@ -137,19 +137,19 @@
 #:   .worktrees/parallel-active.tsv and deletes the local worktree and branch.
 set -euo pipefail
 HERE="$(cd "$(dirname "$0")" && pwd)"
-# shellcheck source=scripts/lib/common.sh
+# shellcheck source=.method/scripts/lib/common.sh
 source "$HERE/lib/common.sh"
-# shellcheck source=scripts/lib/slots.sh
+# shellcheck source=.method/scripts/lib/slots.sh
 source "$HERE/lib/slots.sh"
-# shellcheck source=scripts/lib/progress.sh
+# shellcheck source=.method/scripts/lib/progress.sh
 source "$HERE/lib/progress.sh"
-# shellcheck source=scripts/lib/notes.sh
+# shellcheck source=.method/scripts/lib/notes.sh
 source "$HERE/lib/notes.sh"
-# shellcheck source=scripts/lib/role.sh
+# shellcheck source=.method/scripts/lib/role.sh
 source "$HERE/lib/role.sh"
-# shellcheck source=scripts/lib/refs.sh
+# shellcheck source=.method/scripts/lib/refs.sh
 source "$HERE/lib/refs.sh"
-ROOT="$(cd "$HERE/.." && pwd)"
+ROOT="$(cd "$HERE/../.." && pwd)"
 
 # gh prints "hint:" lines (for example "gh event listen") that drown the result
 # and, once captured, corrupt a value read from the command. Drop them. The last
@@ -465,7 +465,7 @@ remove_done_specs() { # remove_done_specs <issues the PR closes, comma-separated
 }
 
 # PR body with the "## Modelo e esforço" section written from the trace (requested x
-# used, scripts/trace-view.py --pairs): whatever the body had there is replaced; a body
+# used, .method/scripts/trace-view.py --pairs): whatever the body had there is replaced; a body
 # without the section gets it at the end. Prints the file to use.
 body_with_pairs() { # body_with_pairs <body file>
   local out table
@@ -782,16 +782,16 @@ phase_gate() {
   local events sid="${CLAUDE_CODE_SESSION_ID:-}" why
   [ -n "$branch_issue" ] || die "cannot tell the phase issue from branch $branch: the phase branch is the one phase-start.sh creates"
   events="$(phase_trace_file "$ROOT")" || die "cannot locate the trace: merge blocked"
-  [ -f "$events" ] || die "no trace at $events: phase #$branch_issue has no phase_opened; open the phase with scripts/phase-start.sh"
+  [ -f "$events" ] || die "no trace at $events: phase #$branch_issue has no phase_opened; open the phase with .method/scripts/phase-start.sh"
   if [ -z "$sid" ]; then
     clean_prereview_of_head "$events" "$(git rev-parse HEAD)" || die "no session id (CLAUDE_CODE_SESSION_ID): the child session of phase #$branch_issue runs --merge"
     return 0
   fi
   why="$(jq -rs --arg i "$branch_issue" --arg s "$sid" '
       def of($e): [.[] | select(type == "object" and .event == $e and (.issue | tostring) == $i) | (.session_id // "")];
-      if (of("phase_opened") | length) == 0 then "no phase_opened of the issue in the trace: the phase opens only through scripts/phase-start.sh"
+      if (of("phase_opened") | length) == 0 then "no phase_opened of the issue in the trace: the phase opens only through .method/scripts/phase-start.sh"
       elif (of("phase_opened") | index($s)) then "this session opened the phase: forward the request to the child session and stop"
-      elif (of("phase_session") | index($s) | not) then "this session has no phase_session of the issue: run scripts/check-env.sh in the phase worktree, in the child session"
+      elif (of("phase_session") | index($s) | not) then "this session has no phase_session of the issue: run .method/scripts/check-env.sh in the phase worktree, in the child session"
       elif ([.[] | select(type == "object" and .session_id == $s and (.event | IN("SessionStart", "SessionEnd", "Stop", "SubagentStart", "SubagentStop", "PreToolUse", "PostToolUse")))] | length) == 0
         then "no hook event of this session in the trace: the session id was not recorded by the harness"
       else "" end' "$events" 2>/dev/null)" ||
@@ -813,7 +813,7 @@ unprotected_gate() { # unprotected_gate <sha>
   echo "unprotected mode: CI and review/independent are success on ${sha:0:12} (read through the API)"
 }
 
-# Notes to the phase left unanswered on its issue (scripts/lib/notes.sh). A read
+# Notes to the phase left unanswered on its issue (.method/scripts/lib/notes.sh). A read
 # that fails is an error (fails closed).
 pending_notes() {
   local notes
@@ -828,7 +828,7 @@ refuse_pending_notes() {
   if [ -n "$notes" ]; then
     echo "refused: issue #$issue has a note to phase #$issue with no answer:"
     echo "$notes"
-    echo "read it, follow it, and answer with a comment headed by scripts/lib/author.sh (De: fase #$issue); then run --merge again"
+    echo "read it, follow it, and answer with a comment headed by .method/scripts/lib/author.sh (De: fase #$issue); then run --merge again"
     exit 12
   fi
 }
@@ -954,11 +954,11 @@ Ok do dono do repo registrado (quadro de escolha) para:$reasons." >/dev/null
   if required="$(gh api "repos/$repo/branches/$base/protection" --jq '.required_status_checks | ([.checks[]?.context] + (.contexts // [])) | unique | .[]' 2>/dev/null)"; then
     for c in CI review/independent; do
       printf '%s\n' "$required" | stdin_grep -qxF "$c" ||
-        die "the protection of $base does not require $c: no merge without the gate; fix: scripts/setup-repo.sh --only protection"
+        die "the protection of $base does not require $c: no merge without the gate; fix: .method/scripts/setup-repo.sh --only protection"
     done
   else
     gh variable list --repo "$repo" --json name --jq '.[].name' 2>/dev/null | stdin_grep -qxF PROCESS_BRANCH_MODE ||
-      die "$base is not protected, or its protection cannot be read: no merge without the gate; fix: scripts/setup-repo.sh --only protection"
+      die "$base is not protected, or its protection cannot be read: no merge without the gate; fix: .method/scripts/setup-repo.sh --only protection"
     unprotected_gate "$sha"
   fi
 
@@ -976,7 +976,7 @@ Ok do dono do repo registrado (quadro de escolha) para:$reasons." >/dev/null
     gh pr merge "$n" --repo "$repo" --rebase --delete-branch >/dev/null
   fi
   echo "merge requested for PR #$n (rebase, auto)"
-  echo "no deploy from the phase: the main session runs scripts/deploy.sh after the last merge of the group"
+  echo "no deploy from the phase: the main session runs .method/scripts/deploy.sh after the last merge of the group"
 
   if [ "$wait" = 1 ]; then
     local tries=0
@@ -998,7 +998,7 @@ Ok do dono do repo registrado (quadro de escolha) para:$reasons." >/dev/null
         local wrun
         wrun="$(printf '%s' "$wci_url" | sed -n 's#.*/actions/runs/\([0-9][0-9]*\).*#\1#p')"
         echo "PR #$n: $bad on HEAD ${sha:0:12}${wci_url:+ (failed run: $wci_url)}; the merge will not happen until it is green"
-        echo "next: fix it in a new commit, then --prepare and --merge again; if it is a flake: scripts/rerun-ci.sh ${wrun:-<run-id>}, then --merge --wait again"
+        echo "next: fix it in a new commit, then --prepare and --merge again; if it is a flake: .method/scripts/rerun-ci.sh ${wrun:-<run-id>}, then --merge --wait again"
         echo "the owner's ok (--owner-ok) holds only for the old SHA ${sha:0:12}: a new commit needs a new ok"
         exit 13
       fi
@@ -1008,7 +1008,7 @@ Ok do dono do repo registrado (quadro de escolha) para:$reasons." >/dev/null
       if [ -n "$cancelled" ]; then
         run_id="$(printf '%s' "$cancelled" | sed -n 's#.*/actions/runs/\([0-9][0-9]*\).*#\1#p')"
         echo "PR #$n: a check on HEAD ${sha:0:12} was cancelled ($cancelled); it will not recover by itself"
-        echo "rerun: scripts/rerun-ci.sh ${run_id:-<run-id>}, then --merge --wait again"
+        echo "rerun: .method/scripts/rerun-ci.sh ${run_id:-<run-id>}, then --merge --wait again"
         exit 1
       fi
       sleep "${CLOSE_PHASE_MERGE_POLL:-30}"
@@ -1028,7 +1028,7 @@ cleanup_message() { # cleanup_message <main checkout> <phase worktree>
   [ "$2" != "$1" ] || return 0
   echo "Archive this session in the Claude app (menu ... -> Archive) after the owner agreed once, with the spec or in one card at the end of the group. The manager then calls set_remote_control and archive_session; if the app returns a field, repeat once with that field, for both. Do not delete it: the history is gone for good. Closing the tab is not enough."
   local stale
-  stale="$("$1/scripts/sessions.sh" --stale 2>/dev/null || true)"
+  stale="$("$1/.method/scripts/sessions.sh" --stale 2>/dev/null || true)"
   [ -z "$stale" ] || printf 'Other sessions of this repository, not archived and idle (archive them too):\n%s\n' "$stale"
 }
 
@@ -1040,7 +1040,7 @@ cleanup() {
     n="$(gh pr list --repo "$repo" --head "$branch" --state merged --json number --jq '.[0].number // empty')"
     [ -n "$n" ] || die "PR for $branch is not merged yet"
     trace_event phase_closed pr="$n"
-    # shellcheck source=scripts/lib/project.sh
+    # shellcheck source=.method/scripts/lib/project.sh
     source "$HERE/lib/project.sh"
     # A board write that fails does not stop the cleanup: it fails the script at the end.
     project_set_done_if_closed "$(issue_from_branch "$branch")" || board=1
@@ -1074,7 +1074,7 @@ cleanup() {
   # goes away, keeps the duration at the real end and out of the next opening.
   slots_end_phase "$here"
   if [ "$here" != "$main_root" ]; then
-    # shellcheck source=scripts/lib/procs.sh
+    # shellcheck source=.method/scripts/lib/procs.sh
     source "$HERE/lib/procs.sh"
     procs_cleanup_worktree "$here" "$(issue_from_branch "$branch")" "$(events_file "$here" 2>/dev/null || true)"
     git -C "$main_root" worktree remove --force "$here"
@@ -1162,7 +1162,7 @@ abort() {
     echo "closed PR #$pr"
   fi
   delete_remote_branch "$here"
-  # shellcheck source=scripts/lib/project.sh
+  # shellcheck source=.method/scripts/lib/project.sh
   source "$HERE/lib/project.sh"
   local board=0
   project_set_status "$n" "Todo" || board=1
@@ -1222,11 +1222,11 @@ require_base_protection() { # require_base_protection <base> <sha>
   if required="$(gh api "repos/$repo/branches/$base/protection" --jq '.required_status_checks | ([.checks[]?.context] + (.contexts // [])) | unique | .[]' 2>/dev/null)"; then
     for c in CI review/independent; do
       printf '%s\n' "$required" | stdin_grep -qxF "$c" ||
-        die "the protection of $base does not require $c: no merge without the gate; fix: scripts/setup-repo.sh --only protection"
+        die "the protection of $base does not require $c: no merge without the gate; fix: .method/scripts/setup-repo.sh --only protection"
     done
   else
     gh variable list --repo "$repo" --json name --jq '.[].name' 2>/dev/null | stdin_grep -qxF PROCESS_BRANCH_MODE ||
-      die "$base is not protected, or its protection cannot be read: no merge without the gate; fix: scripts/setup-repo.sh --only protection"
+      die "$base is not protected, or its protection cannot be read: no merge without the gate; fix: .method/scripts/setup-repo.sh --only protection"
     unprotected_gate "$sha"
   fi
 }

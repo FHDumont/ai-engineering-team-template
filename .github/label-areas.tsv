@@ -1,5 +1,5 @@
-# kind, pattern, label. Replaces the defaults of scripts/auto-label.py.
-path	(^|\s|`)scripts/	area:scripts
+# kind, pattern, label. Replaces the defaults of .method/scripts/auto-label.py.
+path	(^|\s|`).method/scripts/	area:scripts
 path	(^|\s|`)\.github/	area:ci
 path	(^|\s|`)docs/	area:docs
 path	(^|\s|`)\.claude/	area:process

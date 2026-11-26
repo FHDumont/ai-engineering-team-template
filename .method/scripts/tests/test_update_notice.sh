@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # The update notice has the sections auto-label requires (#149).
-# shellcheck source=scripts/tests/lib.sh
+# shellcheck source=.method/scripts/tests/lib.sh
 source "$(dirname "$0")/lib.sh"
 notice="$(cat "$REPO/.github/update-notice.md")"
 for section in "Objetivo" "Pronto quando" "Arquivos ou áreas afetadas" "Prioridade sugerida" "Decisões do dono"; do

@@ -15,7 +15,7 @@
 #: - "## 6. Scripts": lists exactly the method scripts. With
 #:   .github/method-files.txt, that file is the list (one path per line);
 #:   a script of the repository that is not in it is not required. Without
-#:   the file, the list is every file directly in scripts/;
+#:   the file, the list is every file directly in .method/scripts/;
 #: - "### 6.2 Hooks": the same, for .claude/hooks/ and .githooks/;
 #: - "## 7. Arquivos": every path without a placeholder (<...> or *) exists.
 #:   CHANGELOG.md and ROADMAP.md may both be absent until the first group; if
@@ -31,10 +31,10 @@
 #: Lists every problem and exits 1.
 set -euo pipefail
 HERE="$(cd "$(dirname "$0")" && pwd)"
-# shellcheck source=scripts/lib/common.sh
+# shellcheck source=.method/scripts/lib/common.sh
 source "$HERE/lib/common.sh"
 case "${1:-}" in -h|--help) print_help "$0"; exit 0 ;; esac
-ROOT="${REPO_ROOT:-$(cd "$HERE/.." && pwd)}"
+ROOT="${REPO_ROOT:-$(cd "$HERE/../.." && pwd)}"
 cd "$ROOT"
 
 fail=0
@@ -156,13 +156,13 @@ if [ -f "$design" ]; then
       [ -e "$p" ] || problem "$manifest lists $p, which does not exist"
     done <<<"$method_list"
     manifest_note="$manifest"
-    method_scripts="$(printf '%s\n' "$method_list" | grep '^scripts/' || true)"
+    method_scripts="$(printf '%s\n' "$method_list" | grep '^.method/scripts/' || true)"
     method_hooks="$(printf '%s\n' "$method_list" | grep -E '^(\.claude/hooks|\.githooks)/' || true)"
   else
-    method_scripts="$(files_of scripts)"
+    method_scripts="$(files_of .method/scripts)"
     method_hooks="$(files_of .claude/hooks; files_of .githooks)"
   fi
-  same_files scripts "$(section '## 6. Scripts' | first_column | grep '^scripts/' || true)" "$method_scripts"
+  same_files scripts "$(section '## 6. Scripts' | first_column | grep '^.method/scripts/' || true)" "$method_scripts"
   same_files hooks "$(section '### 6.2 Hooks' | first_column | grep -E '^(\.claude/hooks|\.githooks)/' || true)" \
     "$method_hooks"
   # CHANGELOG.md and ROADMAP.md are generated at the end of the first group.
