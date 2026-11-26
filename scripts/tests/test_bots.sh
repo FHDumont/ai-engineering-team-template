@@ -282,10 +282,12 @@ assert_status 1 "label-issue refuses the ask label of an unknown bot" env BOTS_F
 [ ! -e "$SCRIPTS/lib/bots.tsv" ] && ok || bad "scripts/lib/ holds no bot list"
 
 # An untracked file with a bot name is found before it is committed (#117).
-printf 'solo-bot-untracked\n' >"$REPO/scripts/untracked-bot-name.txt"
-bot_hits="$(cd "$REPO" && git ls-files -co --exclude-standard scripts | tr '\n' '\0' | xargs -0 grep -nF -- 'solo-bot-untracked' 2>/dev/null || true)"
+# Built in a copy: the real scripts/ is never written (#281).
+bot_repo="$(make_repo)"
+mkdir -p "$bot_repo/scripts"
+printf 'solo-bot-untracked\n' >"$bot_repo/scripts/untracked-bot-name.txt"
+bot_hits="$(cd "$bot_repo" && git ls-files -co --exclude-standard scripts | tr '\n' '\0' | xargs -0 grep -nHF -- 'solo-bot-untracked' 2>/dev/null || true)"
 assert_contains "$bot_hits" "untracked-bot-name.txt" "an untracked file with a forbidden token is found"
-rm -f "$REPO/scripts/untracked-bot-name.txt"
 
 # Names of one repository (the list of docs/repo-notes.md, when the file exists) stay out of
 # the method's code. An empty list must not make grep fail. A name that appears only
