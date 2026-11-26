@@ -141,6 +141,21 @@ assert_contains "$(gh_calls)" "statuses" "the opinion of this session is publish
 cp "$TMP/edited.md" "$repo/.process/reviewer-$SHA.md"
 assert_status 1 "an edited opinion is still refused with two reviewers in the trace" \
   sh -c "cd '$repo' && '$CLOSE' --publish-review '$TMP/edited.md' --round 1"
+# With the agent id saved next to the opinion (--save-review), the stop is the one of that agent.
+jq -cn --arg h "$(opinion_sha "$TMP/mine.md")" '{event: "SubagentStop", session_id: "x", agent_id: "mine1", agent_type: "close-reviewer", output_sha: $h}' >>"$TRACE"
+out_ev "$TMP/other.md" other-session
+cp "$TMP/mine.md" "$repo/.process/reviewer-$SHA.md"
+echo mine1 >"$repo/.process/reviewer-$SHA.agent"
+assert_status 0 "the opinion passes by its agent id with another reviewer stopping later" \
+  sh -c "cd '$repo' && '$CLOSE' --publish-review '$TMP/mine.md' --round 1"
+cp "$TMP/edited.md" "$repo/.process/reviewer-$SHA.md"
+assert_status 1 "an edited opinion is refused with the agent id saved" \
+  sh -c "cd '$repo' && '$CLOSE' --publish-review '$TMP/edited.md' --round 1"
+echo ghost >"$repo/.process/reviewer-$SHA.agent"
+assert_status 1 "an agent id with no stop in the trace is refused" \
+  sh -c "cd '$repo' && '$CLOSE' --publish-review '$TMP/edited.md' --round 1"
+assert_contains "$(last_output)" "no close-reviewer stop for agent ghost" "says the agent has no stop"
+rm -f "$repo/.process/reviewer-$SHA.agent"
 
 # #131: a second --prepare that sends nothing must not record phase_push, or the
 # review of that same SHA is refused. A later prepare that does push still asks
@@ -206,6 +221,7 @@ assert_contains "$(last_output)" "does not match" "says the hash differs"
 assert_eq "no" "$([ -f "$repo/.process/reviewer-$head258.md" ] && echo yes || echo no)" "nothing saved on a hash mismatch"
 jq -cn --arg h "$sha258" '{event: "SubagentStop", session_id: "child", agent_id: "bg1", agent_type: "close-reviewer", output_sha: $h}' >>"$TRACE"
 assert_status 0 "--save-review saves the opinion of the background subagent"   sh -c "cd '$repo' && '$CLOSE' --save-review bg1"
+assert_eq "bg1" "$(cat "$repo/.process/reviewer-$head258.agent")" "--save-review records the agent id next to the opinion"
 assert_eq "$sha258" "$(printf '%s' "$(cat "$repo/.process/reviewer-$head258.md")" | shasum -a 256 | cut -d' ' -f1)" "the saved file holds the opinion literally"
 : >"$FAKE_GH_LOG"
 assert_status 0 "--publish-review accepts the saved file"   sh -c "cd '$repo' && '$CLOSE' --publish-review '$repo/.process/reviewer-$head258.md' --verdict success --round 1"
