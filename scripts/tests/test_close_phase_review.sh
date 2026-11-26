@@ -124,6 +124,24 @@ cp "$TMP/orig.md" "$repo/.process/reviewer-$SHA.md"
 assert_status 0 "the opinion as recorded is published" sh -c "cd '$repo' && '$CLOSE' --publish-review '$TMP/orig.md' --round 1"
 handler "type:feature" success
 
+# #277: two close-reviewer stops of different sessions in the shared trace: the opinion of this
+# session is checked against its own stop, not against the last one of the trace.
+reset_phase_evidence
+push_ev "$SHA"
+round_ev
+printf '## Revisão independente\n\nVeredito: aprovado\nRessalva: minha\n' >"$TMP/mine.md"
+printf '## Revisão independente\n\nVeredito: aprovado\nRessalva: de outra fase\n' >"$TMP/other.md"
+out_ev "$TMP/mine.md" child
+out_ev "$TMP/other.md" other-session
+cp "$TMP/mine.md" "$repo/.process/reviewer-$SHA.md"
+: >"$FAKE_GH_LOG"
+assert_status 0 "the opinion of this session passes although another session's reviewer stopped later" \
+  sh -c "cd '$repo' && '$CLOSE' --publish-review '$TMP/mine.md' --round 1"
+assert_contains "$(gh_calls)" "statuses" "the opinion of this session is published"
+cp "$TMP/edited.md" "$repo/.process/reviewer-$SHA.md"
+assert_status 1 "an edited opinion is still refused with two reviewers in the trace" \
+  sh -c "cd '$repo' && '$CLOSE' --publish-review '$TMP/edited.md' --round 1"
+
 # #131: a second --prepare that sends nothing must not record phase_push, or the
 # review of that same SHA is refused. A later prepare that does push still asks
 # for a new round.
