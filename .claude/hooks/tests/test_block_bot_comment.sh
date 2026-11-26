@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Tests for the block-bot-comment.sh hook.
-# shellcheck source=scripts/tests/lib.sh
-source "$(dirname "$0")/../../../scripts/tests/lib.sh"
+# shellcheck source=.method/scripts/tests/lib.sh
+source "$(dirname "$0")/../../../.method/scripts/tests/lib.sh"
 HOOK="$REPO/.claude/hooks/block-bot-comment.sh"
 
 run() { jq -cn --arg c "$1" --arg d "$REPO" '{tool_input: {command: $c}, cwd: $d}' | "$HOOK"; }
@@ -48,7 +48,7 @@ texto
 EOF"
 assert_status 0 "ignores close without --comment" run 'gh issue close 3'
 assert_status 0 "ignores other commands" run 'gh issue view 3'
-assert_status 0 "ignores ask-bot.sh itself" run 'scripts/ask-bot.sh bot-a 3 "pergunta"'
+assert_status 0 "ignores ask-bot.sh itself" run '.method/scripts/ask-bot.sh bot-a 3 "pergunta"'
 
 # Explicit recipient, not a substring (#90). Bots: ops, vendas, acme-site.
 custom="$TMP/bots.tsv"

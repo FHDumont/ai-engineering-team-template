@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # GitHub App token per role (issue #35). A fake gh records GH_TOKEN.
 # The owner creates the app; nothing here creates one.
-# shellcheck source=scripts/tests/lib.sh
+# shellcheck source=.method/scripts/tests/lib.sh
 source "$(dirname "$0")/lib.sh"
 
 cat >"$TMP/handler.sh" <<'H'

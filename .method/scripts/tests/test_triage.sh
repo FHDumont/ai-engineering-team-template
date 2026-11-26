@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Tests for triage.sh.
-# shellcheck source=scripts/tests/lib.sh
+# shellcheck source=.method/scripts/tests/lib.sh
 source "$(dirname "$0")/lib.sh"
 
 cat >"$TMP/handler.sh" <<'H'
@@ -27,7 +27,7 @@ assert_eq '[]' "$("$SCRIPTS/triage.sh" --issue 9 2>/dev/null)" "--issue of a clo
 assert_contains "$("$SCRIPTS/triage.sh" --issue 9 2>&1 >/dev/null)" "warn: issue #9 is not open" "--issue of a closed issue warns on stderr"
 assert_eq "" "$("$SCRIPTS/triage.sh" --issue 3 2>&1 >/dev/null)" "--issue of an open issue warns nothing"
 # Runner re-offer trigger (pure logic).
-# shellcheck source=scripts/lib/runner_offer.sh
+# shellcheck source=.method/scripts/lib/runner_offer.sh
 source "$SCRIPTS/lib/runner_offer.sh"
 d() { runner_offer_decision "$@"; }
 assert_contains "$(d true 0 360 10)" "offer" "avg 6 min offers"

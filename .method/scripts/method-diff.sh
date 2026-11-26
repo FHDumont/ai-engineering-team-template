@@ -11,7 +11,7 @@
 #: destination inside the method folders, outside the manifest, and a method doc: AGENTS.md, CLAUDE.md,
 #: docs/process-design.md, docs/adr/{TEMPLATE,INDEX,ADR-*}.md, .cursor/rules/*), removed, kept,
 #: repo-owned (a repository file with a template default), deleted (both ends have it, the repository dropped it, the manifest does not name it: never brought back) or repo-only. template-only marks a test of
-#: scripts/tests/template/ that a repository must not have (--remove deletes
+#: .method/scripts/tests/template/ that a repository must not have (--remove deletes
 #: it); missing-label names a method label absent from .github/labels.tsv. --remove
 #: deletes a file the template dropped since that commit when this repository
 #: did not change it. A repository-only file is never deleted. --find-base
@@ -23,7 +23,7 @@
 #: and the check-docs.sh of the origin).
 set -euo pipefail
 HERE="$(cd "$(dirname "$0")" && pwd)"
-# shellcheck source=scripts/lib/common.sh
+# shellcheck source=.method/scripts/lib/common.sh
 source "$HERE/lib/common.sh"
 
 template="" from="" to="" remove=0 find=0 notice=0
@@ -100,7 +100,7 @@ done < <(git -C "$root" ls-files)
 # (FHDumont/ai-engineering-team-template#213), ones the repository dropped are deleted (FHDumont/ai-engineering-team-template#235).
 while read -r f; do
   [ -n "$f" ] || continue
-  case "$f" in scripts/tests/template/*|docs/specs/*) continue ;; esac
+  case "$f" in .method/scripts/tests/template/*|docs/specs/*) continue ;; esac
   printf '%s\n' "$dirs" | stdin_grep -qx "${f%%/*}" || continue
   [ "$f" != "${f#*/}" ] || continue
   paths="$paths
@@ -129,7 +129,7 @@ while read -r path; do
   else
     rb=""
   fi
-  if [ "${path#scripts/tests/template/}" != "$path" ]; then
+  if [ "${path#.method/scripts/tests/template/}" != "$path" ]; then
     # Tests that only hold in the template: never part of a repository.
     if [ -n "$rb" ]; then
       echo "template-only $path"
@@ -177,7 +177,7 @@ if [ "$notice" = 0 ]; then cat "$report"; exit 0; fi
 
 # --notice: the checklist of this interval only.
 items() { grep "^$1 " "$report" | cut -d' ' -f2- || true; }
-echo "Itens da atualização $from → $to (gerado por scripts/method-diff.sh --notice):"
+echo "Itens da atualização $from → $to (gerado por .method/scripts/method-diff.sh --notice):"
 echo
 for c in missing missing-label removed adapted; do
   for f in $(items "$c"); do
@@ -203,14 +203,14 @@ if [ -f "$root/docs/STATE.md" ] && grep -qF 'o job `tests` roda em todo PR' "$ro
   echo "- [ ] A frase antiga do \`docs/STATE.md\` (\"o job \`tests\` roda em todo PR\") saiu na revisão do STATE."
 fi
 # The label the update PR gets depends on the verifier of the origin (the base of the PR runs it).
-origin_verifier="$(git -C "$template" show "$from:scripts/lib/sensitive_paths.py" 2>/dev/null || true)"
+origin_verifier="$(git -C "$template" show "$from:.method/scripts/lib/sensitive_paths.py" 2>/dev/null || true)"
 case "$origin_verifier" in
   *SENSITIVE_CLASS*) label=needs-gate-review ;;
   *) label=needs-owner-ok ;;
 esac
 echo "- [ ] O verificador da origem põe \`$label\` neste PR. A label nova do portão entra no merge pelo \`close-phase.sh\` (FHDumont/ai-engineering-team-template#220), sem passo manual."
 # The base of the PR runs its own check-docs.sh: lower limits there fail a doc the new one accepts (FHDumont/ai-engineering-team-template#216).
-if ! diff <(git -C "$template" show "$from:scripts/check-docs.sh" 2>/dev/null | grep '^limit ') \
-  <(git -C "$template" show "$to:scripts/check-docs.sh" 2>/dev/null | grep '^limit ') >/dev/null; then
-  echo "- [ ] Confira os docs também com o \`check-docs.sh\` da origem, que tem limites menores (o Policy da CI usa o da base): \`git -C $template show $from:scripts/check-docs.sh >scripts/.check-docs-origin.sh && bash scripts/.check-docs-origin.sh; rm -f scripts/.check-docs-origin.sh\`"
+if ! diff <(git -C "$template" show "$from:.method/scripts/check-docs.sh" 2>/dev/null | grep '^limit ') \
+  <(git -C "$template" show "$to:.method/scripts/check-docs.sh" 2>/dev/null | grep '^limit ') >/dev/null; then
+  echo "- [ ] Confira os docs também com o \`check-docs.sh\` da origem, que tem limites menores (o Policy da CI usa o da base): \`git -C $template show $from:.method/scripts/check-docs.sh >.method/scripts/.check-docs-origin.sh && bash .method/scripts/.check-docs-origin.sh; rm -f .method/scripts/.check-docs-origin.sh\`"
 fi

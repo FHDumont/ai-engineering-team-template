@@ -3,11 +3,11 @@
 # sessions.sh, with fake processes: scripts named claude and server that only sleep,
 # and a parent whose path says Claude.app. Every process is spawned by the test, in
 # a temporary directory, and stopped by it at the end.
-# shellcheck source=scripts/tests/lib.sh
+# shellcheck source=.method/scripts/tests/lib.sh
 source "$(dirname "$0")/lib.sh"
-# shellcheck source=scripts/lib/common.sh
+# shellcheck source=.method/scripts/lib/common.sh
 source "$SCRIPTS/lib/common.sh"
-# shellcheck source=scripts/lib/procs.sh
+# shellcheck source=.method/scripts/lib/procs.sh
 source "$SCRIPTS/lib/procs.sh"
 
 assert_eq 90 "$(etime_seconds 01:30)" "etime mm:ss"

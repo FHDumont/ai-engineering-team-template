@@ -25,7 +25,7 @@
 #: --label     runner label (default: the runner name)
 set -euo pipefail
 HERE="$(cd "$(dirname "$0")" && pwd)"
-# shellcheck source=scripts/lib/common.sh
+# shellcheck source=.method/scripts/lib/common.sh
 source "$HERE/lib/common.sh"
 
 dry=0 reg=0 chk=0 dir="" name="" label=""
@@ -74,7 +74,7 @@ dry-run: a self-hosted runner registration would:
 4. Install and start the runner as a service (./svc.sh install && ./svc.sh start).
 5. Set the repository variable CI_RUNS_ON to the runner label.
 Nothing was executed.
-to register, run only: scripts/setup-runner.sh --register
+to register, run only: .method/scripts/setup-runner.sh --register
 S
 exit 0
 fi

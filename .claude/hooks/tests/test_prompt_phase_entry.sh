@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Tests of the prompt-phase-entry.sh hook and of the texts that keep "executar #n" on one path.
-# shellcheck source=scripts/tests/lib.sh
-source "$(dirname "$0")/../../../scripts/tests/lib.sh"
+# shellcheck source=.method/scripts/tests/lib.sh
+source "$(dirname "$0")/../../../.method/scripts/tests/lib.sh"
 HOOK="$REPO/.claude/hooks/prompt-phase-entry.sh"
 
 run() { jq -cn --arg p "$1" '{hook_event_name: "UserPromptSubmit", session_id: "s", prompt: $p}' | "$HOOK"; }
@@ -9,7 +9,7 @@ run() { jq -cn --arg p "$1" '{hook_event_name: "UserPromptSubmit", session_id: "
 for p in "executar #95" "Executar #95 agora" "  executar a issue 95" "executar issue #95" "executar 95"; do
   assert_status 0 "never blocks: $p" run "$p"
   out="$(last_output)"
-  assert_contains "$out" "scripts/phase-start.sh 95" "points to phase-start.sh: $p"
+  assert_contains "$out" ".method/scripts/phase-start.sh 95" "points to phase-start.sh: $p"
   assert_contains "$out" "plan skill" "points to the plan skill: $p"
 done
 for p in "fechar fase" "pode executar #95 depois?" "executar a fase" "o que falta na #95?"; do

@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Tests for the block-agent-pair.sh hook.
-# shellcheck source=scripts/tests/lib.sh
-source "$(dirname "$0")/../../../scripts/tests/lib.sh"
+# shellcheck source=.method/scripts/tests/lib.sh
+source "$(dirname "$0")/../../../.method/scripts/tests/lib.sh"
 HOOK="$REPO/.claude/hooks/block-agent-pair.sh"
 
 run() { # run <tool_input json>
@@ -16,7 +16,7 @@ assert_contains "$(last_output)" "effort" "names what is missing"
 assert_status 2 "blocks an agent with neither" run '{"prompt": "x", "subagent_type": "Explore"}'
 assert_status 2 "blocks empty values" run '{"prompt": "x", "model": "", "effort": ""}'
 assert_status 2 "blocks invalid input" sh -c "echo 'not json' | '$HOOK'"
-# The agents of the repo open only with the pair of their weight in scripts/lib/weights.tsv.
+# The agents of the repo open only with the pair of their weight in .method/scripts/lib/weights.tsv.
 reviewer="$("$SCRIPTS/weights.sh" reviewer)"
 triage="$("$SCRIPTS/weights.sh" triage)"
 call() { # call <subagent_type> <model> <effort>

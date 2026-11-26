@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Tests for the trace-event.sh hook and the trace_event function of the scripts.
-# shellcheck source=scripts/tests/lib.sh
-source "$(dirname "$0")/../../../scripts/tests/lib.sh"
+# shellcheck source=.method/scripts/tests/lib.sh
+source "$(dirname "$0")/../../../.method/scripts/tests/lib.sh"
 HOOK="$REPO/.claude/hooks/trace-event.sh"
 # Here the default destination (main checkout of the temporary repo) is what is tested.
 unset PROCESS_EVENTS_FILE
@@ -66,8 +66,8 @@ assert_eq 4 "$(wc -l <"$EV" | tr -d ' ')" "bad input writes nothing"
 # trace_event of the scripts: key=value become fields.
 (
   cd "$repo/.worktrees/issue-7"
-  # shellcheck source=scripts/lib/common.sh
-  source "$REPO/scripts/lib/common.sh"
+  # shellcheck source=.method/scripts/lib/common.sh
+  source "$REPO/.method/scripts/lib/common.sh"
   trace_event bot_ask bot=bot-b ask_id=abc note="a=b c"
 )
 assert_eq bot_ask "$(field 5 event)" "script event name"

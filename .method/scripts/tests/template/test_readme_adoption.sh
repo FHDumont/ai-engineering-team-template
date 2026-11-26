@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Test of the adoption chapters of README.md: every path and script command they
 # cite exists in this repository, and the topics the issue asks for are covered.
-# shellcheck source=scripts/tests/lib.sh
+# shellcheck source=.method/scripts/tests/lib.sh
 source "$(dirname "$0")/../lib.sh"
 
 readme="$REPO/README.md"
@@ -23,8 +23,8 @@ assert_contains "$(cat "$REPO/.claude/skills/execute/SKILL.md")" "caminho absolu
 
 # Topics the chapter must cover.
 for topic in "gh auth status" "proteção de branch" "branch de adoção" "O que sai" "O que entra" \
-  "O que NÃO se copia" "workflow_dispatch" "# deploy-paths:" "scripts/validate.sh" \
-  "scripts/check-docs.sh" "configurar o repo" "labels antigas" "Primeira fase" \
+  "O que NÃO se copia" "workflow_dispatch" "# deploy-paths:" ".method/scripts/validate.sh" \
+  ".method/scripts/check-docs.sh" "configurar o repo" "labels antigas" "Primeira fase" \
   "Inventarie os hooks" "deny"; do
   assert_contains "$adopt" "$topic" "the chapter covers: $topic"
 done
@@ -34,7 +34,7 @@ assert_contains "$adopt" "CHANGELOG.md" "the chapter says CHANGELOG.md is not co
 assert_contains "$(cat "$REPO/README.md")" "meta de tempo" "the quick start mentions the time target"
 readme="$(cat "$REPO/README.md")"
 warn_at="$(printf '%s\n' "$readme" | awk '/Antes de ligar a proteção/{print NR; exit}')"
-setup_at="$(printf '%s\n' "$readme" | awk '/O agente roda `scripts\/setup-repo.sh`/{print NR; exit}')"
+setup_at="$(printf '%s\n' "$readme" | awk '/O agente roda `\.method\/scripts\/setup-repo.sh`/{print NR; exit}')"
 assert_contains "$readme" 'fix/issue-*' "the README names the phase branch the warning is about"
 assert_contains "$readme" '--owner-ok' "the README names --owner-ok"
 if [ -n "$warn_at" ] && [ -n "$setup_at" ] && [ "$warn_at" -lt "$setup_at" ]; then
@@ -86,7 +86,7 @@ check_spans() { # check_spans <text>
     esac
     # A flag of a script must appear in that script's source (its --help).
     case "$first" in
-      scripts/*.sh|scripts/*.py)
+      .method/scripts/*.sh|.method/scripts/*.py)
         for flag in $(printf '%s' "$span" | grep -oE -- '--[a-z-]+'); do
           grep -q -- "$flag" "$REPO/$first" || echo "unknown flag $flag in: $span"
         done ;;
@@ -99,7 +99,7 @@ assert_eq "" "$problems" "every path and command cited by the chapters exists"
 # The folders listed in "O que entra" are all there.
 for p in AGENTS.md CLAUDE.md CONTEXT.md .claude/agents .claude/commands .claude/hooks .claude/skills \
   .claude/settings.json .cursor/rules .githooks .github/ISSUE_TEMPLATE .github/workflows/ci.yml \
-  .github/required-checks docs/process-design.md docs/adr docs/diagrams scripts/lib scripts/tests; do
+  .github/required-checks docs/process-design.md docs/adr docs/diagrams .method/scripts/lib .method/scripts/tests; do
   [ -e "$REPO/$p" ] && ok || bad "template path missing: $p"
 done
 

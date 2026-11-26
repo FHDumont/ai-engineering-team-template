@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Tests of the real pair of the phase session: check-env.sh reads it, compares it with
 # the pair of the spec, records it in the trace and exits non-zero on a divergence.
-# shellcheck source=scripts/tests/lib.sh
+# shellcheck source=.method/scripts/tests/lib.sh
 source "$(dirname "$0")/lib.sh"
 
 repo="$(make_repo)"
@@ -19,7 +19,7 @@ cat >"$repo/docs/specs/pair.md" <<'S'
 2. Etapa. modelo: small · esforço: low · motivo: leve
 3. Etapa. modelo: big · esforço: high · motivo: forte
 S
-git -C "$repo" add scripts .gitignore docs .github
+git -C "$repo" add .method .gitignore docs .github
 git -C "$repo" commit --quiet -m "chore: scripts and spec"
 export PROCESS_EVENTS_FILE="$repo/.process/events.jsonl"
 mkdir -p "$repo/.process"
@@ -43,7 +43,7 @@ opened() { # opened <opener model> <opener effort>: the trace as phase-start.sh 
   jq -cn --arg m "$1" --arg e "$2" '{ts: "2026-01-01T00:00:00Z", event: "phase_opened", session_id: "manager", issue: "7", model: $m, effort: $e}' >"$PROCESS_EVENTS_FILE"
 }
 check() { # check <session id> <effort>
-  env CLAUDE_CODE_SESSION_ID="$1" CLAUDE_EFFORT="$2" sh -c "cd '$wt' && scripts/check-env.sh"
+  env CLAUDE_CODE_SESSION_ID="$1" CLAUDE_EFFORT="$2" sh -c "cd '$wt' && .method/scripts/check-env.sh"
 }
 session_event() { # session_event <session id> <event> <jq expression>
   jq -r --arg s "$1" --arg e "$2" "select(.event == \$e and .session_id == \$s) | $3" "$PROCESS_EVENTS_FILE"
@@ -84,7 +84,7 @@ assert_status 1 "a third pair is still refused" check wrong low
 opened unknown unknown
 assert_status 1 "check-env refuses a session without a transcript" check ghost high
 assert_contains "$(last_output)" "cannot read the real pair" "says the pair was not read"
-assert_status 1 "check-env refuses a session without an effort" env -u CLAUDE_EFFORT CLAUDE_CODE_SESSION_ID=child sh -c "cd '$wt' && scripts/check-env.sh"
+assert_status 1 "check-env refuses a session without an effort" env -u CLAUDE_EFFORT CLAUDE_CODE_SESSION_ID=child sh -c "cd '$wt' && .method/scripts/check-env.sh"
 
 # new-phase.sh records the pair of the opening session in phase_opened.
 cat >"$TMP/handler.sh" <<'H'
@@ -97,7 +97,7 @@ git clone --quiet --bare "$repo" "$TMP/remote.git"
 git -C "$repo" remote add origin "$TMP/remote.git"
 git -C "$repo" fetch --quiet origin
 transcript manager claude-mid-2
-assert_status 0 "phase-start opens the phase" env CLAUDE_CODE_SESSION_ID=manager CLAUDE_EFFORT=medium sh -c "cd '$repo' && scripts/phase-start.sh 8 --no-check"
+assert_status 0 "phase-start opens the phase" env CLAUDE_CODE_SESSION_ID=manager CLAUDE_EFFORT=medium sh -c "cd '$repo' && .method/scripts/phase-start.sh 8 --no-check"
 assert_eq "claude-mid-2 medium" "$(jq -r 'select(.event == "phase_opened" and .issue == "8") | "\(.model) \(.effort)"' "$PROCESS_EVENTS_FILE")" "phase_opened carries the pair of the opening session"
 assert_contains "$(last_output)" "model: big" "start_session gets the pair of the spec"
 

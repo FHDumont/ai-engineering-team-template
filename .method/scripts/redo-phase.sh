@@ -28,11 +28,11 @@
 #: Exits 9 in the session that opened the phase (the child session redoes it).
 set -euo pipefail
 HERE="$(cd "$(dirname "$0")" && pwd)"
-# shellcheck source=scripts/lib/common.sh
+# shellcheck source=.method/scripts/lib/common.sh
 source "$HERE/lib/common.sh"
-# shellcheck source=scripts/lib/refs.sh
+# shellcheck source=.method/scripts/lib/refs.sh
 source "$HERE/lib/refs.sh"
-ROOT="$(cd "$HERE/.." && pwd)"
+ROOT="$(cd "$HERE/../.." && pwd)"
 
 while [ $# -gt 0 ]; do
   case "$1" in
@@ -73,7 +73,7 @@ if [ -f "$state" ]; then
     mv "$state.kept.tmp" "$state.kept"
     echo "dropped ${stopped:0:12}: the resolution left nothing to apply on main"
   elif [ -n "$stopped" ] || [ -n "$(unmerged)" ]; then
-    die "the cherry-pick is still stopped: resolve the files, git add them by name and run git cherry-pick --continue (nothing left to commit: run scripts/redo-phase.sh again without it)" 4
+    die "the cherry-pick is still stopped: resolve the files, git add them by name and run git cherry-pick --continue (nothing left to commit: run .method/scripts/redo-phase.sh again without it)" 4
   fi
   echo "resuming the redo of $old on $new"
 else
@@ -110,8 +110,8 @@ while [ -s "$state.todo" ]; do
     echo "$c" >>"$state.kept"
     echo "real conflict: cherry-pick of ${c:0:12} ($(git log -1 --format=%s "$c")) stopped on branch $new" >&2
     unmerged | sed 's/^/  conflict: /' >&2
-    echo "resolve these files, git add them by name, run git cherry-pick --continue, then run scripts/redo-phase.sh again" >&2
-    echo "nothing left to commit after the resolution (the change is already on main): git add the files and run scripts/redo-phase.sh again; it drops the commit. Never git cherry-pick --skip by hand" >&2
+    echo "resolve these files, git add them by name, run git cherry-pick --continue, then run .method/scripts/redo-phase.sh again" >&2
+    echo "nothing left to commit after the resolution (the change is already on main): git add the files and run .method/scripts/redo-phase.sh again; it drops the commit. Never git cherry-pick --skip by hand" >&2
     exit 4
   fi
   git rev-parse -q --verify CHERRY_PICK_HEAD >/dev/null || die "cherry-pick of $c failed without a conflict: see git status"

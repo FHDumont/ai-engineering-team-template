@@ -48,7 +48,7 @@ def render(prs):
     # Newest first.
     prs.sort(key=lambda p: (p["mergedAt"], p["number"]), reverse=True)
     lines = ["# Changelog", "",
-             "<!-- Gerado por scripts/gen-changelog.py; não editar à mão. -->", ""]
+             "<!-- Gerado por .method/scripts/gen-changelog.py; não editar à mão. -->", ""]
     for label, title in GROUPS + [(None, OTHER)]:
         group = [p for p in prs if first_type(p) == label]
         if not group:

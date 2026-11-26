@@ -13,9 +13,9 @@
 #: current directory. The agent does not read this output: it is for the owner.
 set -euo pipefail
 HERE="$(cd "$(dirname "$0")" && pwd)"
-# shellcheck source=scripts/lib/common.sh
+# shellcheck source=.method/scripts/lib/common.sh
 source "$HERE/lib/common.sh"
-# shellcheck source=scripts/lib/progress.sh
+# shellcheck source=.method/scripts/lib/progress.sh
 source "$HERE/lib/progress.sh"
 require_cmd jq
 

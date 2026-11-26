@@ -6,11 +6,11 @@ set -euo pipefail
 TESTS_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # template/ is one level deeper; its tests still see the repository root.
 case "$TESTS_DIR" in
-  */template) REPO="$(cd "$TESTS_DIR/../../.." && pwd)" ;;
-  *) REPO="$(cd "$TESTS_DIR/../.." && pwd)" ;;
+  */template) REPO="$(cd "$TESTS_DIR/../../../.." && pwd)" ;;
+  *) REPO="$(cd "$TESTS_DIR/../../.." && pwd)" ;;
 esac
 # shellcheck disable=SC2034  # used by the tests that load this file
-SCRIPTS="$REPO/scripts"
+SCRIPTS="$REPO/.method/scripts"
 TMP="$(cd "$(mktemp -d "${TMPDIR:-/tmp}/tmp.XXXXXXXX")" && pwd -P)"
 # No test leaves a process alive (issue #66): whatever the test started in the
 # background, or left with its folder as the cwd or in its command line, is stopped at
@@ -19,7 +19,7 @@ TMP="$(cd "$(mktemp -d "${TMPDIR:-/tmp}/tmp.XXXXXXXX")" && pwd -P)"
 # processes (parent 1, a few of them): lsof over every process of the machine was the
 # dearest step, paid by each test. In the CI (CI set) the machine is the runner's and the
 # search stays the full one, since a detached process may have another parent there.
-# shellcheck source=scripts/lib/procs.sh
+# shellcheck source=.method/scripts/lib/procs.sh
 source "$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/lib/procs.sh"
 test_sweep() {
   local p own="" left
@@ -41,7 +41,7 @@ export PROCESS_EVENTS_FILE="$TMP/events.jsonl"
 export BOTS_FILE="$TESTS_DIR/fixtures/bots.tsv"
 
 # Paths the suite may scan (#99). Project code outside this list is invisible to it.
-# scripts/tests/template holds checks that exist only in this template and is excluded.
+# .method/scripts/tests/template holds checks that exist only in this template and is excluded.
 method_paths() {
   cat <<'EOF'
 AGENTS.md
@@ -76,7 +76,7 @@ docs/STATE.md
 docs/adr
 docs/diagrams
 docs/repo-notes.md
-scripts
+.method/scripts
 EOF
 }
 # method_existing <repo>: those paths that exist, one per line.
@@ -94,7 +94,7 @@ method_grep() {
     [ -n "$p" ] && paths+=("$p")
   done < <(method_existing "$root")
   [ "${#paths[@]}" -gt 0 ] || return 0
-  git -C "$root" grep "$@" -- "${paths[@]}" ':!scripts/tests/template'
+  git -C "$root" grep "$@" -- "${paths[@]}" ':!.method/scripts/tests/template'
 }
 # The time limit of the tests comes from the real machine-limits.env (issue #71): only
 # these two values are read, before the folder is swapped, and nothing is created there.
@@ -110,8 +110,8 @@ export AI_METHOD_POLL_SECONDS=1 AI_METHOD_SLOTS_VALIDATE=20 AI_METHOD_SLOTS_FASE
 # No test inherits the session of whoever runs it: each one names its own.
 unset CLAUDE_CODE_SESSION_ID
 # Time limit of the tests (issue #71): the parameter of machine-limits.env, grown by the load.
-# shellcheck source=scripts/lib/slots.sh
-source "$REPO/scripts/lib/slots.sh"
+# shellcheck source=.method/scripts/lib/slots.sh
+source "$REPO/.method/scripts/lib/slots.sh"
 : "${AI_METHOD_TEST_TIMEOUT_SECONDS:=600}" "${AI_METHOD_WARN_LOAD1:=8}"
 # test_limited <command...>: runs the command under the alarm of that limit.
 test_limited() { perl -e 'alarm shift; exec @ARGV' "$(slots_test_timeout)" "$@"; }
@@ -171,14 +171,14 @@ make_repo() {
   echo "$dir"
 }
 
-# Copies scripts/ into a temporary repo with validate.sh and check-docs.sh replaced by
+# Copies .method/scripts/ into a temporary repo with validate.sh and check-docs.sh replaced by
 # stubs: no test reaches the real suite again through the copy (close-phase.sh
 # --prepare, check-env.sh). Every test that needs the scripts in a repo copies them here.
 copy_scripts() { # copy_scripts <repo>
-  mkdir -p "$1/scripts"
-  cp -R "$SCRIPTS/." "$1/scripts/"
-  printf '#!/usr/bin/env bash\necho "ok: stub $*"\n' >"$1/scripts/validate.sh"
-  printf '#!/usr/bin/env bash\necho "ok: stub $*"\n' >"$1/scripts/check-docs.sh"
+  mkdir -p "$1/.method/scripts"
+  cp -R "$SCRIPTS/." "$1/.method/scripts/"
+  printf '#!/usr/bin/env bash\necho "ok: stub $*"\n' >"$1/.method/scripts/validate.sh"
+  printf '#!/usr/bin/env bash\necho "ok: stub $*"\n' >"$1/.method/scripts/check-docs.sh"
 }
 
 finish() {

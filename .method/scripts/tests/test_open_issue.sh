@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Tests of open-issue.sh: template body, required sections and labels.
-# shellcheck source=scripts/tests/lib.sh
+# shellcheck source=.method/scripts/tests/lib.sh
 source "$(dirname "$0")/lib.sh"
 OPEN="$SCRIPTS/open-issue.sh"
 

@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Tests of deploy.sh in a sandbox: one test per refusal and per path.
-# shellcheck source=scripts/tests/lib.sh
+# shellcheck source=.method/scripts/tests/lib.sh
 source "$(dirname "$0")/lib.sh"
 repo="$(make_repo)"
 copy_scripts "$repo"
@@ -9,13 +9,13 @@ printf '# deploy-paths: app/ .github/workflows/deploy-app.yml\non:\n  workflow_d
 printf '# deploy-manual: the owner starts a rollback from the Actions screen\n# deploy-paths: app/\non:\n  workflow_dispatch:\n' >"$repo/.github/workflows/deploy-rollback.yml"
 echo v1 >"$repo/app/index.html"
 printf '.worktrees/\n.process/\n' >"$repo/.gitignore"
-git -C "$repo" add scripts .github app .gitignore
+git -C "$repo" add .method .github app .gitignore
 git -C "$repo" commit --quiet -m "chore: scripts and app"
 remote="$TMP/remote.git"
 git clone --quiet --bare "$repo" "$remote"
 git -C "$repo" remote add origin "$remote"
 git -C "$repo" fetch --quiet origin
-DEPLOY="$repo/scripts/deploy.sh"
+DEPLOY="$repo/.method/scripts/deploy.sh"
 SHA="$(git -C "$repo" rev-parse HEAD)"
 TRACE="$repo/.process/events.jsonl"
 mkdir -p "$repo/.process"
@@ -102,7 +102,7 @@ git -C "$repo" worktree add --quiet -b feat/issue-5-x "$repo/.worktrees/issue-5"
 run 1 "refuses with a phase open"
 assert_contains "$(last_output)" "phase still open (worktree of #5)" "names the open phase"
 assert_eq 0 "$(dispatches)" "no dispatch with a phase open"
-assert_status 1 "refuses outside the main checkout" env CLAUDE_CODE_SESSION_ID=main sh -c "cd '$repo/.worktrees/issue-5' && scripts/deploy.sh --interval 0"
+assert_status 1 "refuses outside the main checkout" env CLAUDE_CODE_SESSION_ID=main sh -c "cd '$repo/.worktrees/issue-5' && .method/scripts/deploy.sh --interval 0"
 assert_contains "$(last_output)" "runs from the main checkout" "says where it runs"
 git -C "$repo" worktree remove --force "$repo/.worktrees/issue-5"
 git -C "$repo" branch -D feat/issue-5-x >/dev/null
@@ -223,7 +223,7 @@ assert_contains "$(last_output)" "no deploy-*.yml workflow" "says there is no de
 # Same session: check-env outside a phase, then deploy. No phase_session is recorded.
 git -C "$repo" switch --quiet -c chore/adoption
 : >"$TRACE"
-assert_status 0 "check-env outside a phase passes" env -u PROCESS_EVENTS_FILE CLAUDE_CODE_SESSION_ID=adopt sh -c "cd '$repo' && scripts/check-env.sh"
+assert_status 0 "check-env outside a phase passes" env -u PROCESS_EVENTS_FILE CLAUDE_CODE_SESSION_ID=adopt sh -c "cd '$repo' && .method/scripts/check-env.sh"
 assert_contains "$(last_output)" "no phase issue or no session id" "says the pair was not checked"
 assert_eq "" "$(jq -r 'select(.event == "phase_session") | .event' "$TRACE")" "check-env outside a phase records no phase_session"
 git -C "$repo" switch --quiet main

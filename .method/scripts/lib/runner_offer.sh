@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Pure logic of the trigger that re-offers the self-hosted runner.
-# Load with: source scripts/lib/runner_offer.sh
+# Load with: source .method/scripts/lib/runner_offer.sh
 #
 # runner_offer_decision <private_repo:true|false> <runs_on_set:0|1> <avg_sec> <quota_pct>
 # Prints "offer <reason>" or "skip <reason>". Empty avg_sec and quota_pct = unknown criterion

@@ -11,9 +11,9 @@
 #: a deploy rerun. This script is the only rerun of an intermittent CI job.
 set -euo pipefail
 HERE="$(cd "$(dirname "$0")" && pwd)"
-# shellcheck source=scripts/lib/common.sh
+# shellcheck source=.method/scripts/lib/common.sh
 source "$HERE/lib/common.sh"
-ROOT="$(cd "$HERE/.." && pwd)"
+ROOT="$(cd "$HERE/../.." && pwd)"
 
 [ "${1:-}" != -h ] && [ "${1:-}" != --help ] || { print_help "$0"; exit 0; }
 [ $# -eq 1 ] || die "usage: rerun-ci.sh <run-id>" 2
@@ -47,7 +47,7 @@ count=0
 [ -f "$dir/$run" ] && count="$(tr -dc '0-9' <"$dir/$run" || true)"
 count="${count:-0}"
 if [ "$count" -ge "$limit" ]; then
-  echo "offer: the failed jobs of ci.yml run $run failed again after $count reruns; open an issue with scripts/open-issue.sh --type finding --size small"
+  echo "offer: the failed jobs of ci.yml run $run failed again after $count reruns; open an issue with .method/scripts/open-issue.sh --type finding --size small"
   exit 1
 fi
 n=$((count + 1))

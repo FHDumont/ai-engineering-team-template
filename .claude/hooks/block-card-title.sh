@@ -19,8 +19,8 @@ count="$(printf '%s' "$input" | jq -r '(.tool_input.questions // []) | length' 2
 sid="$(printf '%s' "$input" | jq -r '.session_id // empty')"
 cwd="$(printf '%s' "$input" | jq -r '.cwd // empty')"
 
-# shellcheck source=scripts/lib/common.sh
-source "$here/../../scripts/lib/common.sh"
+# shellcheck source=.method/scripts/lib/common.sh
+source "$here/../../.method/scripts/lib/common.sh"
 main_root="$(git -C "${cwd:-.}" worktree list --porcelain 2>/dev/null | sed -n '1s/^worktree //p')" || exit 0
 [ -n "$main_root" ] || exit 0
 open=""

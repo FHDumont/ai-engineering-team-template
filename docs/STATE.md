@@ -6,7 +6,7 @@ Repositório criado a partir do template do método (`docs/process-design.md`). 
 
 - **Projeto:** nome, objetivo e stack ainda não registrados; a skill `setup` registra aqui.
 - **Método:** scripts, hooks, skills, agentes e CI. Decisões em `docs/adr/INDEX.md`.
-- **Modelo e esforço:** os pares de `scripts/lib/weights.tsv` são o padrão do template; ajuste o arquivo ao plano da conta.
+- **Modelo e esforço:** os pares de `.method/scripts/lib/weights.tsv` são o padrão do template; ajuste o arquivo ao plano da conta.
 - **App:** `app/` é só um marcador para o workflow de exemplo; troque pelo código do projeto.
 - **Deploy:** `deploy-example.yml` é exemplo: builda `app/` e guarda o artefato, sem publicar. Só `workflow_dispatch`, via `deploy.sh`. Suíte pula com CI verde. `# deploy-paths:` aceita `!caminho`.
 - **Fim do grupo:** skill `integrate`: `gen-docs.sh`, `deploy.sh`, arquivar filhas, `end-check.sh`. Batimento some se todas as fases só esperam o dono.
@@ -14,7 +14,7 @@ Repositório criado a partir do template do método (`docs/process-design.md`). 
 - **Runner:** hospedado pelo GitHub (`ubuntu-latest`); a variável `CI_RUNS_ON` não está definida.
 - **Bots (caminho B):** nenhum webhook configurado; `docs/BOTS.md` e `.github/bots.tsv` trazem só exemplos.
 - **Projects:** sem quadro.
-- **Progresso:** scripts longos gravam o andamento em `~/.cache/ai-method/progress/`; `scripts/progress.sh` mostra ao dono.
+- **Progresso:** scripts longos gravam o andamento em `~/.cache/ai-method/progress/`; `.method/scripts/progress.sh` mostra ao dono.
 
 ## Pendente
 

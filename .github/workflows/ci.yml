@@ -10,16 +10,16 @@
 # cannot download actions: the step runs the command with CI_CHECKOUT_FULL=true
 # when the job needs the full history. The base is read with git archive.
 #
-# The verifiers that decide the gate (scripts/ci-gate.sh,
-# scripts/check-attribution.sh, scripts/check-docs.sh,
-# scripts/lib/sensitive_paths.py and .github/sensitive-paths) are read from the
+# The verifiers that decide the gate (.method/scripts/ci-gate.sh,
+# .method/scripts/check-attribution.sh, .method/scripts/check-docs.sh,
+# .method/scripts/lib/sensitive_paths.py and .github/sensitive-paths) are read from the
 # base commit of the PR, extracted at base/ (git archive): a PR cannot weaken the check
 # that judges it. On push to main the gate is read from github.sha (the commit
 # that carries this workflow). github.event.before is the previous main: the
 # adoption push has no verifiers there, and an update still has the old gate.
 # The first CI, when the base has no method, does not run the pull request's
 # checkers in the policy job (that job holds pull-requests: write). The
-# aggregator falls back to the gate of this commit only when base/scripts/ci-gate.sh
+# aggregator falls back to the gate of this commit only when base/.method/scripts/ci-gate.sh
 # is absent.
 name: "CI"
 run-name: "CI · ${{ github.event_name == 'push' && format('main · {0}', github.event.head_commit.message) || format('PR #{0} · {1}', github.event.pull_request.number, github.event.pull_request.title) }}"
@@ -276,7 +276,7 @@ jobs:
           set -euo pipefail
           mkdir -p base
           # Only what the base has: the base of an adoption PR has no method yet.
-          paths="$(git ls-tree --name-only "$BASE_SHA" -- .github scripts)"
+          paths="$(git ls-tree --name-only "$BASE_SHA" -- .github .method)"
           if [ -n "$paths" ]; then
             # shellcheck disable=SC2086
             git archive "$BASE_SHA" $paths | tar -x -C base
@@ -345,13 +345,13 @@ jobs:
           HEAD_SHA: ${{ github.event.pull_request.head.sha }}
           PR_BODY: ${{ github.event.pull_request.body }}
         run: |
-          if [ ! -f base/scripts/check-attribution.sh ]; then
+          if [ ! -f base/.method/scripts/check-attribution.sh ]; then
             echo "ok: base has no attribution checker (first CI); the checker of the pull request is not run beside the write token"
             exit 0
           fi
           printf '%s\n' "$PR_BODY" >"$RUNNER_TEMP/pr-body.md"
           base="$(git merge-base "$BASE_SHA" "$HEAD_SHA")"
-          base/scripts/check-attribution.sh --range "$base..$HEAD_SHA" --text-file "$RUNNER_TEMP/pr-body.md"
+          base/.method/scripts/check-attribution.sh --range "$base..$HEAD_SHA" --text-file "$RUNNER_TEMP/pr-body.md"
       - name: "Label sensitive paths with needs-owner-ok"
         env:
           GH_TOKEN: ${{ github.token }}
@@ -359,14 +359,14 @@ jobs:
           HEAD_SHA: ${{ github.event.pull_request.head.sha }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
         run: |
-          if [ ! -f base/scripts/lib/sensitive_paths.py ]; then
+          if [ ! -f base/.method/scripts/lib/sensitive_paths.py ]; then
             echo "ok: base has no sensitive-path checker (first CI); the checker of the pull request is not run beside the write token"
             exit 0
           fi
           # One path per line, read by any verifier of the base (the one of c1b76da
           # does not know -z lists). quotepath off keeps accented paths whole.
           git -c core.quotepath=off diff --name-only --no-renames "$BASE_SHA...$HEAD_SHA" >"$RUNNER_TEMP/touched.txt"
-          touched="$(python3 base/scripts/lib/sensitive_paths.py base/.github/sensitive-paths <"$RUNNER_TEMP/touched.txt")"
+          touched="$(python3 base/.method/scripts/lib/sensitive_paths.py base/.github/sensitive-paths <"$RUNNER_TEMP/touched.txt")"
           if [ -z "$touched" ]; then
             echo "no sensitive paths"
             exit 0
@@ -375,7 +375,7 @@ jobs:
           # A verifier of the base that knows the classes lists only owner-ok paths with
           # SENSITIVE_CLASS; an older one ignores it and lists everything, which keeps the
           # stricter label.
-          owner="$(SENSITIVE_CLASS=owner-ok python3 base/scripts/lib/sensitive_paths.py base/.github/sensitive-paths <"$RUNNER_TEMP/touched.txt")"
+          owner="$(SENSITIVE_CLASS=owner-ok python3 base/.method/scripts/lib/sensitive_paths.py base/.github/sensitive-paths <"$RUNNER_TEMP/touched.txt")"
           if [ -n "$owner" ]; then
             gh api "repos/$GITHUB_REPOSITORY/issues/$PR_NUMBER/labels" -f "labels[]=needs-owner-ok" >/dev/null
             echo "::notice::needs-owner-ok: this PR touches sensitive paths and needs the owner's ok"
@@ -387,11 +387,11 @@ jobs:
       # The checker of the base judges the docs of the PR.
       - name: "Check docs limits"
         run: |
-          if [ ! -f base/scripts/check-docs.sh ]; then
+          if [ ! -f base/.method/scripts/check-docs.sh ]; then
             echo "ok: base has no docs checker (first CI); the checker of the pull request is not run beside the write token"
             exit 0
           fi
-          REPO_ROOT="$PWD" base/scripts/check-docs.sh
+          REPO_ROOT="$PWD" base/.method/scripts/check-docs.sh
 
   lint:
     name: "Lint"
@@ -412,7 +412,7 @@ jobs:
           CI_CHECKOUT_FULL: "false"
         run: eval "$CI_CHECKOUT_CMD"
       - name: "Shellcheck and Python syntax"
-        run: scripts/validate.sh --lint
+        run: .method/scripts/validate.sh --lint
 
   tests:
     name: "Tests"
@@ -433,7 +433,7 @@ jobs:
           CI_CHECKOUT_FULL: "false"
         run: eval "$CI_CHECKOUT_CMD"
       - name: "Script and hook tests"
-        run: scripts/validate.sh --tests
+        run: .method/scripts/validate.sh --tests
       # Example: the app is only built here on the PR; deploy-example.yml
       # validates main, builds and deploys, by workflow_dispatch. Replace the
       # command with the build of your project.
@@ -491,7 +491,7 @@ jobs:
       - name: "Check workflow standard"
         env:
           PROCESS_CI_MODE: ${{ vars.PROCESS_CI_MODE }}
-        run: python3 scripts/check-workflows.py
+        run: python3 .method/scripts/check-workflows.py
 
   ci:
     name: "CI"
@@ -526,7 +526,7 @@ jobs:
           set -euo pipefail
           mkdir -p base
           # Only what the base has: the base of an adoption PR has no method yet.
-          paths="$(git ls-tree --name-only "$BASE_SHA" -- scripts)"
+          paths="$(git ls-tree --name-only "$BASE_SHA" -- .method)"
           if [ -n "$paths" ]; then
             # shellcheck disable=SC2086
             git archive "$BASE_SHA" $paths | tar -x -C base
@@ -535,9 +535,9 @@ jobs:
         env:
           NEEDS: ${{ toJSON(needs) }}
         run: |
-          if [ -f base/scripts/ci-gate.sh ]; then
-            base/scripts/ci-gate.sh
+          if [ -f base/.method/scripts/ci-gate.sh ]; then
+            base/.method/scripts/ci-gate.sh
           else
             echo "ok: base has no ci-gate.sh (first CI); using the gate of this commit"
-            scripts/ci-gate.sh
+            .method/scripts/ci-gate.sh
           fi

@@ -18,15 +18,15 @@
 # in any syntax or GIT_CONFIG_*), git commit -a/--all, git add/stage
 # -A/./:/ /-u, git push --force/-f/--mirror/+refspec, git reset --hard (also
 # abbreviated) and any direct PR merge (`gh pr merge`, `gh api …
-# pulls/N/merge`): the merge goes through scripts/close-phase.sh --merge.
+# pulls/N/merge`): the merge goes through .method/scripts/close-phase.sh --merge.
 # Also blocks the other ways around the gate: `gh api graphql` with a merge or
 # branch-protection mutation (inline, by -F query=@file or --input; a request
 # that cannot be read is blocked) and any write on …/branches/*/protection
 # (a method other than GET, or request fields, which make gh send a POST).
 # Also blocks `git clean` with `-f`/`--force` and `git branch -D` (or
-# `--delete --force`). Also blocks every deploy dispatch outside scripts/deploy.sh:
+# `--delete --force`). Also blocks every deploy dispatch outside .method/scripts/deploy.sh:
 # `gh workflow run`, `gh run rerun`, and `gh api` on a …/dispatches or …/rerun endpoint.
-# scripts/rerun-ci.sh is not one of those commands, so the hook does not swallow
+# .method/scripts/rerun-ci.sh is not one of those commands, so the hook does not swallow
 # it. A raw `gh run rerun` stays blocked, including a deploy rerun. Push --force,
 # reset --hard and a push to main are unchanged.
 #
@@ -459,7 +459,7 @@ def check_git(args, state, env):
     if sub == "commit":
         branch = state.switched or branch_of(target)
         if branch in ("main", "master"):
-            block("never commit on %s (open a phase branch with scripts/phase-start.sh)" % branch)
+            block("never commit on %s (open a phase branch with .method/scripts/phase-start.sh)" % branch)
         takes_value = {"-m", "-F", "-c", "-C", "-t", "--author", "--date", "--message",
                        "--file", "--template", "--cleanup", "--fixup", "--squash", "--trailer"}
         j = 0
@@ -604,10 +604,10 @@ def check_gh(args, state):
     if positional[:2] == ["pr", "merge"]:
         if "--admin" in args:
             block("never merge as admin; go through the gate (CI + review/independent)")
-        block("merge only with scripts/close-phase.sh --merge (checks needs-owner-ok and the gate, then --rebase)")
+        block("merge only with .method/scripts/close-phase.sh --merge (checks needs-owner-ok and the gate, then --rebase)")
     if positional[:1] == ["api"] and any(re.search(r"pulls/[0-9]+/merge", a) for a in args):
-        block("merge only with scripts/close-phase.sh --merge")
-    deploy_only = "deploy only with scripts/deploy.sh, run by the main session after the last merge"
+        block("merge only with .method/scripts/close-phase.sh --merge")
+    deploy_only = "deploy only with .method/scripts/deploy.sh, run by the main session after the last merge"
     if positional[:2] in (["workflow", "run"], ["run", "rerun"]):
         block(deploy_only)
     if positional[:1] == ["api"] and any(re.search(r"(^|/)(dispatches|rerun(-failed-jobs)?)/?([?#]|$)", a) for a in args):
@@ -616,7 +616,7 @@ def check_gh(args, state):
         return
     method, fields, files = gh_api_request(args)
     if any(PROTECTION_PATH.search(a) for a in args) and (method not in (None, "GET") or (method is None and fields)):
-        block("never write the branch protection by hand; it is set only by scripts/setup-repo.sh")
+        block("never write the branch protection by hand; it is set only by .method/scripts/setup-repo.sh")
     if positional[:2] == ["api", "graphql"]:
         # The query may come from a file: read it, and fail closed when it cannot be read.
         text = list(args)
@@ -628,7 +628,7 @@ def check_gh(args, state):
                 block("could not read the GraphQL request of this gh api call (%s); pass the query inline" % f)
         if any(GRAPHQL_GATE.search(t) for t in text):
             block("never merge or change the branch protection through GraphQL; "
-                  "merge only with scripts/close-phase.sh --merge")
+                  "merge only with .method/scripts/close-phase.sh --merge")
 
 
 # ---------- analysis ----------

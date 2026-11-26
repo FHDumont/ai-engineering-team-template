@@ -1,49 +1,49 @@
 #!/usr/bin/env bash
 # Tests of the affected-tests selection of validate.sh: in a phase it runs the tests
 # the diff against the base reaches, plus the gate tests; anything unmapped runs all.
-# shellcheck source=scripts/tests/lib.sh
+# shellcheck source=.method/scripts/tests/lib.sh
 source "$(dirname "$0")/lib.sh"
 
 repo="$(make_repo)"
-mkdir -p "$repo/scripts/lib" "$repo/scripts/tests"
-cp "$SCRIPTS/validate.sh" "$repo/scripts/validate.sh"
-cp "$SCRIPTS/lib/common.sh" "$SCRIPTS/lib/slots.sh" "$SCRIPTS/lib/progress.sh" "$SCRIPTS/lib/procs.sh" "$SCRIPTS/lib/machine-limits.env.example" "$repo/scripts/lib/"
+mkdir -p "$repo/.method/scripts/lib" "$repo/.method/scripts/tests"
+cp "$SCRIPTS/validate.sh" "$repo/.method/scripts/validate.sh"
+cp "$SCRIPTS/lib/common.sh" "$SCRIPTS/lib/slots.sh" "$SCRIPTS/lib/progress.sh" "$SCRIPTS/lib/procs.sh" "$SCRIPTS/lib/machine-limits.env.example" "$repo/.method/scripts/lib/"
 RAN="$TMP/ran.log"
 # Each test appends its own name to the log; alpha reads foo.sh, beta reads bar.sh,
 # gamma_gate is a gate test, pipefail is the scan of every script (always runs), delta reads wrapper.sh, which sources the library lib/util.sh.
 for t in alpha:foo.sh beta:bar.sh gamma_gate:gate.sh delta:wrapper.sh pipefail:nothing.sh; do
   name="${t%%:*}"; target="${t#*:}"
-  cat >"$repo/scripts/tests/test_$name.sh" <<P
+  cat >"$repo/.method/scripts/tests/test_$name.sh" <<P
 #!/usr/bin/env bash
 # reads $target
 echo $name >>"$RAN"
 P
 done
-printf '#!/usr/bin/env bash\necho foo\n' >"$repo/scripts/foo.sh"
-printf '#!/usr/bin/env bash\necho bar\n' >"$repo/scripts/bar.sh"
-printf '#!/usr/bin/env bash\necho gate\n' >"$repo/scripts/gate.sh"
-printf '#!/usr/bin/env bash\nsource lib/util.sh\n' >"$repo/scripts/wrapper.sh"
-mkdir -p "$repo/scripts/lib"
-echo 'x=1' >"$repo/scripts/lib/util.sh"
-printf '#!/usr/bin/env bash\necho lonely\n' >"$repo/scripts/lonely.sh"
-git -C "$repo" add scripts
+printf '#!/usr/bin/env bash\necho foo\n' >"$repo/.method/scripts/foo.sh"
+printf '#!/usr/bin/env bash\necho bar\n' >"$repo/.method/scripts/bar.sh"
+printf '#!/usr/bin/env bash\necho gate\n' >"$repo/.method/scripts/gate.sh"
+printf '#!/usr/bin/env bash\nsource lib/util.sh\n' >"$repo/.method/scripts/wrapper.sh"
+mkdir -p "$repo/.method/scripts/lib"
+echo 'x=1' >"$repo/.method/scripts/lib/util.sh"
+printf '#!/usr/bin/env bash\necho lonely\n' >"$repo/.method/scripts/lonely.sh"
+git -C "$repo" add .method
 git -C "$repo" commit --quiet -m "chore: scripts"
 git -C "$repo" checkout --quiet -b fix/issue-9-demo
 
 run() { # run <args...>: validate.sh --tests; the names of the tests that ran, sorted
   rm -f "$RAN"
-  (cd "$repo" && env -u CI -u PROCESS_VALIDATE_RUNNING scripts/validate.sh "$@") >"$TMP/v.out" 2>&1 || true
+  (cd "$repo" && env -u CI -u PROCESS_VALIDATE_RUNNING .method/scripts/validate.sh "$@") >"$TMP/v.out" 2>&1 || true
   sort "$RAN" 2>/dev/null | tr '\n' ' '
 }
 
 # A diff of one script: its test, the tests of the scripts that call it, and the gate tests.
-echo "# edit" >>"$repo/scripts/foo.sh"
+echo "# edit" >>"$repo/.method/scripts/foo.sh"
 git -C "$repo" commit --quiet -am "fix: foo"
 assert_eq "alpha gamma_gate pipefail " "$(run --tests)" "a diff of foo.sh runs its test and the gate tests"
 assert_contains "$(cat "$TMP/v.out")" "affected" "the output says the run is partial"
 
 # A shared library also runs the tests of the scripts that load it.
-echo "# edit" >>"$repo/scripts/lib/util.sh"
+echo "# edit" >>"$repo/.method/scripts/lib/util.sh"
 git -C "$repo" commit --quiet -am "fix: util"
 assert_eq "alpha delta gamma_gate pipefail " "$(run --tests)" "a diff of a lib runs the tests of the scripts that load it"
 git -C "$repo" reset --quiet --hard HEAD~1
@@ -51,11 +51,11 @@ git -C "$repo" reset --quiet --hard HEAD~1
 # --full runs everything, so does the CI.
 assert_eq "alpha beta delta gamma_gate pipefail " "$(run --tests --full)" "--full runs every test"
 rm -f "$RAN"
-(cd "$repo" && env -u PROCESS_VALIDATE_RUNNING CI=true scripts/validate.sh --tests) >/dev/null 2>&1 || true
+(cd "$repo" && env -u PROCESS_VALIDATE_RUNNING CI=true .method/scripts/validate.sh --tests) >/dev/null 2>&1 || true
 assert_eq "alpha beta delta gamma_gate pipefail " "$(sort "$RAN" | tr '\n' ' ')" "the CI runs every test"
 
 # A changed file no test reads: no map, run everything.
-echo "# edit" >>"$repo/scripts/lonely.sh"
+echo "# edit" >>"$repo/.method/scripts/lonely.sh"
 git -C "$repo" commit --quiet -am "fix: lonely"
 assert_eq "alpha beta delta gamma_gate pipefail " "$(run --tests)" "a changed file without a map runs everything"
 
@@ -74,7 +74,7 @@ assert_eq "alpha gamma_gate pipefail " "$(run --tests)" "a spec under docs/ does
 
 # A partial green run is recorded for --prepare: phase_validate on HEAD with scope=affected.
 ev="$TMP/events.jsonl"
-assert_status 0 "the partial run is green" env -u CI -u PROCESS_VALIDATE_RUNNING PROCESS_EVENTS_FILE="$ev" bash -c 'cd "$1" && scripts/validate.sh --lint --tests' _ "$repo"
+assert_status 0 "the partial run is green" env -u CI -u PROCESS_VALIDATE_RUNNING PROCESS_EVENTS_FILE="$ev" bash -c 'cd "$1" && .method/scripts/validate.sh --lint --tests' _ "$repo"
 assert_eq "affected $(git -C "$repo" rev-parse HEAD)" "$(jq -rs '[.[] | select(.event == "phase_validate")] | last | "\(.scope) \(.sha)"' "$ev")" "the partial green run is recorded on HEAD with scope=affected"
-assert_status 0 "--full is green" env -u CI -u PROCESS_VALIDATE_RUNNING PROCESS_EVENTS_FILE="$ev" bash -c 'cd "$1" && scripts/validate.sh --lint --tests --full' _ "$repo"
+assert_status 0 "--full is green" env -u CI -u PROCESS_VALIDATE_RUNNING PROCESS_EVENTS_FILE="$ev" bash -c 'cd "$1" && .method/scripts/validate.sh --lint --tests --full' _ "$repo"
 assert_eq "full" "$(jq -rs '[.[] | select(.event == "phase_validate")] | last | .scope' "$ev")" "a full run is recorded with scope=full"

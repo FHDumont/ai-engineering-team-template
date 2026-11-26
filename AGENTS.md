@@ -4,8 +4,8 @@ Método: `docs/process-design.md`. Estado em `docs/STATE.md`; decisões em `docs
 
 ## Rodar e testar
 
-- `scripts/validate.sh`: lint (shellcheck) e todos os testes. `scripts/check-docs.sh`: limites dos docs e desenho contra o repo.
-- Todo script tem `--help`. Histórico: `scripts/search-history.sh "termo"`.
+- `.method/scripts/validate.sh`: lint (shellcheck) e todos os testes. `.method/scripts/check-docs.sh`: limites dos docs e desenho contra o repo.
+- Todo script tem `--help`. Histórico: `.method/scripts/search-history.sh "termo"`.
 
 ## Idioma
 
@@ -13,15 +13,15 @@ Código novo e o do método, comentários, identificadores, nomes de arquivos, l
 
 ## Regras
 
-1. O dono nunca roda script do método nem mexe na configuração do método. Setup pré-aprovado e obrigatório: sem `scripts/setup-repo.sh --check` limpo nenhuma fase abre; em desvio, rode `scripts/setup-repo.sh`.
+1. O dono nunca roda script do método nem mexe na configuração do método. Setup pré-aprovado e obrigatório: sem `.method/scripts/setup-repo.sh --check` limpo nenhuma fase abre; em desvio, rode `.method/scripts/setup-repo.sh`.
 2. Toda decisão do dono é um quadro de escolha (`AskUserQuestion`) que começa por `Fase #n — título`. Só a principal pergunta; a filha pede só o ok da ação sensível (merge `needs-owner-ok`, `--abort --discard`), que não atravessa sessões. "Fechar fase" vale em qualquer sessão.
-3. Toda parada e mensagem final de turno termina com o bloco de `scripts/status.sh` (Estado, Você precisa, Próximo passo); cole a saída como está, fora de bloco de código. Estados: `trabalhando`, `esperando você`, `pronto` (`end-check.sh` limpo).
+3. Toda parada e mensagem final de turno termina com o bloco de `.method/scripts/status.sh` (Estado, Você precisa, Próximo passo); cole a saída como está, fora de bloco de código. Estados: `trabalhando`, `esperando você`, `pronto` (`end-check.sh` limpo).
 4. Paralelo é o preferido; skills carregam só na etapa (`triage`, `plan`, `execute`, `close-phase`, `integrate`, `ask-bot`, `setup`).
 5. Arquivos guardam só o estado atual, nada que o git repete.
-6. Nenhuma assinatura de IA em commits, PRs, issues ou comentários (coautoria, "Generated with", emoji). Comentário de agente ou bot leva o cabeçalho de autoria (`scripts/lib/author.sh`); sem ele é do dono.
+6. Nenhuma assinatura de IA em commits, PRs, issues ou comentários (coautoria, "Generated with", emoji). Comentário de agente ou bot leva o cabeçalho de autoria (`.method/scripts/lib/author.sh`); sem ele é do dono.
 7. Use o GitHub direto (`gh`); scripts só para fluxos repetidos.
 8. Todo agente é aberto com `model` e `effort` explícitos.
-9. "executar #n" passa pelo `plan`; a fase só abre por `scripts/phase-start.sh` (exige spec), sempre em sessão filha.
+9. "executar #n" passa pelo `plan`; a fase só abre por `.method/scripts/phase-start.sh` (exige spec), sempre em sessão filha.
 10. Do `gh auth`, só `status`; login e escopo: `process-design` §8.3.
 
 ## Execução
@@ -30,7 +30,7 @@ Código novo e o do método, comentários, identificadores, nomes de arquivos, l
 - Verificar antes de declarar feito: leia o fato de volta (`process-design` §2.1).
 - Bug começa com um teste que falha no código antigo.
 - Sem refatoração de carona.
-- Um commit por etapa. Achados: `scripts/open-issue.sh --type finding` com `size:*`.
+- Um commit por etapa. Achados: `.method/scripts/open-issue.sh --type finding` com `size:*`.
 
 ## Quando perguntar
 
@@ -40,8 +40,8 @@ Código novo e o do método, comentários, identificadores, nomes de arquivos, l
 
 ## Git
 
-- Nunca commitar na `main`; cada fase tem branch e worktree (`scripts/phase-start.sh`).
+- Nunca commitar na `main`; cada fase tem branch e worktree (`.method/scripts/phase-start.sh`).
 - Nunca `git add -A`, `git add .`, `git commit -a`; adicione arquivos pelo nome.
-- Merge só pelo portão (`CI` + `review/independent`) com `scripts/close-phase.sh --merge`, por rebase (o script faz), nunca `--squash` ou `--admin`.
+- Merge só pelo portão (`CI` + `review/independent`) com `.method/scripts/close-phase.sh --merge`, por rebase (o script faz), nunca `--squash` ou `--admin`.
 - Nunca `git push --force` nem `git reset --hard`.
 - Fim do grupo: skill `integrate`, pela principal.

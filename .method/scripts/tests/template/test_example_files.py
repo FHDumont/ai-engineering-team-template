@@ -3,7 +3,7 @@
 import os
 import unittest
 
-ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
+ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))))
 
 
 class ExampleFileTests(unittest.TestCase):
@@ -14,8 +14,8 @@ class ExampleFileTests(unittest.TestCase):
         self.assertIn("workflow_dispatch", on)
         self.assertNotIn("\n  push", "\n" + on)
         self.assertNotIn("pull_request", on)
-        self.assertIn("scripts/ci-already-green.sh", text)
-        self.assertIn("scripts/validate.sh", text)
+        self.assertIn(".method/scripts/ci-already-green.sh", text)
+        self.assertIn(".method/scripts/validate.sh", text)
         self.assertIn("steps.gate.outputs.skip", text)
 
     def test_app_readme_names_deploy(self):

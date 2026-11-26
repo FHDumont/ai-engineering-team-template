@@ -22,9 +22,9 @@
 #: registry ignore a line with no worktree.
 set -euo pipefail
 HERE="$(cd "$(dirname "$0")" && pwd)"
-# shellcheck source=scripts/lib/common.sh
+# shellcheck source=.method/scripts/lib/common.sh
 source "$HERE/lib/common.sh"
-# shellcheck source=scripts/lib/slots.sh
+# shellcheck source=.method/scripts/lib/slots.sh
 source "$HERE/lib/slots.sh"
 
 issues=() pass=()
@@ -59,7 +59,7 @@ if [ -s "$registry" ]; then
     for i in "${issues[@]}"; do [ "$i" != "$n" ] || left="$left #$n"; done
   done <"$registry"
   [ -z "$left" ] ||
-    die "$registry has leftover lines ($(echo $left)): run scripts/close-phase.sh --cleanup in the main checkout, or close-phase.sh --abort in the phase worktree"
+    die "$registry has leftover lines ($(echo $left)): run .method/scripts/close-phase.sh --cleanup in the main checkout, or close-phase.sh --abort in the phase worktree"
 fi
 
 # Enough phase slots for the whole group, before anything is created.
@@ -104,7 +104,7 @@ undo() {
   local p
   for p in ${opened[@]+"${opened[@]}"}; do
     echo "undoing the phase at $p"
-    (cd "$p" && "$p/scripts/close-phase.sh" --abort --discard) || echo "warn: could not undo $p" >&2
+    (cd "$p" && "$p/.method/scripts/close-phase.sh" --abort --discard) || echo "warn: could not undo $p" >&2
   done
   if [ "$dry" = 0 ] && [ "$all_pending" = 1 ]; then
     for n in "${issues[@]}"; do in_registry "$n" || registry_set "$n" pending; done
@@ -135,6 +135,6 @@ if [ "$dry" = 0 ]; then
   echo "registered ${#issues[@]} parallel phases in $registry"
   if [ "$free_now" -lt "${#issues[@]}" ]; then
     left=""; for n in "${issues[@]:$free_now}"; do left="$left #$n"; done
-    echo "pending:$left (no free phase slot for them now; scripts/phase-start.sh <issue> opens one when a slot is free)"
+    echo "pending:$left (no free phase slot for them now; .method/scripts/phase-start.sh <issue> opens one when a slot is free)"
   fi
 fi

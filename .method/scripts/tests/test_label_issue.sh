@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Tests of label-issue.sh.
-# shellcheck source=scripts/tests/lib.sh
+# shellcheck source=.method/scripts/tests/lib.sh
 source "$(dirname "$0")/lib.sh"
 LABEL="$SCRIPTS/label-issue.sh"
 

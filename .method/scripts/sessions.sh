@@ -25,11 +25,11 @@
 #:   (default 4).
 set -euo pipefail
 HERE="$(cd "$(dirname "$0")" && pwd)"
-# shellcheck source=scripts/lib/common.sh
+# shellcheck source=.method/scripts/lib/common.sh
 source "$HERE/lib/common.sh"
-# shellcheck source=scripts/lib/slots.sh
+# shellcheck source=.method/scripts/lib/slots.sh
 source "$HERE/lib/slots.sh"
-# shellcheck source=scripts/lib/procs.sh
+# shellcheck source=.method/scripts/lib/procs.sh
 source "$HERE/lib/procs.sh"
 
 [ $# -gt 0 ] || { print_help "$0"; exit 2; }

@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # The texts describe one path for the phase: child session only, how it is opened,
 # what happens when start_session is refused, and who closes it.
-# shellcheck source=scripts/tests/lib.sh
+# shellcheck source=.method/scripts/tests/lib.sh
 source "$(dirname "$0")/lib.sh"
 
 plan="$(cat "$REPO/.claude/skills/plan/SKILL.md")"
@@ -9,7 +9,7 @@ close="$(cat "$REPO/.claude/skills/close-phase/SKILL.md")"
 design="$(cat "$REPO/docs/process-design.md")"
 
 # The announced subagent is gone from every text and script.
-for f in AGENTS.md docs/process-design.md docs/STATE.md scripts/close-phase.sh \
+for f in AGENTS.md docs/process-design.md docs/STATE.md .method/scripts/close-phase.sh \
   .claude/skills/plan/SKILL.md .claude/skills/execute/SKILL.md .claude/skills/close-phase/SKILL.md; do
   assert_not_contains "$(cat "$REPO/$f")" "subagent-phases" "$f does not cite .process/subagent-phases"
   assert_not_contains "$(cat "$REPO/$f")" "anunciad" "$f has no announced subagent"
@@ -52,7 +52,7 @@ assert_not_contains "$close" "regera" "close-phase does not regenerate files in 
 assert_not_contains "$design" "Regera \`CHANGELOG.md\`" "the design does not regenerate files in the phase"
 assert_contains "$close" "posterior ao último push" "close-phase says a review needs a round after the last push"
 assert_contains "$integration" "só espera" "integration says integrate-parallel.sh only waits"
-# Deploy: one path, scripts/deploy.sh by the main session; no text sends the phase or
+# Deploy: one path, .method/scripts/deploy.sh by the main session; no text sends the phase or
 # close-phase.sh --merge to dispatch it.
 for name in .claude/skills/close-phase/SKILL.md .claude/skills/integrate/SKILL.md .claude/skills/integrate/integration.md \
   docs/process-design.md docs/STATE.md; do
@@ -87,8 +87,8 @@ assert_contains "$design" "block-card-title.sh" "the design lists the card hook"
 assert_contains "$design" "end-check.sh" "the design lists end-check.sh"
 # The end step is one text, in the integrate skill, the same for a solo and a parallel group;
 # the other texts point to it.
-assert_eq "scripts/gen-docs.sh scripts/deploy.sh archive_session scripts/end-check.sh" \
-  "$(printf '%s\n' "$integrate" | grep -oE 'scripts/gen-docs\.sh|scripts/deploy\.sh|archive_session|scripts/end-check\.sh' | awk '!seen[$0]++' | paste -sd' ' -)" \
+assert_eq ".method/scripts/gen-docs.sh .method/scripts/deploy.sh archive_session .method/scripts/end-check.sh" \
+  "$(printf '%s\n' "$integrate" | grep -oE '.method/scripts/gen-docs\.sh|.method/scripts/deploy\.sh|archive_session|.method/scripts/end-check\.sh' | awk '!seen[$0]++' | paste -sd' ' -)" \
   "integrate has the end step in order: gen-docs.sh, deploy.sh, archiving, end-check.sh"
 assert_contains "$integrate" "solo ou paralelo" "the end step is the same for a solo and a parallel group"
 assert_contains "$integrate" "tente de novo uma vez" "the main session retries the archiving by itself"
@@ -102,7 +102,7 @@ for name in .claude/skills/close-phase/SKILL.md .claude/skills/integrate/SKILL.m
   assert_not_contains "$text" "só após duas recusas" "$name has no archiving by the owner after two refusals"
   assert_not_contains "$text" "o script chamou" "$name has no deploy by integrate-parallel.sh"
   assert_not_contains "$text" '`integrate-parallel.sh` o chama' "$name has no deploy called by integrate-parallel.sh"
-  assert_not_contains "$text" "chama o \`scripts/deploy.sh\`" "$name has no script that calls deploy.sh"
+  assert_not_contains "$text" "chama o \`.method/scripts/deploy.sh\`" "$name has no script that calls deploy.sh"
   assert_not_contains "$text" "sai do registro à mão" "$name edits no registry by hand"
 done
 # Archiving the child sessions: the child leaves no live work behind, and the manager
@@ -174,10 +174,10 @@ was=8
 # with the old number and minutes (#44 had one) must not fail the suite.
 old_interval_in() {
   local root="$1" scope="."
-  # A method checkout is scanned only on method paths. A tiny fixture (no scripts/)
+  # A method checkout is scanned only on method paths. A tiny fixture (no .method/scripts/)
   # is scanned whole, still skipping the generated files.
-  if [ -e "$root/scripts" ] || [ -e "$root/AGENTS.md" ]; then
-    scope="$(method_existing "$root" | tr '\n' ' ') :!scripts/tests/template"
+  if [ -e "$root/.method/scripts" ] || [ -e "$root/AGENTS.md" ]; then
+    scope="$(method_existing "$root" | tr '\n' ' ') :!.method/scripts/tests/template"
     # The ADRs of the repo are its own text, not the method's, unless the manifest lists them.
     local adr
     for adr in $(cd "$root" && git ls-files --cached --others --exclude-standard 'docs/adr/ADR-[0-9][0-9][0-9]*.md'); do
@@ -189,12 +189,12 @@ old_interval_in() {
 }
 assert_eq "" "$(old_interval_in "$REPO")" "no file keeps the old interval of the heartbeat"
 # An untracked file with the old interval is visible before it is committed (#117).
-# Built in a copy: the real scripts/ is never written (#281).
+# Built in a copy: the real .method/scripts/ is never written (#281).
 untracked_repo="$(make_repo)"
 copy_scripts "$untracked_repo"
-printf 'a cada %s minutos\n' "$was" >"$untracked_repo/scripts/untracked-interval.md"
+printf 'a cada %s minutos\n' "$was" >"$untracked_repo/.method/scripts/untracked-interval.md"
 printf 'a cada %s minutos\n' "$was" >"$untracked_repo/not-method-interval.md"
-assert_contains "$(old_interval_in "$untracked_repo")" "scripts/untracked-interval.md" "an untracked method file with the old interval is found"
+assert_contains "$(old_interval_in "$untracked_repo")" ".method/scripts/untracked-interval.md" "an untracked method file with the old interval is found"
 assert_eq "" "$(old_interval_in "$untracked_repo" | grep not-method-interval.md || true)" "a file outside the method is not scanned"
 gen_repo="$(mktemp -d)"
 git -C "$gen_repo" init -q
@@ -208,7 +208,7 @@ rm -rf "$gen_repo"
 # End-step action denied by the app: one path, a choice card that authorizes and
 # the session itself runs the action again; the owner never runs a script.
 denied="$(printf '%s\n' "$integrate" | awk '/negada pelo app\. Caminho único/{p=1} /^[0-9]+\. /&&!/negada pelo app/{p=0} p')"
-assert_contains "$denied" "\`scripts/deploy.sh\`" "integrate covers the deploy denied by the app"
+assert_contains "$denied" "\`.method/scripts/deploy.sh\`" "integrate covers the deploy denied by the app"
 assert_contains "$denied" "\`archive_session\`" "integrate covers the archiving denied by the app"
 assert_contains "$denied" "quadro de escolha (\`AskUserQuestion\`) que começa por \`Fase #n — título\`" "integrate sends a denied action to a choice card"
 assert_contains "$denied" '"Autorizar o deploy"' "integrate names the option that authorizes the deploy"
@@ -221,7 +221,7 @@ assert_not_contains "$integrate" "arquivar a sessão\` e pare" "a session the ap
 # states a ceiling of start_session as a fact, and the texts send a divergence to check-env.sh.
 execute="$(cat "$REPO/.claude/skills/execute/SKILL.md")"
 sec3="$(printf '%s\n' "$design" | awk '/^## 3\. /{p=1; print; next} /^## /{p=0} p')"
-assert_contains "$sec3" "scripts/lib/weights.tsv" "section 3 names the weights file"
+assert_contains "$sec3" ".method/scripts/lib/weights.tsv" "section 3 names the weights file"
 assert_contains "$sec3" "o app não garante" "section 3 says the app does not guarantee the pair"
 assert_contains "$sec3" "phase_pair_mismatch" "section 3 says what a divergence records"
 assert_contains "$sec3" "trace-view.py --pairs" "section 3 says the script writes the PR table"
@@ -257,7 +257,7 @@ done
 assert_contains "$execute" "rode nesta sessão cada verificação que é script" "execute runs the script checks in the session at lab-test"
 for f in .claude/skills/*/SKILL.md; do
   lab="$(grep 'lab-test' "$REPO/$f" || true)"
-  assert_not_contains "$lab" "rode scripts/" "$f lab-test text never asks the owner to run scripts/"
+  assert_not_contains "$lab" "rode .method/scripts/" "$f lab-test text never asks the owner to run .method/scripts/"
   case "$lab" in *"rode o scripts"*|*"rode o \`scripts"*) bad "$f lab-test text asks the owner to run a script" ;; *) ok ;; esac
 done
 

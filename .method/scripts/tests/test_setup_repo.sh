@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Tests of setup-repo.sh: the --dry-run diff, applying, and idempotence.
-# shellcheck source=scripts/tests/lib.sh
+# shellcheck source=.method/scripts/tests/lib.sh
 source "$(dirname "$0")/lib.sh"
 SETUP="$SCRIPTS/setup-repo.sh"
 # #272: this test must never write the real .github/required-checks. A test running at the
@@ -142,7 +142,7 @@ H
 XREPO="$(make_repo)"
 copy_scripts "$XREPO"
 mkdir -p "$XREPO/.github"
-XSETUP="$XREPO/scripts/setup-repo.sh"
+XSETUP="$XREPO/.method/scripts/setup-repo.sh"
 export TMP
 use_fake_gh "$TMP/extra-prot.sh"
 touch "$TMP/protected" "$TMP/keep-security"

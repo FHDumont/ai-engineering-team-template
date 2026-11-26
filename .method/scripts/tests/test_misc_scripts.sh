@@ -1,13 +1,13 @@
 #!/usr/bin/env bash
 # Tests for search-history, measure-session and the --help of every script.
-# shellcheck source=scripts/tests/lib.sh
+# shellcheck source=.method/scripts/tests/lib.sh
 source "$(dirname "$0")/lib.sh"
 
 # A script that is not part of the method must not be executed (issue #92).
-# The sentinel lives in a copy: the real scripts/ is never written (#281).
+# The sentinel lives in a copy: the real .method/scripts/ is never written (#281).
 copy="$(make_repo)"
 copy_scripts "$copy"
-CSCRIPTS="$copy/scripts"
+CSCRIPTS="$copy/.method/scripts"
 # copy_scripts stubs these two; their --help is read from the real ones.
 cp "$SCRIPTS/validate.sh" "$SCRIPTS/check-docs.sh" "$CSCRIPTS/"
 sentinel="$CSCRIPTS/zz-not-a-method-script.sh"
@@ -21,7 +21,7 @@ exit 0
 EOF
 chmod +x "$sentinel"
 
-# Closed list of the method's scripts. Never a glob of scripts/: an adopted
+# Closed list of the method's scripts. Never a glob of .method/scripts/: an adopted
 # repository keeps the application's scripts in that directory (issue #92).
 for name in \
   archive-adr.sh ask-bot.sh auto-label.py check-attribution.sh check-docs.sh \
@@ -41,7 +41,7 @@ do
   assert_contains "$(printf '%s' "$out" | tr '[:upper:]' '[:lower:]')" "usage" "$(basename "$s") --help shows usage in English"
   assert_not_contains "$out" "Uso:" "$(basename "$s") --help has no Portuguese usage"
 done
-[ ! -f "$marker" ] && ok || bad "a sentinel script in scripts/ was executed"
+[ ! -f "$marker" ] && ok || bad "a sentinel script in .method/scripts/ was executed"
 rm -f "$sentinel"
 
 repo="$(make_repo)"

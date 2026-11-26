@@ -4,14 +4,14 @@
 # Applies to git commit, gh pr create|edit|comment|review|close and gh issue
 # create|comment|edit|close. Checks the command, each of its arguments (the body
 # passed in --body, --comment or -m is an argument) and the files named by
-# --body-file/-F/--file, with scripts/check-attribution.sh.
+# --body-file/-F/--file, with .method/scripts/check-attribution.sh.
 # A signature opens a line of an argument or of a file; text that only cites
 # the rule in the middle of a sentence passes.
 # Blocks with exit 2 and the reason on stderr.
 set -euo pipefail
 here="$(cd "$(dirname "$0")" && pwd)"
-# shellcheck source=scripts/lib/common.sh
-source "$here/../../scripts/lib/common.sh"
+# shellcheck source=.method/scripts/lib/common.sh
+source "$here/../../.method/scripts/lib/common.sh"
 
 input="$(cat)"
 cmd="$(printf '%s' "$input" | jq -r '.tool_input.command // empty')"
@@ -24,8 +24,8 @@ if ! printf '%s' "$cmd" | stdin_grep -qE '(^|[;&| ])(git( +-C +[^ ]+)? +commit|g
 fi
 
 # The checker lives in the repository of the command (worktree), else next to the hook.
-checker="$(git -C "$cwd" rev-parse --show-toplevel 2>/dev/null || true)/scripts/check-attribution.sh"
-[ -x "$checker" ] || checker="$here/../../scripts/check-attribution.sh"
+checker="$(git -C "$cwd" rev-parse --show-toplevel 2>/dev/null || true)/.method/scripts/check-attribution.sh"
+[ -x "$checker" ] || checker="$here/../../.method/scripts/check-attribution.sh"
 
 text="$cmd"
 # Each argument on its own lines: the value of --body "…" or --body=… starts a line.

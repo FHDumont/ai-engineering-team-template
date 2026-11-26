@@ -1,14 +1,14 @@
 #!/usr/bin/env bash
 # A copied method file must not cite a bare #n (#147).
-# shellcheck source=scripts/tests/lib.sh
+# shellcheck source=.method/scripts/tests/lib.sh
 source "$(dirname "$0")/lib.sh"
 out="$(python3 - "$REPO" <<'PY'
 import os, re, sys
 root = sys.argv[1]
 pat = re.compile(r"(?<![A-Za-z0-9_/])#([0-9]{1,4})(?![0-9A-Za-z])")
-skip = ("/scripts/tests/", "/.claude/hooks/tests/")
+skip = ("/.method/scripts/tests/", "/.claude/hooks/tests/")
 bad = []
-# Only the files of the method: the manifest, scripts/lib/ and the two workflows. A repo
+# Only the files of the method: the manifest, .method/scripts/lib/ and the two workflows. A repo
 # that adopts the method has scripts of its own that may cite #n (#245).
 manifest = set()
 mf = os.path.join(root, ".github", "method-files.txt")
@@ -18,7 +18,7 @@ if os.path.exists(mf):
         if l and not l.startswith("#"):
             manifest.add(l.rstrip("/"))
 def in_method(rel):
-    if rel.startswith("scripts/lib/") or rel in ("docs/process-design.md", ".github/workflows/ci.yml", ".github/workflows/issues-label.yml"):
+    if rel.startswith(".method/scripts/lib/") or rel in ("docs/process-design.md", ".github/workflows/ci.yml", ".github/workflows/issues-label.yml"):
         return True
     return rel in manifest or any(rel.startswith(m + "/") for m in manifest)
 for dirpath, _, files in os.walk(root):
@@ -27,7 +27,7 @@ for dirpath, _, files in os.walk(root):
         rel = os.path.relpath(path, root)
         if any(s in "/" + rel for s in skip):
             continue
-        if not rel.startswith(("docs/process-design.md", "scripts/", ".github/workflows/")):
+        if not rel.startswith(("docs/process-design.md", ".method/scripts/", ".github/workflows/")):
             continue
         if not in_method(rel):
             continue

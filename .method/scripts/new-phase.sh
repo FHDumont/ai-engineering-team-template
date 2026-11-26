@@ -24,15 +24,15 @@
 #: and frees the slot: the same opening works again with no cleanup by hand.
 #: phase_opened is recorded only after that check succeeds, so a failed opening
 #: does not count as a phase start in the trace.
-#: Each step goes to ~/.cache/ai-method/progress/ (scripts/progress.sh), never to the
+#: Each step goes to ~/.cache/ai-method/progress/ (.method/scripts/progress.sh), never to the
 #: output; --dry-run records nothing.
 set -euo pipefail
 HERE="$(cd "$(dirname "$0")" && pwd)"
-# shellcheck source=scripts/lib/common.sh
+# shellcheck source=.method/scripts/lib/common.sh
 source "$HERE/lib/common.sh"
-# shellcheck source=scripts/lib/slots.sh
+# shellcheck source=.method/scripts/lib/slots.sh
 source "$HERE/lib/slots.sh"
-# shellcheck source=scripts/lib/progress.sh
+# shellcheck source=.method/scripts/lib/progress.sh
 source "$HERE/lib/progress.sh"
 
 [ $# -gt 0 ] || { print_help "$0"; exit 2; }
@@ -83,7 +83,7 @@ branch="$type/issue-$issue-$slug"
 path="$main_root/.worktrees/issue-$issue"
 
 # A configured board must accept writes before anything opens (--dry-run included).
-# shellcheck source=scripts/lib/project.sh
+# shellcheck source=.method/scripts/lib/project.sh
 source "$HERE/lib/project.sh"
 progress_step "checking the board"
 project_preflight || die "phase #$issue not opened: the board cannot be written (cause and fix above)"
@@ -155,7 +155,7 @@ if [ ${#added[@]} -gt 0 ]; then
 fi
 if [ "$check" = 1 ]; then
   progress_step "checking the environment (check-env.sh)"
-  (cd "$path" && CHECK_ENV_OPENING=1 "$path/scripts/check-env.sh")
+  (cd "$path" && CHECK_ENV_OPENING=1 "$path/.method/scripts/check-env.sh")
 fi
 # phase_opened is recorded only once the opening has succeeded. A check that
 # refuses undoes the worktree and must not count as a phase start: the trace

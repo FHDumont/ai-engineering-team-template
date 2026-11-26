@@ -7,11 +7,11 @@ import sys
 import time
 import unittest
 
-ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 
 
 def load(name):
-    spec = importlib.util.spec_from_file_location(name.replace("-", "_"), os.path.join(ROOT, "scripts", name + ".py"))
+    spec = importlib.util.spec_from_file_location(name.replace("-", "_"), os.path.join(ROOT, ".method", "scripts", name + ".py"))
     mod = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(mod)
     return mod
@@ -95,7 +95,7 @@ class OptionTests(unittest.TestCase):
     # Options nobody calls are gone: the files are generated once, by
     # gen-docs.sh, after the merges, so no PR or issue is counted ahead of time.
     def refused(self, script, *args):
-        run = subprocess.run([sys.executable, os.path.join(ROOT, "scripts", script), "--output", "-"] + list(args),
+        run = subprocess.run([sys.executable, os.path.join(ROOT, ".method", "scripts", script), "--output", "-"] + list(args),
                              text=True, capture_output=True)
         self.assertEqual(2, run.returncode, run.stderr)
         self.assertIn("unrecognized arguments", run.stderr)

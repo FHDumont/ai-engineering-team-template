@@ -19,9 +19,9 @@ phase_guard() {
   local top
   [ -n "$1" ] && [ -n "${CLAUDE_CODE_SESSION_ID:-}" ] || return 0
   top="$(git rev-parse --show-toplevel 2>/dev/null || true)"
-  [ -f "$top/scripts/lib/common.sh" ] || return 0
-  # shellcheck source=scripts/lib/common.sh
-  source "$top/scripts/lib/common.sh"
+  [ -f "$top/.method/scripts/lib/common.sh" ] || return 0
+  # shellcheck source=.method/scripts/lib/common.sh
+  source "$top/.method/scripts/lib/common.sh"
   [ "$(phase_opener_state "$1" "$CLAUDE_CODE_SESSION_ID" "$top")" = opener ] || return 0
   echo "$2: this session opened phase #$1 and must not write to it; the child session executes it (process-design §4.3)" >&2
   return 1
@@ -36,11 +36,11 @@ phase_require_session() {
   local top trace sid="${CLAUDE_CODE_SESSION_ID:-}"
   [ -n "$1" ] || return 0
   top="$(git rev-parse --show-toplevel 2>/dev/null || true)"
-  [ -f "$top/scripts/lib/common.sh" ] || return 0
-  # shellcheck source=scripts/lib/common.sh
-  source "$top/scripts/lib/common.sh"
+  [ -f "$top/.method/scripts/lib/common.sh" ] || return 0
+  # shellcheck source=.method/scripts/lib/common.sh
+  source "$top/.method/scripts/lib/common.sh"
   if [ -z "$sid" ]; then
-    echo "$2: no session id: phase_session of #$1 was not checked (run scripts/check-env.sh in the child session)" >&2
+    echo "$2: no session id: phase_session of #$1 was not checked (run .method/scripts/check-env.sh in the child session)" >&2
     return 0
   fi
   [ "$(phase_opener_state "$1" "$sid" "$top")" = opener ] && return 0
@@ -49,13 +49,13 @@ phase_require_session() {
     return 1
   }
   [ -f "$trace" ] || {
-    echo "$2: this session has no phase_session of issue #$1: run scripts/check-env.sh in the phase worktree" >&2
+    echo "$2: this session has no phase_session of issue #$1: run .method/scripts/check-env.sh in the phase worktree" >&2
     return 1
   }
   jq -e -rs --arg s "$sid" --arg i "$1" '
     any(.[]; type == "object" and .event == "phase_session" and .session_id == $s and ((.issue | tostring) == $i))
   ' "$trace" >/dev/null 2>&1 || {
-    echo "$2: this session has no phase_session of issue #$1: run scripts/check-env.sh in the phase worktree" >&2
+    echo "$2: this session has no phase_session of issue #$1: run .method/scripts/check-env.sh in the phase worktree" >&2
     return 1
   }
   return 0

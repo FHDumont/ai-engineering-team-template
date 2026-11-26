@@ -18,11 +18,11 @@
 #: exits != 0 with the cause and the fix (lib/project.sh).
 set -euo pipefail
 HERE="$(cd "$(dirname "$0")" && pwd)"
-# shellcheck source=scripts/lib/common.sh
+# shellcheck source=.method/scripts/lib/common.sh
 source "$HERE/lib/common.sh"
-# shellcheck source=scripts/lib/role.sh
+# shellcheck source=.method/scripts/lib/role.sh
 source "$HERE/lib/role.sh"
-ROOT="$(cd "$HERE/.." && pwd)"
+ROOT="$(cd "$HERE/../.." && pwd)"
 
 type="" title="" dry=0
 values='{}'
@@ -106,9 +106,9 @@ num="$(printf '%s\n' "$url" | sed -n -E 's#^https://.*/issues/([0-9]+)$#\1#p' | 
 have="$(gh issue view "$num" --repo "$repo" --json labels --jq '.labels[].name')" ||
   die "issue #$num not confirmed on read back (gh issue view failed)"
 for l in $labels; do
-  printf '%s\n' "$have" | stdin_grep -qxF "$l" || die "issue #$num was created without the label $l (read back); fix: scripts/label-issue.sh $num --add $l"
+  printf '%s\n' "$have" | stdin_grep -qxF "$l" || die "issue #$num was created without the label $l (read back); fix: .method/scripts/label-issue.sh $num --add $l"
 done
 echo "$url"
-# shellcheck source=scripts/lib/project.sh
+# shellcheck source=.method/scripts/lib/project.sh
 source "$HERE/lib/project.sh"
 project_set_status "$num" "Todo" || die "issue #$num was created, but it is not on the board (cause and fix above)"

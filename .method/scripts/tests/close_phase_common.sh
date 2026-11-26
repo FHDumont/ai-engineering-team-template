@@ -2,7 +2,7 @@
 # Shared setup of the close-phase.sh tests (test_close_phase*.sh): a temporary repo with a
 # local "origin", the trace helpers and the fake gh handler. Sourced, never run alone.
 # shellcheck disable=SC2034  # the variables are read by the test files that source this one
-# shellcheck source=scripts/tests/lib.sh
+# shellcheck source=.method/scripts/tests/lib.sh
 source "$(dirname "$0")/lib.sh"
 
 # Clones the scripts into a temporary repo with a local "origin" remote.
@@ -11,10 +11,10 @@ mkdir -p "$repo/.github"
 # copy_scripts stubs validate.sh and check-docs.sh before the first close-phase.sh
 # call: --prepare never reaches the real suite from here, whatever the gate answers.
 copy_scripts "$repo"
-assert_contains "$(cat "$repo/scripts/validate.sh")" "ok: stub" "validate.sh is a stub from the copy on"
-assert_contains "$(cat "$repo/scripts/check-docs.sh")" "ok: stub" "check-docs.sh is a stub from the copy on"
+assert_contains "$(cat "$repo/.method/scripts/validate.sh")" "ok: stub" "validate.sh is a stub from the copy on"
+assert_contains "$(cat "$repo/.method/scripts/check-docs.sh")" "ok: stub" "check-docs.sh is a stub from the copy on"
 cp "$REPO/.github/sensitive-paths" "$REPO/.github/labels.tsv" "$repo/.github/"
-git -C "$repo" add scripts .github
+git -C "$repo" add .method .github
 git -C "$repo" commit --quiet -m "chore: scripts"
 remote="$TMP/remote.git"
 git clone --quiet --bare "$repo" "$remote"
@@ -58,7 +58,7 @@ git -C "$repo" add feature.txt
 git -C "$repo" commit --quiet -m "feat: x"
 git -C "$repo" push --quiet origin feat/issue-5-x
 SHA="$(git -C "$repo" rev-parse HEAD)"
-CLOSE="$repo/scripts/close-phase.sh"
+CLOSE="$repo/.method/scripts/close-phase.sh"
 
 handler() { # handler <comma-separated labels> <review state>
   cat >"$TMP/handler.sh" <<H

@@ -10,7 +10,7 @@
 #: exits 1 and moves nothing; at the end it reads the file and the line back.
 set -euo pipefail
 HERE="$(cd "$(dirname "$0")" && pwd)"
-# shellcheck source=scripts/lib/common.sh
+# shellcheck source=.method/scripts/lib/common.sh
 source "$HERE/lib/common.sh"
 
 [ $# -gt 0 ] || { print_help "$0"; exit 2; }
@@ -25,7 +25,7 @@ while [ $# -gt 0 ]; do
   esac
 done
 [ -n "$by" ] || die "--by is required" 2
-ROOT="${REPO_ROOT:-$(cd "$HERE/.." && pwd)}"
+ROOT="${REPO_ROOT:-$(cd "$HERE/../.." && pwd)}"
 cd "$ROOT"
 
 # ADR-NNN-title.md or ADR-NNN.md. A repository that already numbered its

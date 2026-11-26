@@ -18,7 +18,7 @@
 GH_SCOPES="gist,project,read:org,repo,workflow"
 GH_LOGIN_CMD="gh auth login -h github.com -p https -w -s $GH_SCOPES"
 PROJECT_FIX_SCOPE="$GH_LOGIN_CMD (only the owner runs it and logs in on the browser; an agent never types the device code)"
-PROJECT_FIX_SETUP="scripts/setup-repo.sh --project (recreates what the board is missing)"
+PROJECT_FIX_SETUP=".method/scripts/setup-repo.sh --project (recreates what the board is missing)"
 
 project_fail() { # project_fail <cause> <fix>
   echo "error: $1" >&2

@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # A self-reported reviewer pair is replaced by the pair in the trace (issue #127).
-# shellcheck source=scripts/tests/close_phase_common.sh
+# shellcheck source=.method/scripts/tests/close_phase_common.sh
 source "$(dirname "$0")/close_phase_common.sh"
 
 handler "type:feature" success

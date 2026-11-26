@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Tests of check-attribution.sh: an AI trailer must fail.
-# shellcheck source=scripts/tests/lib.sh
+# shellcheck source=.method/scripts/tests/lib.sh
 source "$(dirname "$0")/lib.sh"
 CHECK="$SCRIPTS/check-attribution.sh"
 

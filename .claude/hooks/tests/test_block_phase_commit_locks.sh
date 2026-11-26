@@ -8,7 +8,7 @@ blocked child "$wt" 'CLAUDE_CODE_SESSION_ID=x git commit -m x'
 blocked child "$wt" 'env -u CLAUDE_CODE_SESSION_ID git commit -m x'
 blocked child "$main" 'unset CLAUDE_CODE_SESSION_ID'
 blocked child "$main" "export PROCESS_EVENTS_FILE=$TMP/other.jsonl"
-blocked child "$main" "PROCESS_EVENTS_FILE=$TMP/other.jsonl scripts/close-phase.sh --merge"
+blocked child "$main" "PROCESS_EVENTS_FILE=$TMP/other.jsonl .method/scripts/close-phase.sh --merge"
 blocked child "$main" "echo '{\"event\":\"phase_session\"}' >> .process/events.jsonl"
 blocked child "$main" "echo x | tee -a $main/.process/events.jsonl"
 allowed child "$main" 'echo "$CLAUDE_CODE_SESSION_ID"'

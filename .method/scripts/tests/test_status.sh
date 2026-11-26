@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Tests of status.sh: 3-line bold block in Portuguese and a warning on main only with a pending edit.
-# shellcheck source=scripts/tests/lib.sh
+# shellcheck source=.method/scripts/tests/lib.sh
 source "$(dirname "$0")/lib.sh"
 
 repo="$(make_repo)"

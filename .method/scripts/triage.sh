@@ -11,7 +11,7 @@
 #: An issue asked for that is not open is left out, with a warning on stderr.
 set -euo pipefail
 HERE="$(cd "$(dirname "$0")" && pwd)"
-# shellcheck source=scripts/lib/common.sh
+# shellcheck source=.method/scripts/lib/common.sh
 source "$HERE/lib/common.sh"
 
 include_test=0 limit=200 runner_offer=0 only="[]"
@@ -28,7 +28,7 @@ while [ $# -gt 0 ]; do
   esac
 done
 require_cmd gh jq
-# shellcheck source=scripts/lib/runner_offer.sh
+# shellcheck source=.method/scripts/lib/runner_offer.sh
 source "$HERE/lib/runner_offer.sh"
 
 if [ "$runner_offer" = 1 ]; then

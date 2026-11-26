@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Tests of path B: notify-bot, wait-reply, ask-bot and summarize-thread (simulated).
-# shellcheck source=scripts/tests/lib.sh
+# shellcheck source=.method/scripts/tests/lib.sh
 source "$(dirname "$0")/lib.sh"
 
 # Stateful fake gh: the posted comment is kept in $TMP/posted and joins the list;
@@ -279,14 +279,14 @@ assert_not_contains "$rows" "#" "comment lines are dropped"
 assert_eq "$(grep -vc -e '^#' -e '<slug>' "$REPO/.github/labels.tsv")" "$(BOTS_FILE="$TMP/missing.tsv" bash -c 'source "$1/lib/common.sh"; label_rows "$2"' _ "$SCRIPTS" "$REPO/.github/labels.tsv" | wc -l | tr -d ' ')" "with no bots file the fixed labels remain"
 assert_status 0 "label-issue accepts the ask label of a bot" env BOTS_FILE="$TMP/bots.tsv" "$SCRIPTS/label-issue.sh" 3 --add ask:solo --dry-run
 assert_status 1 "label-issue refuses the ask label of an unknown bot" env BOTS_FILE="$TMP/bots.tsv" "$SCRIPTS/label-issue.sh" 3 --add ask:bot-a --dry-run
-[ ! -e "$SCRIPTS/lib/bots.tsv" ] && ok || bad "scripts/lib/ holds no bot list"
+[ ! -e "$SCRIPTS/lib/bots.tsv" ] && ok || bad ".method/scripts/lib/ holds no bot list"
 
 # An untracked file with a bot name is found before it is committed (#117).
-# Built in a copy: the real scripts/ is never written (#281).
+# Built in a copy: the real .method/scripts/ is never written (#281).
 bot_repo="$(make_repo)"
-mkdir -p "$bot_repo/scripts"
-printf 'solo-bot-untracked\n' >"$bot_repo/scripts/untracked-bot-name.txt"
-bot_hits="$(cd "$bot_repo" && git ls-files -co --exclude-standard scripts | tr '\n' '\0' | xargs -0 grep -nHF -- 'solo-bot-untracked' 2>/dev/null || true)"
+mkdir -p "$bot_repo/.method/scripts"
+printf 'solo-bot-untracked\n' >"$bot_repo/.method/scripts/untracked-bot-name.txt"
+bot_hits="$(cd "$bot_repo" && git ls-files -co --exclude-standard .method/scripts | tr '\n' '\0' | xargs -0 grep -nHF -- 'solo-bot-untracked' 2>/dev/null || true)"
 assert_contains "$bot_hits" "untracked-bot-name.txt" "an untracked file with a forbidden token is found"
 
 # Names of one repository (the list of docs/repo-notes.md, when the file exists) stay out of
@@ -300,12 +300,12 @@ name_hits() { # name_hits <repo> <names, one per line>
   [ -n "$names" ] || return 0
   # The set check-docs.sh scans: the design, AGENTS.md, skills, and the method's scripts
   # and hooks. STATE, BOTS, CONTEXT and the ADRs belong to the repository and may cite its names.
-  paths="$(method_existing "$repo" | grep -E '^(docs/process-design\.md|AGENTS\.md|\.claude/(skills|hooks)|\.githooks|scripts)$' || true)"
+  paths="$(method_existing "$repo" | grep -E '^(docs/process-design\.md|AGENTS\.md|\.claude/(skills|hooks)|\.githooks|\.method/scripts)$' || true)"
   [ -n "$paths" ] || return 0
   while IFS= read -r name; do
     [ -n "$name" ] || continue
     # shellcheck disable=SC2086
-    one="$(cd "$repo" && git grep -nI --untracked -F -e "$name" -- $paths ':!scripts/tests/template' ':!.github/bots.tsv' ':!docs/repo-notes.md' 2>/dev/null || true)"
+    one="$(cd "$repo" && git grep -nI --untracked -F -e "$name" -- $paths ':!.method/scripts/tests/template' ':!.github/bots.tsv' ':!docs/repo-notes.md' 2>/dev/null || true)"
     hits="$hits$one"
   done <<<"$names"
   printf '%s' "$hits" | cut -c1-120
@@ -314,11 +314,11 @@ if [ -f "$REPO/docs/repo-notes.md" ]; then
   assert_eq "" "$(name_hits "$REPO" "$(repo_only_names "$REPO/docs/repo-notes.md")")" "the method's code cites no repository-only name"
 fi
 empty_repo="$(make_repo)"
-mkdir -p "$empty_repo/scripts" "$empty_repo/docs" "$empty_repo/.github/workflows"
-echo 'method' >"$empty_repo/scripts/keep.sh"
+mkdir -p "$empty_repo/.method/scripts" "$empty_repo/docs" "$empty_repo/.github/workflows"
+echo 'method' >"$empty_repo/.method/scripts/keep.sh"
 printf '# Notas\n\n## Nomes só deste repositório\n\n(nenhum nome)\n' >"$empty_repo/docs/repo-notes.md"
 printf 'name: build\nruns-on: project-runner-99\n' >"$empty_repo/.github/workflows/build.yml"
-git -C "$empty_repo" add scripts docs .github && git -C "$empty_repo" commit --quiet -m "chore: fixture"
+git -C "$empty_repo" add .method docs .github && git -C "$empty_repo" commit --quiet -m "chore: fixture"
 assert_eq "" "$(name_hits "$empty_repo" "$(repo_only_names "$empty_repo/docs/repo-notes.md")")" "an empty name list does not fail the scan"
 printf '\n- `project-runner-99`\n' >>"$empty_repo/docs/repo-notes.md"
 assert_eq "" "$(name_hits "$empty_repo" "$(repo_only_names "$empty_repo/docs/repo-notes.md")")" "a name only outside the method is not a hit"
@@ -327,7 +327,7 @@ echo 'project-runner-99' >"$empty_repo/docs/STATE.md"
 echo 'project-runner-99' >"$empty_repo/docs/BOTS.md"
 echo 'project-runner-99' >"$empty_repo/docs/adr/0001-x.md"
 assert_eq "" "$(name_hits "$empty_repo" "$(repo_only_names "$empty_repo/docs/repo-notes.md")")" "a name in STATE, BOTS or an ADR is not a hit"
-echo 'project-runner-99' >>"$empty_repo/scripts/keep.sh"
-assert_contains "$(name_hits "$empty_repo" "$(repo_only_names "$empty_repo/docs/repo-notes.md")")" "scripts/keep.sh" "a name inside a method file is a hit"
+echo 'project-runner-99' >>"$empty_repo/.method/scripts/keep.sh"
+assert_contains "$(name_hits "$empty_repo" "$(repo_only_names "$empty_repo/docs/repo-notes.md")")" ".method/scripts/keep.sh" "a name inside a method file is a hit"
 
 finish

@@ -6,8 +6,8 @@
 #:
 #: The only way to dispatch a deploy. Run by the main session, from the main
 #: checkout, after the last phase of the group is merged and after
-#: scripts/gen-docs.sh, in the end step of the group (the same for a solo and a
-#: parallel group). The workflow itself runs scripts/validate.sh on main before
+#: .method/scripts/gen-docs.sh, in the end step of the group (the same for a solo and a
+#: parallel group). The workflow itself runs .method/scripts/validate.sh on main before
 #: the build.
 #:
 #: Refuses (exit 1), dispatching nothing, when:
@@ -30,7 +30,7 @@
 #:   - otherwise dispatches once (workflow_dispatch on main), prints the run URL
 #:     and waits for the run (default 1800 s, read every 15 s).
 #:
-#: --check only reads (scripts/end-check.sh calls it): no refusal above applies,
+#: --check only reads (.method/scripts/end-check.sh calls it): no refusal above applies,
 #: nothing is dispatched and nothing is waited for. Exits 5 when a workflow
 #: still has a deploy to do or a run still going on the SHA of main.
 #:
@@ -38,7 +38,7 @@
 #: in time; 4 a run finished without success; 5 (--check) deploy not done.
 set -euo pipefail
 HERE="$(cd "$(dirname "$0")" && pwd)"
-# shellcheck source=scripts/lib/common.sh
+# shellcheck source=.method/scripts/lib/common.sh
 source "$HERE/lib/common.sh"
 
 usage_error() { # usage_error <message>: the message and the usage, exit 2
@@ -75,7 +75,7 @@ main_root="$(git worktree list --porcelain | sed -n '1s/^worktree //p')"
 repo="$(repo_slug)"
 # --check only reads: the refusals are for the session that dispatches.
 if [ "$check" = 0 ]; then
-  [ "$(cd "$HERE/.." && pwd -P)" = "$(cd "$main_root" && pwd -P)" ] ||
+  [ "$(cd "$HERE/../.." && pwd -P)" = "$(cd "$main_root" && pwd -P)" ] ||
     die "deploy refused: deploy.sh runs from the main checkout ($main_root), by the main session"
 
   # A phase session never deploys. Fails closed: no session id, or a trace line

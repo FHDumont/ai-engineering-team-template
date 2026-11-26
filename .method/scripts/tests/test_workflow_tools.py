@@ -10,12 +10,12 @@ import sys
 import tempfile
 import unittest
 
-ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 HERE = os.path.dirname(os.path.abspath(__file__))
-sys.path.insert(0, os.path.join(ROOT, "scripts", "lib"))
+sys.path.insert(0, os.path.join(ROOT, ".method", "scripts", "lib"))
 import sensitive_paths as sp  # noqa: E402
 
-spec = importlib.util.spec_from_file_location("check_workflows", os.path.join(ROOT, "scripts", "check-workflows.py"))
+spec = importlib.util.spec_from_file_location("check_workflows", os.path.join(ROOT, ".method", "scripts", "check-workflows.py"))
 cw = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(cw)
 
@@ -70,10 +70,10 @@ jobs:
     steps:
       - name: "See if this tree already has green CI"
         id: gate
-        run: scripts/ci-already-green.sh "$GITHUB_SHA" >> "$GITHUB_OUTPUT"
+        run: .method/scripts/ci-already-green.sh "$GITHUB_SHA" >> "$GITHUB_OUTPUT"
       - name: "Lint and tests"
         if: steps.gate.outputs.skip != 'true'
-        run: scripts/validate.sh
+        run: .method/scripts/validate.sh
   build:
     name: "Build"
     needs: validate
@@ -108,11 +108,11 @@ jobs:
                       self.deploy_problems(self.DEPLOY.replace("  workflow_dispatch:\n", "  push:\n")))
 
     def test_deploy_validates_main_before_the_build(self):
-        no_validate = self.DEPLOY.replace("run: scripts/validate.sh", "run: echo skip")
-        self.assertIn("needs a job that runs scripts/validate.sh", self.deploy_problems(no_validate))
+        no_validate = self.DEPLOY.replace("run: .method/scripts/validate.sh", "run: echo skip")
+        self.assertIn("needs a job that runs .method/scripts/validate.sh", self.deploy_problems(no_validate))
         loose_build = self.DEPLOY.replace("    needs: validate\n", "")
         problems = self.deploy_problems(loose_build)
-        self.assertIn("job build: must need the job that runs scripts/validate.sh", problems)
+        self.assertIn("job build: must need the job that runs .method/scripts/validate.sh", problems)
         self.assertIn("job deploy: must need", problems)
 
     def test_deploy_declares_its_paths(self):
@@ -124,15 +124,15 @@ jobs:
     def test_deploy_must_gate_the_suite_on_green_ci(self):
         # #270: running validate.sh on every deploy is refused; the CI gate is required.
         always = self.DEPLOY.replace("        if: steps.gate.outputs.skip != 'true'\n", "")
-        self.assertIn("scripts/validate.sh must run only when the gate says skip != true",
+        self.assertIn(".method/scripts/validate.sh must run only when the gate says skip != true",
                       self.deploy_problems(always))
-        no_gate = self.DEPLOY.replace("scripts/ci-already-green.sh", "echo")
-        self.assertIn("must run scripts/ci-already-green.sh", self.deploy_problems(no_gate))
+        no_gate = self.DEPLOY.replace(".method/scripts/ci-already-green.sh", "echo")
+        self.assertIn("must run .method/scripts/ci-already-green.sh", self.deploy_problems(no_gate))
         plain = self.DEPLOY.replace(
             '      - name: "See if this tree already has green CI"\n        id: gate\n'
-            '        run: scripts/ci-already-green.sh "$GITHUB_SHA" >> "$GITHUB_OUTPUT"\n', "").replace(
+            '        run: .method/scripts/ci-already-green.sh "$GITHUB_SHA" >> "$GITHUB_OUTPUT"\n', "").replace(
             "        if: steps.gate.outputs.skip != 'true'\n", "")
-        self.assertIn("must run scripts/ci-already-green.sh", self.deploy_problems(plain))
+        self.assertIn("must run .method/scripts/ci-already-green.sh", self.deploy_problems(plain))
 
     def test_deploy_gate_needs_checks_read(self):
         no_perm = self.DEPLOY.replace("      checks: read\n", "")
@@ -201,13 +201,13 @@ class SensitivePathsTests(unittest.TestCase):
         globs = sp.load_globs(os.path.join(ROOT, ".github", "sensitive-paths"))
         paths = ["src/auth/login.py", "auth/x.py", "db/migrations/001.sql", ".env", ".env.local",
                  "web/package-lock.json", "package-lock.json", "app/billing/api.ts",
-                 "README.md", "scripts/setup-repo.sh", "docs/auth.md", "authors.txt"]
+                 "README.md", ".method/scripts/setup-repo.sh", "docs/auth.md", "authors.txt"]
         hits = sp.sensitive(paths, globs)
-        self.assertEqual(hits, paths[:8] + ["scripts/setup-repo.sh"])
+        self.assertEqual(hits, paths[:8] + [".method/scripts/setup-repo.sh"])
 
     def test_gate_files_sensitive(self):
         globs = sp.load_globs(os.path.join(ROOT, ".github", "sensitive-paths"))
-        paths = [".github/workflows/deploy-example.yml", "scripts/close-phase.sh", "scripts/status.sh"]
+        paths = [".github/workflows/deploy-example.yml", ".method/scripts/close-phase.sh", ".method/scripts/status.sh"]
         self.assertEqual(sp.sensitive(paths, globs), paths[:2])
 
     def test_gate_verifiers_sensitive(self):
@@ -215,8 +215,8 @@ class SensitivePathsTests(unittest.TestCase):
         # itself needs the owner's ok (check-docs.sh, read from the base by the
         # policy job, is one of them).
         globs = sp.load_globs(os.path.join(ROOT, ".github", "sensitive-paths"))
-        paths = [".github/workflows/ci.yml", "scripts/ci-gate.sh", "scripts/check-attribution.sh",
-                 "scripts/check-docs.sh", "scripts/lib/sensitive_paths.py", ".github/sensitive-paths"]
+        paths = [".github/workflows/ci.yml", ".method/scripts/ci-gate.sh", ".method/scripts/check-attribution.sh",
+                 ".method/scripts/check-docs.sh", ".method/scripts/lib/sensitive_paths.py", ".github/sensitive-paths"]
         self.assertEqual(sp.sensitive(paths, globs), paths)
         for rel in paths:
             self.assertTrue(os.path.isfile(os.path.join(ROOT, rel)), rel)
@@ -226,10 +226,10 @@ class SensitivePathsTests(unittest.TestCase):
         # deploy workflows and the gate itself. A list with no class header is all owner-ok.
         globs = os.path.join(ROOT, ".github", "sensitive-paths")
         owner = [".env", "db/migrations/1.sql", "x/secrets/k", "x/credentials/k", "app/auth/a.py",
-                 "app/billing/b.py", "app/payments/p.py", "infra/production/m.tf", "scripts/setup-repo.sh"]
+                 "app/billing/b.py", "app/payments/p.py", "infra/production/m.tf", ".method/scripts/setup-repo.sh"]
         gate = ["package-lock.json", "uv.lock", "requirements-dev.txt", ".github/workflows/deploy-x.yml",
-                ".github/workflows/ci.yml", "scripts/ci-gate.sh", "scripts/check-attribution.sh",
-                "scripts/check-docs.sh", "scripts/close-phase.sh", "scripts/lib/sensitive_paths.py",
+                ".github/workflows/ci.yml", ".method/scripts/ci-gate.sh", ".method/scripts/check-attribution.sh",
+                ".method/scripts/check-docs.sh", ".method/scripts/close-phase.sh", ".method/scripts/lib/sensitive_paths.py",
                 ".github/sensitive-paths"]
         paths = owner + gate + ["README.md"]
         self.assertEqual(sp.sensitive_class(paths, globs, "owner-ok"), owner)
@@ -237,12 +237,12 @@ class SensitivePathsTests(unittest.TestCase):
         d = tempfile.mkdtemp()
         self.addCleanup(shutil.rmtree, d, True)
         old = os.path.join(d, "old")
-        open(old, "w").write("**/auth/**\nscripts/close-phase.sh\n")
+        open(old, "w").write("**/auth/**\n.method/scripts/close-phase.sh\n")
         # The method's gate paths are gate by code, even in an old single-class list (FHDumont/ai-engineering-team-template#207).
-        self.assertEqual(sp.sensitive_class(["a/auth/x", "scripts/close-phase.sh", "package-lock.json"], old, "owner-ok"),
+        self.assertEqual(sp.sensitive_class(["a/auth/x", ".method/scripts/close-phase.sh", "package-lock.json"], old, "owner-ok"),
                          ["a/auth/x"])
-        self.assertEqual(sp.sensitive_class(["a/auth/x", "scripts/close-phase.sh", "package-lock.json"], old, "gate"),
-                         ["scripts/close-phase.sh", "package-lock.json"])
+        self.assertEqual(sp.sensitive_class(["a/auth/x", ".method/scripts/close-phase.sh", "package-lock.json"], old, "gate"),
+                         [".method/scripts/close-phase.sh", "package-lock.json"])
         # A path in both classes is owner-ok (the stricter one).
         both = os.path.join(d, "both")
         open(both, "w").write("# class: gate\nx/**\n# class: owner-ok\nx/y\n")
@@ -250,7 +250,7 @@ class SensitivePathsTests(unittest.TestCase):
         self.assertEqual(sp.sensitive_class(["x/y", "x/z"], both, "gate"), ["x/z"])
 
     def test_cli_lists_by_class_and_reads_lines_or_nul(self):
-        script = os.path.join(ROOT, "scripts", "lib", "sensitive_paths.py")
+        script = os.path.join(ROOT, ".method", "scripts", "lib", "sensitive_paths.py")
         globs = os.path.join(ROOT, ".github", "sensitive-paths")
         def run(stdin, cls=None):
             env = dict(os.environ)
@@ -259,11 +259,11 @@ class SensitivePathsTests(unittest.TestCase):
                 env["SENSITIVE_CLASS"] = cls
             return subprocess.run(["python3", script, globs], input=stdin, text=True, capture_output=True,
                                   env=env, cwd=ROOT).stdout.split()
-        lines = ".env\nscripts/close-phase.sh\nREADME.md\n"
-        self.assertEqual(run(lines), [".env", "scripts/close-phase.sh"])
+        lines = ".env\n.method/scripts/close-phase.sh\nREADME.md\n"
+        self.assertEqual(run(lines), [".env", ".method/scripts/close-phase.sh"])
         self.assertEqual(run(lines, "owner-ok"), [".env"])
-        self.assertEqual(run(lines, "gate"), ["scripts/close-phase.sh"])
-        self.assertEqual(run(lines.replace("\n", "\0"), "gate"), ["scripts/close-phase.sh"])
+        self.assertEqual(run(lines, "gate"), [".method/scripts/close-phase.sh"])
+        self.assertEqual(run(lines.replace("\n", "\0"), "gate"), [".method/scripts/close-phase.sh"])
 
     def test_double_star(self):
         r = sp.glob_to_regex("**/auth/**")
@@ -273,16 +273,16 @@ class SensitivePathsTests(unittest.TestCase):
     def test_method_paths_in_code(self):
         paths = [".claude/hooks/block-dangerous-git.sh", ".claude/settings.json",
                  ".githooks/pre-push", ".github/actions/x/action.yml",
-                 "scripts/lib/procs.sh", "scripts/sessions.sh",
-                 "scripts/start-headless.sh", "scripts/setup-repo.sh", "README.md"]
+                 ".method/scripts/lib/procs.sh", ".method/scripts/sessions.sh",
+                 ".method/scripts/start-headless.sh", ".method/scripts/setup-repo.sh", "README.md"]
         hits = sp.sensitive(paths, [])
         self.assertEqual(hits, paths[:-1])
 
     def test_repo_file_only_adds(self):
         hits = sp.sensitive(["app/custom/secret.txt", "README.md"], ["app/custom/**"])
         self.assertEqual(hits, ["app/custom/secret.txt"])
-        hits = sp.sensitive(["scripts/setup-repo.sh", "app/custom/secret.txt"], ["app/custom/**"])
-        self.assertEqual(hits, ["scripts/setup-repo.sh", "app/custom/secret.txt"])
+        hits = sp.sensitive([".method/scripts/setup-repo.sh", "app/custom/secret.txt"], ["app/custom/**"])
+        self.assertEqual(hits, [".method/scripts/setup-repo.sh", "app/custom/secret.txt"])
 
     def test_write_token_workflow_is_sensitive(self):
         d = tempfile.mkdtemp()
@@ -343,10 +343,10 @@ class CiStepsTests(unittest.TestCase):
                            ("commit.gpgsign", "false"), ("core.quotepath", "true")):
             git(self.repo, "config", key, value)
         # The base has the verifiers of this checkout.
-        for rel in ("scripts/lib/sensitive_paths.py", ".github/sensitive-paths"):
+        for rel in (".method/scripts/lib/sensitive_paths.py", ".github/sensitive-paths"):
             os.makedirs(os.path.dirname(os.path.join(self.repo, rel)), exist_ok=True)
             shutil.copy(os.path.join(ROOT, rel), os.path.join(self.repo, rel))
-        git(self.repo, "add", "scripts", ".github")
+        git(self.repo, "add", ".method", ".github")
         git(self.repo, "commit", "--quiet", "-m", "chore: seed")
         self.base = git(self.repo, "rev-parse", "HEAD")
         git(self.repo, "switch", "--quiet", "-c", "feat/x")
@@ -392,7 +392,7 @@ class CiStepsTests(unittest.TestCase):
         out = self.detect({"docs/x.md": "x\n", "docs/specs/s.md": "x\n", "README.md": "x\n"})
         self.assertEqual((out["code"], out["run_tests"]), ("false", "false"))
         for rel in ("AGENTS.md", "CLAUDE.md", "docs/process-design.md", ".claude/skills/plan/SKILL.md",
-                    "scripts/x.sh", "app/README.md"):
+                    ".method/scripts/x.sh", "app/README.md"):
             self.assertEqual(self.detect({rel: "x\n"})["run_tests"], "true", rel)
 
     def test_generated_docs_run_the_tests(self):
@@ -418,7 +418,7 @@ class CiStepsTests(unittest.TestCase):
         # #137: reading CHANGELOG.md or ROADMAP.md of this checkout would bring #54 back.
         # A fixture written in a temporary repo does not count.
         bad = []
-        for base in (os.path.join(ROOT, "scripts", "tests"),
+        for base in (os.path.join(ROOT, ".method", "scripts", "tests"),
                      os.path.join(ROOT, ".claude", "hooks", "tests")):
             if not os.path.isdir(base):
                 continue
@@ -441,7 +441,7 @@ class CiStepsTests(unittest.TestCase):
 
     def test_tests_skip_when_code_already_tested(self):
         # A docs-only push on top of a commit whose Tests passed does not run the suite again.
-        first = self.commit({"scripts/x.sh": "x\n"})
+        first = self.commit({".method/scripts/x.sh": "x\n"})
         head = self.commit({"docs/x.md": "x\n"})
         fake = os.path.join(self.tmp, "bin")
         os.makedirs(fake)
@@ -465,7 +465,7 @@ fi
             out = dict(l.split("=", 1) for l in open(os.path.join(self.tmp, "output")).read().split())
             self.assertEqual(out["run_tests"], want, passed)
         # Code changed after the tested commit: the suite runs, whatever the check says.
-        head2 = self.commit({"scripts/y.sh": "y\n"})
+        head2 = self.commit({".method/scripts/y.sh": "y\n"})
         r = self.run_step("changes", "Detect changed paths", head2, dict(env, GH_TESTS="1"))
         out = dict(l.split("=", 1) for l in open(os.path.join(self.tmp, "output")).read().split())
         self.assertEqual(out["run_tests"], "true")
@@ -505,7 +505,7 @@ if [ -n "$jq_expr" ]; then printf '%%s\\n' "$body" | jq -r "$jq_expr"; else prin
 
     def test_tests_run_when_newer_tests_failed(self):
         # A green, B red, C docs-only: the newest Tests result is a failure, so run.
-        a = self.commit({"scripts/x.sh": "x\n"})
+        a = self.commit({".method/scripts/x.sh": "x\n"})
         b = self.commit({"docs/a.md": "a\n"})
         c = self.commit({"docs/b.md": "b\n"})
         env = self.write_gh_conclusions({a: "success", b: "failure"})
@@ -540,7 +540,7 @@ printf '%%s\\n' "$body"
     def test_newer_pending_run_is_not_hidden_by_an_older_success(self):
         # The newest run on the newer commit is still pending (no started_at). An older
         # success on that same commit must not cover it.
-        a = self.commit({"scripts/x.sh": "x\n"})
+        a = self.commit({".method/scripts/x.sh": "x\n"})
         b = self.commit({"docs/a.md": "a\n"})
         c = self.commit({"docs/b.md": "b\n"})
         env = self.write_gh_runs({
@@ -561,7 +561,7 @@ printf '%%s\\n' "$body"
     def test_skipped_on_the_newer_commit_reads_the_older_success(self):
         # Only skipped may look at an older commit. A skipped Tests there, with a
         # success on the older commit and no code change, does not run again.
-        a = self.commit({"scripts/x.sh": "x\n"})
+        a = self.commit({".method/scripts/x.sh": "x\n"})
         b = self.commit({"docs/a.md": "a\n"})
         c = self.commit({"docs/b.md": "b\n"})
         env = self.write_gh_conclusions({a: "success", b: "skipped"})
@@ -571,7 +571,7 @@ printf '%%s\\n' "$body"
         self.assertEqual(out["run_tests"], "false")
 
     def test_other_app_success_does_not_cover_the_commit(self):
-        a = self.commit({"scripts/x.sh": "x\n"})
+        a = self.commit({".method/scripts/x.sh": "x\n"})
         b = self.commit({"docs/a.md": "a\n"})
         c = self.commit({"docs/b.md": "b\n"})
         env = self.write_gh_runs({
@@ -586,7 +586,7 @@ printf '%%s\\n' "$body"
         self.assertEqual(out["run_tests"], "true")
 
     def test_tests_run_on_cancelled_pending_or_api_error(self):
-        a = self.commit({"scripts/x.sh": "x\n"})
+        a = self.commit({".method/scripts/x.sh": "x\n"})
         b = self.commit({"docs/a.md": "a\n"})
         c = self.commit({"docs/b.md": "b\n"})
         for conc in ("cancelled", "timed_out", "pending", "apierr"):
@@ -597,7 +597,7 @@ printf '%%s\\n' "$body"
             self.assertEqual(out["run_tests"], "true", conc)
 
     def test_tests_skip_only_when_success_contains_base(self):
-        a = self.commit({"scripts/x.sh": "x\n"})
+        a = self.commit({".method/scripts/x.sh": "x\n"})
         b = self.commit({"docs/a.md": "a\n"})
         env = self.write_gh_conclusions({a: "success"})
         r = self.run_step("changes", "Detect changed paths", b, env)
@@ -656,22 +656,22 @@ if [ -n "$jq_expr" ]; then printf '%%s\\n' "$body" | jq -r "$jq_expr"; else prin
 
     def test_push_main_skips_when_the_tree_is_the_head_of_a_merged_pr(self):
         # The common case, one merge: main has the tree of the head of the PR, which had CI green.
-        out = self.push_main({"scripts/x.sh": "x\n"})
+        out = self.push_main({".method/scripts/x.sh": "x\n"})
         self.assertEqual((out["run_tests"], out["code"], out["workflows"], out["event"]), ("false", "false", "false", "push"))
 
     def test_push_main_runs_the_suite_on_the_sum_of_two_merges(self):
         # PR 56 and PR 57 rebased in a row (#59): the tree of main is the head of neither PR.
-        first = self.commit({"scripts/a.sh": "a\n"})
-        out = self.push_main({"scripts/b.sh": "b\n"}, pr_head_tree_of=first)
+        first = self.commit({".method/scripts/a.sh": "a\n"})
+        out = self.push_main({".method/scripts/b.sh": "b\n"}, pr_head_tree_of=first)
         self.assertEqual((out["run_tests"], out["code"], out["event"]), ("true", "true", "push"))
 
     def test_push_main_runs_when_the_pr_had_no_green_ci_or_failed_tests(self):
-        self.assertEqual(self.push_main({"scripts/x.sh": "x\n"}, ci="failure")["run_tests"], "true")
-        self.assertEqual(self.push_main({"scripts/y.sh": "y\n"}, tests="failure")["run_tests"], "true")
+        self.assertEqual(self.push_main({".method/scripts/x.sh": "x\n"}, ci="failure")["run_tests"], "true")
+        self.assertEqual(self.push_main({".method/scripts/y.sh": "y\n"}, tests="failure")["run_tests"], "true")
 
     def test_push_main_uses_the_newest_tests_result(self):
         # An older success must not hide a newer timeout on the same PR head.
-        self.assertEqual(self.push_main({"scripts/z.sh": "z\n"}, tests="timed_out")["run_tests"], "true")
+        self.assertEqual(self.push_main({".method/scripts/z.sh": "z\n"}, tests="timed_out")["run_tests"], "true")
 
     def test_push_main_skips_inert_docs(self):
         out = self.push_main({"docs/x.md": "x\n"}, pr_head_tree_of=self.base)
@@ -693,7 +693,7 @@ if [ -n "$jq_expr" ]; then printf '%%s\\n' "$body" | jq -r "$jq_expr"; else prin
         wf = cw.load(os.path.join(ROOT, ".github", "workflows", "ci.yml"))
         self.assertIn("confirmed", wf["jobs"]["changes"]["outputs"])
         self.assertIn("needs.changes.outputs.confirmed", wf["jobs"]["ci"]["if"])
-        out = self.push_main({"scripts/x.sh": "x\n"})
+        out = self.push_main({".method/scripts/x.sh": "x\n"})
         self.assertEqual(out.get("confirmed"), "true")
         self.assertIn("already tested in the PR", self.last_push_stdout)
         summary = os.path.join(self.tmp, "summary.md")
@@ -713,7 +713,7 @@ if [ -n "$jq_expr" ]; then printf '%%s\\n' "$body" | jq -r "$jq_expr"; else prin
         wf = cw.load(os.path.join(ROOT, ".github", "workflows", "ci.yml"))
         tests = wf["jobs"]["tests"]
         self.assertEqual(tests["if"], "needs.changes.outputs.run_tests != 'false'")
-        self.assertIn("scripts/validate.sh --tests", [s.get("run") for s in tests["steps"]])
+        self.assertIn(".method/scripts/validate.sh --tests", [s.get("run") for s in tests["steps"]])
         self.assertEqual(wf["jobs"]["lint"]["if"], "needs.changes.outputs.code == 'true'")
 
     def test_filter_issue_template_is_code(self):
@@ -786,13 +786,13 @@ if [ -n "$jq_expr" ]; then printf '%%s\\n' "$body" | jq -r "$jq_expr"; else prin
     def test_sensitive_paths_are_read_from_the_base(self):
         # The PR empties the globs and the matcher, and touches a sensitive file.
         head = self.commit({".github/sensitive-paths": "# none\n",
-                            "scripts/lib/sensitive_paths.py": "import sys\nsys.exit(0)\n",
-                            "scripts/close-phase.sh": "echo changed\n"})
+                            ".method/scripts/lib/sensitive_paths.py": "import sys\nsys.exit(0)\n",
+                            ".method/scripts/close-phase.sh": "echo changed\n"})
         self.base_checkout()
         env, log = self.fake_gh()
         r = self.run_step("policy", "Label sensitive paths with needs-owner-ok", head, env)
         self.assertEqual(r.returncode, 0, r.stderr)
-        self.assertIn("scripts/close-phase.sh", r.stdout)
+        self.assertIn(".method/scripts/close-phase.sh", r.stdout)
         self.assertIn("labels[]=needs-gate-review", open(log).read())
 
     def test_policy_labels_with_a_base_verifier_that_does_not_know_nul_lists(self):
@@ -800,11 +800,11 @@ if [ -n "$jq_expr" ]; then printf '%%s\\n' "$body" | jq -r "$jq_expr"; else prin
         # path per line. A PR that touches ci.yml still gets a label (the old verifier
         # cannot tell the classes, so the label is the strict one).
         shutil.copy(os.path.join(HERE, "fixtures", "sensitive_paths_c1b76da.py"),
-                    os.path.join(self.repo, "scripts", "lib", "sensitive_paths.py"))
-        git(self.repo, "add", "scripts")
+                    os.path.join(self.repo, ".method", "scripts", "lib", "sensitive_paths.py"))
+        git(self.repo, "add", ".method")
         git(self.repo, "commit", "--quiet", "-m", "chore: old verifier")
         self.base = git(self.repo, "rev-parse", "HEAD")
-        head = self.commit({".github/workflows/ci.yml": "name: CI\n", "scripts/close-phase.sh": "x\n"})
+        head = self.commit({".github/workflows/ci.yml": "name: CI\n", ".method/scripts/close-phase.sh": "x\n"})
         self.base_checkout()
         env, log = self.fake_gh()
         r = self.run_step("policy", "Label sensitive paths with needs-owner-ok", head, env)
@@ -828,35 +828,35 @@ if [ -n "$jq_expr" ]; then printf '%%s\\n' "$body" | jq -r "$jq_expr"; else prin
         self.setUp()
         self.assertEqual(self.policy_labels({"db/migrations/001.sql": "x\n"}), (True, False))
         self.setUp()
-        self.assertEqual(self.policy_labels({"db/migrations/001.sql": "x\n", "scripts/close-phase.sh": "x\n"}),
+        self.assertEqual(self.policy_labels({"db/migrations/001.sql": "x\n", ".method/scripts/close-phase.sh": "x\n"}),
                          (True, True))
         self.setUp()
         self.assertEqual(self.policy_labels({"README.md": "x\n"}), (False, False))
 
     def test_docs_checker_is_read_from_the_base(self):
-        os.makedirs(os.path.join(self.repo, "scripts", "lib"), exist_ok=True)
-        shutil.copy(os.path.join(ROOT, "scripts", "check-docs.sh"), os.path.join(self.repo, "scripts"))
-        shutil.copy(os.path.join(ROOT, "scripts", "lib", "common.sh"), os.path.join(self.repo, "scripts", "lib"))
-        git(self.repo, "add", "scripts")
+        os.makedirs(os.path.join(self.repo, ".method", "scripts", "lib"), exist_ok=True)
+        shutil.copy(os.path.join(ROOT, ".method", "scripts", "check-docs.sh"), os.path.join(self.repo, ".method", "scripts"))
+        shutil.copy(os.path.join(ROOT, ".method", "scripts", "lib", "common.sh"), os.path.join(self.repo, ".method", "scripts", "lib"))
+        git(self.repo, "add", ".method")
         git(self.repo, "commit", "--quiet", "-m", "chore: checker")
         self.base = git(self.repo, "rev-parse", "HEAD")
         # The PR replaces the checker by one that always passes and breaks a doc rule.
-        head = self.commit({"scripts/check-docs.sh": "#!/usr/bin/env bash\nexit 0\n",
+        head = self.commit({".method/scripts/check-docs.sh": "#!/usr/bin/env bash\nexit 0\n",
                             "CLAUDE.md": "read AGENTS.md\n"})
-        os.chmod(os.path.join(self.repo, "scripts", "check-docs.sh"), 0o755)
+        os.chmod(os.path.join(self.repo, ".method", "scripts", "check-docs.sh"), 0o755)
         self.base_checkout()
         r = self.run_step("policy", "Check docs limits", head)
         self.assertEqual(r.returncode, 1, r.stdout + r.stderr)
         self.assertIn('CLAUDE.md must contain only "@AGENTS.md"', r.stdout)
 
     def test_attribution_checker_is_read_from_the_base(self):
-        shutil.copy(os.path.join(ROOT, "scripts", "check-attribution.sh"), os.path.join(self.repo, "scripts"))
-        shutil.copy(os.path.join(ROOT, "scripts", "lib", "common.sh"), os.path.join(self.repo, "scripts", "lib"))
-        git(self.repo, "add", "scripts")
+        shutil.copy(os.path.join(ROOT, ".method", "scripts", "check-attribution.sh"), os.path.join(self.repo, ".method", "scripts"))
+        shutil.copy(os.path.join(ROOT, ".method", "scripts", "lib", "common.sh"), os.path.join(self.repo, ".method", "scripts", "lib"))
+        git(self.repo, "add", ".method")
         git(self.repo, "commit", "--quiet", "-m", "chore: checker")
         self.base = git(self.repo, "rev-parse", "HEAD")
         # The PR replaces the checker by one that always passes.
-        head = self.commit({"scripts/check-attribution.sh": "#!/usr/bin/env bash\nexit 0\n"})
+        head = self.commit({".method/scripts/check-attribution.sh": "#!/usr/bin/env bash\nexit 0\n"})
         self.base_checkout()
         r = self.run_step("policy", "Check AI attribution in commits and PR body", head,
                           {"PR_BODY": "Resumo\n\nCo-Authored-By: Someone <noreply@anthropic.com>\n"})
@@ -864,12 +864,12 @@ if [ -n "$jq_expr" ]; then printf '%%s\\n' "$body" | jq -r "$jq_expr"; else prin
         self.assertIn("AI attribution", r.stdout)
 
     def test_gate_is_read_from_the_base(self):
-        os.makedirs(os.path.join(self.repo, "scripts"), exist_ok=True)
-        head = self.commit({"scripts/ci-gate.sh": "#!/usr/bin/env bash\necho CI passed\n"})
-        os.chmod(os.path.join(self.repo, "scripts", "ci-gate.sh"), 0o755)
-        os.makedirs(os.path.join(self.repo, "base", "scripts", "lib"))
+        os.makedirs(os.path.join(self.repo, ".method", "scripts"), exist_ok=True)
+        head = self.commit({".method/scripts/ci-gate.sh": "#!/usr/bin/env bash\necho CI passed\n"})
+        os.chmod(os.path.join(self.repo, ".method", "scripts", "ci-gate.sh"), 0o755)
+        os.makedirs(os.path.join(self.repo, "base", ".method", "scripts", "lib"))
         for rel in ("ci-gate.sh", "lib/common.sh"):
-            shutil.copy(os.path.join(ROOT, "scripts", rel), os.path.join(self.repo, "base", "scripts", rel))
+            shutil.copy(os.path.join(ROOT, ".method", "scripts", rel), os.path.join(self.repo, "base", ".method", "scripts", rel))
         needs = '{"changes": {"result": "success", "outputs": {"code": "true"}}, "policy": {"result": "success"}, ' \
                 '"lint": {"result": "failure"}, "tests": {"result": "success"}, "workflows": {"result": "skipped"}}'
         r = self.run_step("ci", "Aggregate required jobs", head, {"NEEDS": needs})
@@ -894,9 +894,9 @@ if [ -n "$jq_expr" ]; then printf '%%s\\n' "$body" | jq -r "$jq_expr"; else prin
     def test_first_ci_uses_the_gate_of_this_commit_when_the_base_has_none(self):
         # Adoption PR: the base commit has no ci-gate.sh. The gate of this commit
         # still fails a red lint; a missing file must not skip the gate.
-        self.commit({"scripts/ci-gate.sh": open(os.path.join(ROOT, "scripts", "ci-gate.sh")).read(),
-                     "scripts/lib/common.sh": open(os.path.join(ROOT, "scripts", "lib", "common.sh")).read()})
-        os.chmod(os.path.join(self.repo, "scripts", "ci-gate.sh"), 0o755)
+        self.commit({".method/scripts/ci-gate.sh": open(os.path.join(ROOT, ".method", "scripts", "ci-gate.sh")).read(),
+                     ".method/scripts/lib/common.sh": open(os.path.join(ROOT, ".method", "scripts", "lib", "common.sh")).read()})
+        os.chmod(os.path.join(self.repo, ".method", "scripts", "ci-gate.sh"), 0o755)
         head = git(self.repo, "rev-parse", "HEAD")
         needs = ('{"changes": {"result": "success", "outputs": {"code": "true"}}, '
                  '"policy": {"result": "success"}, "lint": {"result": "failure"}, '
@@ -911,9 +911,9 @@ if [ -n "$jq_expr" ]; then printf '%%s\\n' "$body" | jq -r "$jq_expr"; else prin
         # the checkers of the pull request must not run in that job.
         marker = os.path.join(self.tmp, "pr-checker-ran")
         head = self.commit({
-            "scripts/check-docs.sh": "#!/bin/sh\necho docs >>%s\nexit 1\n" % marker,
-            "scripts/check-attribution.sh": "#!/bin/sh\necho attr >>%s\nexit 1\n" % marker,
-            "scripts/lib/sensitive_paths.py":
+            ".method/scripts/check-docs.sh": "#!/bin/sh\necho docs >>%s\nexit 1\n" % marker,
+            ".method/scripts/check-attribution.sh": "#!/bin/sh\necho attr >>%s\nexit 1\n" % marker,
+            ".method/scripts/lib/sensitive_paths.py":
                 "import pathlib,sys\npathlib.Path(%r).write_text('paths')\nsys.exit(1)\n" % marker,
         })
         for name, extra in (
@@ -946,17 +946,17 @@ if [ -n "$jq_expr" ]; then printf '%%s\\n' "$body" | jq -r "$jq_expr"; else prin
         old_run = subprocess.run([old], env=env, text=True, capture_output=True)
         self.assertEqual(old_run.returncode, 1, old_run.stdout)
         self.assertIn("policy is skipped", old_run.stdout)
-        new_run = subprocess.run([os.path.join(ROOT, "scripts", "ci-gate.sh")], env=env, text=True, capture_output=True)
+        new_run = subprocess.run([os.path.join(ROOT, ".method", "scripts", "ci-gate.sh")], env=env, text=True, capture_output=True)
         self.assertEqual(new_run.returncode, 0, new_run.stdout + new_run.stderr)
         self.assertIn("CI passed", new_run.stdout)
 
     def test_red_base_tells_how_to_leave_it(self):
         script = r"""
-source scripts/tests/phase_start_common.sh
+source .method/scripts/tests/phase_start_common.sh
 spec seven.md 7
 export PHASE_START_CI_WAIT=2 PHASE_START_CI_POLL=1
 set +e
-env FAKE_BASE_CI=red sh -c "cd '$repo' && scripts/phase-start.sh 7 --no-check" >"$TMP/red.out" 2>&1
+env FAKE_BASE_CI=red sh -c "cd '$repo' && .method/scripts/phase-start.sh 7 --no-check" >"$TMP/red.out" 2>&1
 rc=$?
 set -e
 printf 'RC:%s\n' "$rc"
@@ -971,7 +971,7 @@ cat "$TMP/red.out"
 
     def test_pr_only_mode_accepts_a_different_tree_and_refuses_red(self):
         script = r"""
-source scripts/tests/phase_start_common.sh
+source .method/scripts/tests/phase_start_common.sh
 spec seven.md 7
 mkdir -p "$repo/.github"
 printf 'pr\n' >"$repo/.github/ci-mode"
@@ -985,15 +985,15 @@ run() { # run <outfile> <env...> -- <cmd>
   printf '%s\n' "$rc"
 }
 tree_rc="$(run "$TMP/tree.out" FAKE_BASE_CI=absent FAKE_BASE_PR=tree CLAUDE_CODE_SESSION_ID=manager \
-  sh -c "cd '$repo' && scripts/phase-start.sh 7 --dry-run")"
-red_rc="$(run "$TMP/red.out" FAKE_BASE_CI=red sh -c "cd '$repo' && scripts/phase-start.sh 7 --no-check")"
+  sh -c "cd '$repo' && .method/scripts/phase-start.sh 7 --dry-run")"
+red_rc="$(run "$TMP/red.out" FAKE_BASE_CI=red sh -c "cd '$repo' && .method/scripts/phase-start.sh 7 --no-check")"
 abs_rc="$(run "$TMP/abs.out" FAKE_BASE_CI=absent FAKE_BASE_PR=none \
-  sh -c "cd '$repo' && scripts/phase-start.sh 7 --no-check")"
+  sh -c "cd '$repo' && .method/scripts/phase-start.sh 7 --no-check")"
 rm -f "$repo/.github/ci-mode"
 push_rc="$(run "$TMP/push.out" FAKE_BASE_CI=absent FAKE_BASE_PR=tree \
-  sh -c "cd '$repo' && scripts/phase-start.sh 7 --no-check")"
+  sh -c "cd '$repo' && .method/scripts/phase-start.sh 7 --no-check")"
 prred_rc="$(run "$TMP/prred.out" FAKE_BASE_CI=absent FAKE_BASE_PR=red \
-  sh -c "cd '$repo' && mkdir -p .github && printf 'pr\n' >.github/ci-mode && scripts/phase-start.sh 7 --no-check")"
+  sh -c "cd '$repo' && mkdir -p .github && printf 'pr\n' >.github/ci-mode && .method/scripts/phase-start.sh 7 --no-check")"
 printf 'TREE:%s\n' "$tree_rc"
 cat "$TMP/tree.out"
 printf '\nRED:%s\n' "$red_rc"
@@ -1023,7 +1023,7 @@ cat "$TMP/prred.out"
 
     def test_pr_mode_refuses_an_unread_tree_and_private_without_a_record(self):
         script = r"""
-source scripts/tests/phase_start_common.sh
+source .method/scripts/tests/phase_start_common.sh
 spec seven.md 7
 export PHASE_START_CI_WAIT=2 PHASE_START_CI_POLL=1
 mkdir -p "$TMP/wrap"
@@ -1047,13 +1047,13 @@ run() {
 mkdir -p "$repo/.github"
 printf 'pr\n' >"$repo/.github/ci-mode"
 unread_rc="$(run "$TMP/unread.out" PATH="$TMP/wrap:$PATH" FAKE_BASE_CI=absent FAKE_BASE_PR=green \
-  sh -c "cd '$repo' && scripts/phase-start.sh 7 --no-check")"
+  sh -c "cd '$repo' && .method/scripts/phase-start.sh 7 --no-check")"
 rm -f "$repo/.github/ci-mode"
 priv_rc="$(run "$TMP/priv.out" PATH="$TMP/wrap:$PATH" FAKE_BASE_CI=green \
-  sh -c "cd '$repo' && scripts/phase-start.sh 7 --no-check")"
+  sh -c "cd '$repo' && .method/scripts/phase-start.sh 7 --no-check")"
 printf 'pr\n' >"$repo/.github/ci-mode"
 ok_rc="$(run "$TMP/ok.out" PATH="$TMP/wrap:$PATH" FAKE_BASE_CI=green CLAUDE_CODE_SESSION_ID=manager \
-  sh -c "cd '$repo' && scripts/phase-start.sh 7 --dry-run")"
+  sh -c "cd '$repo' && .method/scripts/phase-start.sh 7 --dry-run")"
 printf 'UNREAD:%s\n' "$unread_rc"
 cat "$TMP/unread.out"
 printf '\nPRIV:%s\n' "$priv_rc"
@@ -1087,7 +1087,7 @@ class RunnerToolsTests(unittest.TestCase):
             src = shutil.which(cmd)
             if src:
                 os.symlink(src, os.path.join(bindir, cmd))
-        script = "source scripts/lib/procs.sh\nproc_cwd_of 42\nprocs_in_dir /work\n"
+        script = "source .method/scripts/lib/procs.sh\nproc_cwd_of 42\nprocs_in_dir /work\n"
         env = dict(os.environ)
         env["PATH"] = bindir
         env["PROCS_PROC_ROOT"] = root
@@ -1108,14 +1108,14 @@ class RunnerToolsTests(unittest.TestCase):
                 os.symlink(src, os.path.join(bindir, cmd))
         env = dict(os.environ)
         env["PATH"] = bindir
-        r = subprocess.run([os.path.join(bindir, "bash"), os.path.join(ROOT, "scripts", "setup-runner.sh"), "--check"],
+        r = subprocess.run([os.path.join(bindir, "bash"), os.path.join(ROOT, ".method", "scripts", "setup-runner.sh"), "--check"],
                            cwd=ROOT, env=env, text=True, capture_output=True)
         text = r.stdout + r.stderr
         self.assertNotEqual(r.returncode, 0, text)
         self.assertIn("PyYAML", text)
         for cmd in ("yq", "lsof", "curl", "tar", "shasum"):
             os.symlink("/bin/echo", os.path.join(bindir, cmd))
-        r = subprocess.run([os.path.join(bindir, "bash"), os.path.join(ROOT, "scripts", "setup-runner.sh"), "--check"],
+        r = subprocess.run([os.path.join(bindir, "bash"), os.path.join(ROOT, ".method", "scripts", "setup-runner.sh"), "--check"],
                            cwd=ROOT, env=env, text=True, capture_output=True)
         text = r.stdout + r.stderr
         self.assertEqual(r.returncode, 0, text)
@@ -1263,9 +1263,9 @@ class NoNewFactTests(unittest.TestCase):
         # #138: the skip that proved nothing new is recorded in the existing
         # scripts, at the tokens the design table names. No new production target.
         design = open(os.path.join(ROOT, "docs", "process-design.md"), encoding="utf-8").read()
-        close = open(os.path.join(ROOT, "scripts", "close-phase.sh"), encoding="utf-8").read()
+        close = open(os.path.join(ROOT, ".method", "scripts", "close-phase.sh"), encoding="utf-8").read()
         ci = open(os.path.join(ROOT, ".github", "workflows", "ci.yml"), encoding="utf-8").read()
-        self.assertNotIn("scripts/repeated-work.sh", design + close + ci)
+        self.assertNotIn(".method/scripts/repeated-work.sh", design + close + ci)
         for token in ("no-new-fact: already on origin",
                       "no-new-fact: already tested in the PR",
                       "no-new-fact: tests already passed",

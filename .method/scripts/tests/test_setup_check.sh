@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Tests of setup-repo.sh --check (the setup is mandatory): 0 only when everything is in place.
 # The refusal of phase-start.sh and open-issue.sh is in test_setup_refusal.sh.
-# shellcheck source=scripts/tests/lib.sh
+# shellcheck source=.method/scripts/tests/lib.sh
 source "$(dirname "$0")/lib.sh"
 SETUP="$SCRIPTS/setup-repo.sh"
 : >"$TMP/none.sh"
@@ -24,12 +24,12 @@ copy_scripts "$nocm"
 mkdir -p "$nocm/.github"
 cp "$REPO"/.github/labels.tsv "$REPO"/.github/bots.tsv "$nocm/.github/"
 rm -f "$nocm/.github/ci-mode"
-assert_status 7 "check exits 7 when the CI mode is not recorded" env -u PROCESS_CI_MODE "$nocm/scripts/setup-repo.sh" --check
+assert_status 7 "check exits 7 when the CI mode is not recorded" env -u PROCESS_CI_MODE "$nocm/.method/scripts/setup-repo.sh" --check
 # The script reads its own repository, not the one of the cwd (issue #209): a cwd with .github/ci-mode must not hide the missing one.
 cwdrepo="$(make_repo)"
 mkdir -p "$cwdrepo/.github"
 : >"$cwdrepo/.github/ci-mode"
-assert_status 7 "check exits 7 when only the cwd repository has ci-mode" sh -c "cd '$cwdrepo' && env -u PROCESS_CI_MODE '$nocm/scripts/setup-repo.sh' --check"
+assert_status 7 "check exits 7 when only the cwd repository has ci-mode" sh -c "cd '$cwdrepo' && env -u PROCESS_CI_MODE '$nocm/.method/scripts/setup-repo.sh' --check"
 assert_contains "$(last_output)" "missing: CI mode" "check names the missing CI mode"
 assert_contains "$(last_output)" "PROCESS_CI_MODE" "check cites the variable"
 assert_contains "$(last_output)" "setup-repo.sh --ci-mode" "check cites the setup step that records it"

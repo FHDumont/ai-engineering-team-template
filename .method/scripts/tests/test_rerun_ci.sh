@@ -1,14 +1,14 @@
 #!/usr/bin/env bash
-# scripts/rerun-ci.sh reruns only the failed jobs of ci.yml on the PR head.
-# shellcheck source=scripts/tests/lib.sh
+# .method/scripts/rerun-ci.sh reruns only the failed jobs of ci.yml on the PR head.
+# shellcheck source=.method/scripts/tests/lib.sh
 source "$(dirname "$0")/lib.sh"
 
 repo="$(make_repo)"
-mkdir -p "$repo/scripts/lib" "$repo/.github/workflows"
-cp "$SCRIPTS/lib/common.sh" "$repo/scripts/lib/common.sh"
-cp "$SCRIPTS/rerun-ci.sh" "$repo/scripts/rerun-ci.sh"
-chmod +x "$repo/scripts/rerun-ci.sh"
-R="$repo/scripts/rerun-ci.sh"
+mkdir -p "$repo/.method/scripts/lib" "$repo/.github/workflows"
+cp "$SCRIPTS/lib/common.sh" "$repo/.method/scripts/lib/common.sh"
+cp "$SCRIPTS/rerun-ci.sh" "$repo/.method/scripts/rerun-ci.sh"
+chmod +x "$repo/.method/scripts/rerun-ci.sh"
+R="$repo/.method/scripts/rerun-ci.sh"
 HEAD=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
 cat >"$TMP/handler.sh" <<'H'
 case "$*" in

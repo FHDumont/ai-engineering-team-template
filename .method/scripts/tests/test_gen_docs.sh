@@ -2,7 +2,7 @@
 # Tests of gen-docs.sh in a sandbox: the single generation of CHANGELOG.md and
 # ROADMAP.md enters main through a PR that holds only those two files and the
 # removal of the specs whose issues are all closed.
-# shellcheck source=scripts/tests/lib.sh
+# shellcheck source=.method/scripts/tests/lib.sh
 source "$(dirname "$0")/lib.sh"
 
 repo="$(make_repo)"
@@ -14,13 +14,13 @@ printf '.worktrees/\n' >"$repo/.gitignore"
 mkdir -p "$repo/docs/specs"
 printf '# Spec\n\nFases #7 e #8.\n' >"$repo/docs/specs/group.md"
 printf '# Spec\n\nFases #7 e #9.\n' >"$repo/docs/specs/open.md"
-git -C "$repo" add scripts .gitignore docs/specs/group.md docs/specs/open.md
+git -C "$repo" add .method .gitignore docs/specs/group.md docs/specs/open.md
 git -C "$repo" commit --quiet -m "chore: scripts"
 remote="$TMP/remote.git"
 git clone --quiet --bare "$repo" "$remote"
 git -C "$repo" remote add origin "$remote"
 git -C "$repo" fetch --quiet origin
-GEN="$repo/scripts/gen-docs.sh"
+GEN="$repo/.method/scripts/gen-docs.sh"
 pr_branch() { echo "gen-docs/$(git -C "$remote" rev-parse main | cut -c1-12)"; }
 BRANCH="$(pr_branch)"
 
@@ -65,8 +65,8 @@ run() { # run <exit code> <description> [VAR=value...]
 }
 
 # A PR with any other file: no review status, no merge.
-run 1 "refuses a PR that holds more than the generated files" FAKE_FILES="CHANGELOG.md scripts/close-phase.sh"
-assert_contains "$(last_output)" "scripts/close-phase.sh" "names the file that is not generated"
+run 1 "refuses a PR that holds more than the generated files" FAKE_FILES="CHANGELOG.md .method/scripts/close-phase.sh"
+assert_contains "$(last_output)" ".method/scripts/close-phase.sh" "names the file that is not generated"
 assert_not_contains "$(gh_calls)" "statuses" "no review status on a PR with other files"
 assert_not_contains "$(gh_calls)" "pr merge" "no merge of a PR with other files"
 sha="$(git -C "$remote" rev-parse "$BRANCH")"
@@ -136,7 +136,7 @@ assert_eq "$sha" "$(git -C "$repo" rev-parse main)" "the local main is at the me
 [ ! -e "$repo/docs/specs/group.md" ] && ok || bad "the spec of closed issues left main"
 [ -f "$repo/docs/specs/open.md" ] && ok || bad "the spec that cites an open issue stays on main"
 rm -f "$TMP/created"
-assert_status 0 "end-check is clean after gen-docs.sh" sh -c "cd '$repo' && scripts/end-check.sh"
+assert_status 0 "end-check is clean after gen-docs.sh" sh -c "cd '$repo' && .method/scripts/end-check.sh"
 
 # Generated files already on main and no spec to remove: nothing to do, no PR.
 run 0 "up to date makes no PR"
@@ -181,7 +181,7 @@ rm -f "$TMP/created" "$TMP/old-closed"
 
 # A phase never runs it: only the main checkout does.
 git -C "$repo" worktree add --quiet -b feat/issue-5-x "$repo/.worktrees/issue-5" origin/main
-assert_status 1 "refuses to run from a phase worktree" sh -c "cd '$repo/.worktrees/issue-5' && scripts/gen-docs.sh --interval 0"
+assert_status 1 "refuses to run from a phase worktree" sh -c "cd '$repo/.worktrees/issue-5' && .method/scripts/gen-docs.sh --interval 0"
 assert_contains "$(last_output)" "main checkout" "says who runs it"
 assert_status 0 "--help works" sh -c "'$GEN' --help"
 finish

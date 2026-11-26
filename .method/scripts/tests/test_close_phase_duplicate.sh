@@ -1,13 +1,13 @@
 #!/usr/bin/env bash
 # Tests of close-phase.sh --check: a commit of the branch that origin/main already has under another SHA.
-# shellcheck source=scripts/tests/close_phase_common.sh
+# shellcheck source=.method/scripts/tests/close_phase_common.sh
 source "$(dirname "$0")/close_phase_common.sh"
 
 reset_phase_evidence
 child_session 5
 export CLOSE_PHASE_MERGEABLE_PAUSE=0 CLOSE_PHASE_CI_TIMEOUT=0 CLOSE_PHASE_CI_POLL=0
 # redo-phase.sh is a stub here (its own behaviour is in test_redo_phase.sh).
-printf '#!/usr/bin/env bash\necho "redo called" >>"%s"\necho "redone: PR #13 replaces PR #12"\n' "$TMP/redo.log" >"$repo/scripts/redo-phase.sh"
+printf '#!/usr/bin/env bash\necho "redo called" >>"%s"\necho "redone: PR #13 replaces PR #12"\n' "$TMP/redo.log" >"$repo/.method/scripts/redo-phase.sh"
 redo_calls() { if [ -f "$TMP/redo.log" ]; then wc -l <"$TMP/redo.log" | tr -d ' '; else echo 0; fi; }
 handler "type:feature" success
 

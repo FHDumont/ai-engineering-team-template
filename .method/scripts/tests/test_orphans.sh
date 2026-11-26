@@ -4,9 +4,9 @@
 # sessions.sh and the cleanup of a phase (issue #88), which must not stop an orphan
 # outside that phase. Every process here is spawned on purpose and stopped by this test
 # at the end, whatever fails. The cleanup case uses fake ps, lsof and kill only.
-# shellcheck source=scripts/tests/lib.sh
+# shellcheck source=.method/scripts/tests/lib.sh
 source "$(dirname "$0")/lib.sh"
-# shellcheck source=scripts/lib/procs.sh
+# shellcheck source=.method/scripts/lib/procs.sh
 source "$SCRIPTS/lib/procs.sh"
 
 export AI_METHOD_ORPHAN_ROOT="$TMP"
@@ -64,20 +64,20 @@ assert_not_contains "$found" "$o2" "a process of another folder is not listed"
 
 # 3. validate.sh: a test that leaves an orphan fails the suite, which stops and lists it.
 vrepo="$(make_repo)"
-mkdir -p "$vrepo/scripts/tests" "$vrepo/scripts/lib"
-cp "$SCRIPTS/validate.sh" "$vrepo/scripts/validate.sh"
-cp "$SCRIPTS"/lib/*.sh "$SCRIPTS"/lib/*.tsv "$SCRIPTS"/lib/*.example "$vrepo/scripts/lib/" 2>/dev/null || true
-cat >"$vrepo/scripts/tests/test_leaves.sh" <<L
+mkdir -p "$vrepo/.method/scripts/tests" "$vrepo/.method/scripts/lib"
+cp "$SCRIPTS/validate.sh" "$vrepo/.method/scripts/validate.sh"
+cp "$SCRIPTS"/lib/*.sh "$SCRIPTS"/lib/*.tsv "$SCRIPTS"/lib/*.example "$vrepo/.method/scripts/lib/" 2>/dev/null || true
+cat >"$vrepo/.method/scripts/tests/test_leaves.sh" <<L
 #!/usr/bin/env bash
 d="\$(mktemp -d "\${TMPDIR:-/tmp}/tmp.XXXXXX")"
 cd "\$d"
 nohup sleep 300 </dev/null >/dev/null 2>&1 &
 echo \$! >"$TMP/leaves.pid"
 L
-git -C "$vrepo" add scripts
+git -C "$vrepo" add .method
 git -C "$vrepo" commit --quiet -m "chore: scripts"
 assert_status 1 "validate.sh fails when a test leaves an orphan" \
-  sh -c "cd '$vrepo' && env -u PROCESS_VALIDATE_RUNNING scripts/validate.sh --tests"
+  sh -c "cd '$vrepo' && env -u PROCESS_VALIDATE_RUNNING .method/scripts/validate.sh --tests"
 assert_contains "$(last_output)" "orphan process" "validate.sh lists the orphan"
 assert_contains "$(last_output)" "$(cat "$TMP/leaves.pid")" "validate.sh names the pid"
 sleep 1
@@ -85,9 +85,9 @@ assert_eq dead "$(alive "$(cat "$TMP/leaves.pid")")" "validate.sh stops the orph
 # A test that loads lib.sh (issue #83): what it leaves detached in its folder is stopped by
 # its own sweep (the search by cwd looks at the detached processes), so the suite is green
 # and nothing stays alive.
-rm "$vrepo/scripts/tests/test_leaves.sh"
-cp "$TESTS_DIR/lib.sh" "$vrepo/scripts/tests/lib.sh"
-cat >"$vrepo/scripts/tests/test_leaves_lib.sh" <<L
+rm "$vrepo/.method/scripts/tests/test_leaves.sh"
+cp "$TESTS_DIR/lib.sh" "$vrepo/.method/scripts/tests/lib.sh"
+cat >"$vrepo/.method/scripts/tests/test_leaves_lib.sh" <<L
 #!/usr/bin/env bash
 source "\$(dirname "\$0")/lib.sh"
 mkdir -p "\$TMP/wt"
@@ -96,14 +96,14 @@ bash -c 'cd "\$1"; nohup sleep 300 </dev/null >/dev/null 2>&1 & echo \$! >"\$2"'
 finish
 L
 assert_status 0 "validate.sh is green when a lib.sh test leaves a detached process in its folder" \
-  sh -c "cd '$vrepo' && env -u PROCESS_VALIDATE_RUNNING scripts/validate.sh --tests"
+  sh -c "cd '$vrepo' && env -u PROCESS_VALIDATE_RUNNING .method/scripts/validate.sh --tests"
 sleep 1
 assert_eq dead "$(alive "$(cat "$TMP/leaves-lib.pid")")" "the sweep of lib.sh stops the process left in the folder of its test"
-rm "$vrepo/scripts/tests/test_leaves_lib.sh" "$vrepo/scripts/tests/lib.sh"
+rm "$vrepo/.method/scripts/tests/test_leaves_lib.sh" "$vrepo/.method/scripts/tests/lib.sh"
 # A clean suite stays green.
-printf '#!/usr/bin/env bash\nexit 0\n' >"$vrepo/scripts/tests/test_clean.sh"
+printf '#!/usr/bin/env bash\nexit 0\n' >"$vrepo/.method/scripts/tests/test_clean.sh"
 assert_status 0 "validate.sh is green without orphans" \
-  sh -c "cd '$vrepo' && env -u PROCESS_VALIDATE_RUNNING scripts/validate.sh --tests"
+  sh -c "cd '$vrepo' && env -u PROCESS_VALIDATE_RUNNING .method/scripts/validate.sh --tests"
 assert_not_contains "$(last_output)" "orphan process" "no orphan line on a clean run"
 
 # 4. sessions.sh --list marks an orphan claude; a claude with a live parent has no mark.

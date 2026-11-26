@@ -29,8 +29,8 @@ deny() {
 }
 
 here="$(cd "$(dirname "$0")" && pwd)"
-# shellcheck source=scripts/lib/common.sh
-source "$here/../../scripts/lib/common.sh"
+# shellcheck source=.method/scripts/lib/common.sh
+source "$here/../../.method/scripts/lib/common.sh"
 input="$(cat)"
 cmd="$(printf '%s' "$input" | jq -r '.tool_input.command // empty')" || deny "invalid hook input"
 sid="$(printf '%s' "$input" | jq -r '.session_id // empty')"

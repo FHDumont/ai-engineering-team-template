@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Tests of .githooks/pre-push: a push to main is refused only in the unprotected mode.
-# shellcheck source=scripts/tests/lib.sh
+# shellcheck source=.method/scripts/tests/lib.sh
 source "$(dirname "$0")/lib.sh"
 
 repo="$(make_repo)"

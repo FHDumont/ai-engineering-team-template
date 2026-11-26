@@ -2,7 +2,7 @@
 # block-agent-pair.sh: PreToolUse (Agent) hook. Every agent or subagent opens with an
 # explicit model and effort (AGENTS.md, rule 8): a call without one of them is blocked
 # with exit 2. The agents of the repo (close-reviewer, triage) declare no pair: theirs
-# is the one of their weight in scripts/lib/weights.tsv, and any other pair is blocked.
+# is the one of their weight in .method/scripts/lib/weights.tsv, and any other pair is blocked.
 # Fails closed on input it cannot read.
 set -euo pipefail
 here="$(cd "$(dirname "$0")" && pwd)"
@@ -22,11 +22,11 @@ case "$(printf '%s' "$input" | jq -r '.tool_input.subagent_type // ""')" in
   triage) weight=triage ;;
   *) exit 0 ;;
 esac
-want="$("$here/../../scripts/weights.sh" "$weight" 2>/dev/null)" || {
-  echo "blocked by block-agent-pair: cannot read the $weight weight (scripts/weights.sh $weight)" >&2
+want="$("$here/../../.method/scripts/weights.sh" "$weight" 2>/dev/null)" || {
+  echo "blocked by block-agent-pair: cannot read the $weight weight (.method/scripts/weights.sh $weight)" >&2
   exit 2
 }
 got="$(printf '%s' "$input" | jq -r '.tool_input | "\(.model) \(.effort)"')"
 [ "$got" = "$want" ] && exit 0
-echo "blocked by block-agent-pair: this agent opens with the $weight weight of scripts/lib/weights.tsv (model ${want% *}, effort ${want#* }), not with ${got% *} and ${got#* }" >&2
+echo "blocked by block-agent-pair: this agent opens with the $weight weight of .method/scripts/lib/weights.tsv (model ${want% *}, effort ${want#* }), not with ${got% *} and ${got#* }" >&2
 exit 2

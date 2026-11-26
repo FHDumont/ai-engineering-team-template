@@ -12,16 +12,16 @@
 #: Prints the reply bodies and exits 0; exits 3 on timeout; exits 1 when the
 #: comments cannot be read or the question is not on the issue.
 #: Early warning (stderr, once, before the first wait): a question comment without the
-#: authorship header (scripts/lib/author.sh) was not posted by ask-bot.sh, so the bot
+#: authorship header (.method/scripts/lib/author.sh) was not posted by ask-bot.sh, so the bot
 #: may never have been notified; run ask-bot.sh --retry <id> instead of waiting in vain.
 #: --warn-after S (default 180): with no reply after S seconds, warns once on stderr that
 #: the bot did not react, suggests ask-bot.sh --retry, and keeps waiting until the timeout.
 #: When the reply is found it records a bot_reply event (bot, ask_id) in the trace.
 set -euo pipefail
 HERE="$(cd "$(dirname "$0")" && pwd)"
-# shellcheck source=scripts/lib/common.sh
+# shellcheck source=.method/scripts/lib/common.sh
 source "$HERE/lib/common.sh"
-# shellcheck source=scripts/lib/author.sh
+# shellcheck source=.method/scripts/lib/author.sh
 source "$HERE/lib/author.sh"
 
 [ $# -gt 0 ] || { print_help "$0"; exit 2; }

@@ -4,7 +4,7 @@ import pathlib
 import re
 import unittest
 
-ROOT = pathlib.Path(__file__).absolute().parents[2]
+ROOT = pathlib.Path(__file__).absolute().parents[3]
 
 
 def accepts(text, name):
@@ -34,7 +34,7 @@ class ScriptFlagTests(unittest.TestCase):
     def test_every_cited_flag_exists(self):
         files = [ROOT / "AGENTS.md"] + list((ROOT / ".claude/skills").rglob("*.md"))
         cite = re.compile(
-            r"`scripts/([A-Za-z0-9_.-]+\.sh)([^`]*)`\s*(?:\(\s*`?(--[A-Za-z0-9-]+)`?\s*\))?"
+            r"`.method/scripts/([A-Za-z0-9_.-]+\.sh)([^`]*)`\s*(?:\(\s*`?(--[A-Za-z0-9-]+)`?\s*\))?"
         )
         flag = re.compile(r"--([A-Za-z0-9][\w-]*)")
         bad = []
@@ -45,11 +45,11 @@ class ScriptFlagTests(unittest.TestCase):
                     flags = flag.findall(rest)
                     if paren:
                         flags.append(paren[2:])
-                    body_path = ROOT / "scripts" / script
+                    body_path = ROOT / ".method" / "scripts" / script
                     body = body_path.read_text(encoding="utf-8") if body_path.is_file() else ""
                     for name in flags:
                         if not body or not accepts(body, name):
-                            bad.append("%s:%d scripts/%s --%s" % (path.relative_to(ROOT), n, script, name))
+                            bad.append("%s:%d .method/scripts/%s --%s" % (path.relative_to(ROOT), n, script, name))
         self.assertEqual([], bad)
 
 

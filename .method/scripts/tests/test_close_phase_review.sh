@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Tests of close-phase.sh --publish-review.
-# shellcheck source=scripts/tests/close_phase_common.sh
+# shellcheck source=.method/scripts/tests/close_phase_common.sh
 source "$(dirname "$0")/close_phase_common.sh"
 
 handler "type:feature" success
@@ -57,7 +57,7 @@ mkdir -p "$TMP/wt/.process"
 cp "$TMP/review.md" "$TMP/wt/.process/reviewer-$SHA.md"
 : >"$FAKE_GH_LOG"
 assert_status 0 "publishes a review saved in the .process/ of the phase worktree" \
-  sh -c "cd '$TMP/wt' && '$TMP/wt/scripts/close-phase.sh' --publish-review '$TMP/review.md' --verdict success --round 1"
+  sh -c "cd '$TMP/wt' && '$TMP/wt/.method/scripts/close-phase.sh' --publish-review '$TMP/review.md' --verdict success --round 1"
 assert_contains "$(gh_calls)" "context=review/independent" "the worktree review sets the status"
 assert_eq "success" "$(cat "$TMP/wt/.process/reviewer-$SHA.verdict")" "the .verdict goes beside the saved review"
 git -C "$repo" worktree remove --force "$TMP/wt"

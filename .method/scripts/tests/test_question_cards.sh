@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # setup and plan stay inside the 4-question card limit (issue #116).
-# shellcheck source=scripts/tests/lib.sh
+# shellcheck source=.method/scripts/tests/lib.sh
 source "$(dirname "$0")/lib.sh"
 
 plan="$(cat "$REPO/.claude/skills/plan/SKILL.md")"

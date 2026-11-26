@@ -3,19 +3,19 @@
 #
 # Applies to gh issue comment, gh pr comment and gh issue|pr close --comment.
 # Blocks (exit 2, reason on stderr) when:
-#  - the text has no authorship header line (scripts/lib/author.sh): the owner, the
+#  - the text has no authorship header line (.method/scripts/lib/author.sh): the owner, the
 #    manager, the children and the bots share one account, and a comment without the
 #    header is read as the owner's;
 #  - the text cites a bot of .github/bots.tsv (slug or name, any case; BOTS_FILE
 #    overrides) or carries an <!-- ask:...: --> marker: a loose comment never
-#    notifies the bot, so the request goes through scripts/ask-bot.sh (--append
+#    notifies the bot, so the request goes through .method/scripts/ask-bot.sh (--append
 #    for new information on an open question).
 # The text is the command, its arguments and the files named by --body-file/-F; a
 # heredoc stays in the command, so it is seen too.
 set -euo pipefail
 here="$(cd "$(dirname "$0")" && pwd)"
-# shellcheck source=scripts/lib/common.sh
-source "$here/../../scripts/lib/common.sh"
+# shellcheck source=.method/scripts/lib/common.sh
+source "$here/../../.method/scripts/lib/common.sh"
 
 input="$(cat)"
 cmd="$(printf '%s' "$input" | jq -r '.tool_input.command // empty')"
@@ -97,7 +97,7 @@ def header_ok(body):
 if not header_ok(text):
     die("blocked by block-bot-comment: a comment from an agent starts with the authorship header (AGENTS.md rule 6):\n"
         "**De:** <papel> · **Para:** <papel> · **Pedido:** <ask_id ou o quê> · **Responde a:** <link ou —>\n"
-        "scripts/lib/author.sh: author_header; no header means the owner wrote it")
+        ".method/scripts/lib/author.sh: author_header; no header means the owner wrote it")
 
 def recipients(body):
     m = re.search(r"\*\*Para:\*\*\s*(.*?)(?:\s*·|\s*$)", body)
@@ -111,13 +111,13 @@ def names_bot(part, slug, name):
 
 for slug, name in bots():
     if re.search(r"(?<![\w-])@" + re.escape(slug) + r"(?![\w-])", text, re.I):
-        die('blocked by block-bot-comment: the comment cites the bot "%s"; a request to a bot goes through scripts/ask-bot.sh <bot> <issue> "text" (--append for new information on an open question); a loose comment never notifies the bot' % slug)
+        die('blocked by block-bot-comment: the comment cites the bot "%s"; a request to a bot goes through .method/scripts/ask-bot.sh <bot> <issue> "text" (--append for new information on an open question); a loose comment never notifies the bot' % slug)
     if any(names_bot(p, slug, name) for p in recipients(text)):
-        die('blocked by block-bot-comment: the comment cites the bot "%s"; a request to a bot goes through scripts/ask-bot.sh <bot> <issue> "text" (--append for new information on an open question); a loose comment never notifies the bot' % (name or slug))
+        die('blocked by block-bot-comment: the comment cites the bot "%s"; a request to a bot goes through .method/scripts/ask-bot.sh <bot> <issue> "text" (--append for new information on an open question); a loose comment never notifies the bot' % (name or slug))
 
 plain = re.sub(r"```.*?```", "", text, flags=re.S)
 plain = re.sub(r"`[^`]*`", "", plain)
 if re.search(r"<!--\s*ask:[A-Za-z0-9-]+:[A-Za-z0-9_-]+\s*-->", plain):
-    die("blocked by block-bot-comment: <!-- ask: markers come only from scripts/ask-bot.sh")
+    die("blocked by block-bot-comment: <!-- ask: markers come only from .method/scripts/ask-bot.sh")
 sys.exit(0)
 PY

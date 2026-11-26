@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Tests for the block-card-title.sh hook.
-# shellcheck source=scripts/tests/lib.sh
-source "$(dirname "$0")/../../../scripts/tests/lib.sh"
+# shellcheck source=.method/scripts/tests/lib.sh
+source "$(dirname "$0")/../../../.method/scripts/tests/lib.sh"
 HOOK="$REPO/.claude/hooks/block-card-title.sh"
 
 run() { # run <session_id> <cwd> <question>...

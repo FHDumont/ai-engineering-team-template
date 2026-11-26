@@ -5,7 +5,7 @@ description: Planejamento nível 2 — lê por inteiro só as issues escolhidas 
 
 # Planejar
 
-1. `scripts/setup-repo.sh --offers`: pendente, quadro.
+1. `.method/scripts/setup-repo.sh --offers`: pendente, quadro.
 2. Sem issue: grilling e `open-issue.sh`.
 3. Leia só as issues escolhidas, `docs/STATE.md`, ADRs.
 3a. **Par da sessão:** `light`/`medium` fica no atual; `strong`: quadro com os dois pares.
@@ -13,11 +13,11 @@ description: Planejamento nível 2 — lê por inteiro só as issues escolhidas 
 4a. §2.1: critério verificável.
 5. Escreva `docs/specs/AAAA-MM-DD-<group>.md`, seção por fase:
    - issue, objetivo, pronto quando, arquivos;
-   - etapas com `modelo: … · esforço: … · motivo: …` (`scripts/weights.sh <peso>`);
+   - etapas com `modelo: … · esforço: … · motivo: …` (`.method/scripts/weights.sh <peso>`);
    - modo de fim, área sensível, solo ou paralela (`integration.md`).
 5b. Lab-test: a spec separa a prova da parada, a do fecho e a do pós-merge. O brief não pede na parada prova que só existe depois. Pós-merge escreve "issue fica aberta até a prova".
 6. Ok da spec: quadro (ou label `approved`). Aplique `end:*` e `group:*`.
-7. **Antes de `start_session`:** linha com o par atual e o da spec; nunca execute aqui. Abertura: só `scripts/phase-start.sh <n> [<n>…]`.
+7. **Antes de `start_session`:** linha com o par atual e o da spec; nunca execute aqui. Abertura: só `.method/scripts/phase-start.sh <n> [<n>…]`.
    - **Filhas:** no mesmo turno do "executar", um `start_session` por fase, com: `initiation: "user_asked"`, `context: "fresh"`, `use_worktree: false`, `title`, `prompt`, `background`, `model`/`effort` da spec. O `check-env.sh` confere.
    - **Batimento, depois das filhas:** só com `list_sessions` mostrando filha rodando. 4 minutos: faz o próximo passo; só escreve, com o bloco, se o estado mudou. apague o batimento neste turno; volta a trabalhar. sem "Sem mudança.".
    - **Sem vaga**: `phase-start.sh` espera; nunca cartão por vaga. Faltando: ondas; pendente: cartão ou batimento. Acima: 76.

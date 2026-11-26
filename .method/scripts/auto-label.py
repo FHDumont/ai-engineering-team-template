@@ -25,8 +25,8 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.join(HERE, "lib"))
 import issue_template as it  # noqa: E402
 
-ROOT = os.path.dirname(HERE)
-# Note between repos: "**De:** … **Para:** …" header (scripts/lib/author.sh).
+ROOT = os.path.dirname(os.path.dirname(HERE))
+# Note between repos: "**De:** … **Para:** …" header (.method/scripts/lib/author.sh).
 RELAY_NOTE = re.compile(r"\*\*De:\*\* .+ · \*\*Para:\*\* ")
 COMMENT_MARK = "<!-- auto-label:needs-context -->"
 
@@ -43,7 +43,7 @@ SENSITIVE = [(r"\b(auth|login|autentica\w*|oauth|sso)\b", "area:auth"),
              (r"\b(billing|cobran\w*|pagamento\w*|payment\w*)\b", "area:billing"),
              (r"\b(migration\w*|migra[çc][ãa]o|migra[çc][õo]es)\b", "area:migration"),
              (r"\b(credentials?|credencia\w*|segredos?|secrets?)\b|\.env\b", "area:credentials")]
-PATH_AREAS = [(r"(^|\s|`)scripts/", "area:scripts"),
+PATH_AREAS = [(r"(^|\s|`).method/scripts/", "area:scripts"),
               (r"(^|\s|`)\.github/", "area:ci"),
               (r"(^|\s|`)docs/", "area:docs"),
               (r"(^|\s|`)\.claude/", "area:process")]

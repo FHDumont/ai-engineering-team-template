@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # Shared preparation of the test_block_phase_commit_*.sh files (not a test itself):
 # the hook, the run/blocked/allowed helpers and a checkout with phase worktrees and its trace.
-# shellcheck source=scripts/tests/lib.sh
-source "$(dirname "${BASH_SOURCE[0]}")/../../../scripts/tests/lib.sh"
+# shellcheck source=.method/scripts/tests/lib.sh
+source "$(dirname "${BASH_SOURCE[0]}")/../../../.method/scripts/tests/lib.sh"
 HOOK="$REPO/.claude/hooks/block-phase-commit.sh"
 
 run() { # run <session_id> <cwd> <command>

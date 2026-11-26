@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Tests of setup-runner.sh.
-# shellcheck source=scripts/tests/lib.sh
+# shellcheck source=.method/scripts/tests/lib.sh
 source "$(dirname "$0")/lib.sh"
 RUNNER="$SCRIPTS/setup-runner.sh"
 
@@ -21,7 +21,7 @@ assert_contains "$out" "config.sh" "dry-run shows config.sh"
 assert_contains "$out" "CI_RUNS_ON" "dry-run shows CI_RUNS_ON"
 assert_contains "$out" "service" "dry-run shows the service step"
 case "$(printf '%s\n' "$out" | tail -1)" in
-  *"to register, run only: scripts/setup-runner.sh --register"*) ok ;;
+  *"to register, run only: .method/scripts/setup-runner.sh --register"*) ok ;;
   *) bad "dry-run last line must say to register with only --register" ;;
 esac
 [ ! -e "$TMP/called" ] && ok || bad "dry-run called gh or curl"

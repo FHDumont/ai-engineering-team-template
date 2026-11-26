@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
-# Tests of the `op read` environment in scripts/lib/secret.sh: no request to the password
+# Tests of the `op read` environment in .method/scripts/lib/secret.sh: no request to the password
 # manager desktop app (OP_BIOMETRIC_UNLOCK_ENABLED=false) and the token only in the command.
 # security and op are stubs on PATH; nothing touches the real credential store or password manager.
-# shellcheck source=scripts/tests/lib.sh
+# shellcheck source=.method/scripts/tests/lib.sh
 source "$(dirname "$0")/lib.sh"
 
 mkdir -p "$TMP/bin"
@@ -28,7 +28,7 @@ export USER="tester"
 export OP_BIOMETRIC_UNLOCK_ENABLED=true
 unset OP_SERVICE_ACCOUNT_TOKEN MY_SECRET
 
-# shellcheck source=scripts/lib/secret.sh
+# shellcheck source=.method/scripts/lib/secret.sh
 source "$SCRIPTS/lib/secret.sh"
 
 rc=0
@@ -42,7 +42,7 @@ assert_not_contains "$(env)" "TOKEN-env-check-77" "token is not exported"
 assert_not_contains "$(cat "$TMP/get.out" "$TMP/get.err")" "TOKEN-env-check-77" "token is not printed"
 
 # op_ready (vault list asks for the desktop app) no longer exists.
-# shellcheck source=scripts/lib/common.sh
+# shellcheck source=.method/scripts/lib/common.sh
 source "$SCRIPTS/lib/common.sh"
 rc=0
 declare -F op_ready >/dev/null || rc=$?

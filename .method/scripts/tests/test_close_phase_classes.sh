@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Tests of the two classes of .github/sensitive-paths in close-phase.sh --merge (#186):
 # owner-ok needs the owner; gate needs a second close-reviewer opinion and no owner.
-# shellcheck source=scripts/tests/close_phase_common.sh
+# shellcheck source=.method/scripts/tests/close_phase_common.sh
 source "$(dirname "$0")/close_phase_common.sh"
 
 # The gate_review event goes where the gate reads the trace.

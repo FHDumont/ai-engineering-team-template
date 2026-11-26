@@ -7,7 +7,7 @@
 #:         phase, it looks only at the files changed against the merge-base with the
 #:         main branch (AI_METHOD_LINT_BASE) and the untracked ones; the full
 #:         validation stays in close-phase.sh --prepare and in the CI.
-#: --tests: runs scripts/tests/test_*.sh, scripts/tests/test_*.py and
+#: --tests: runs .method/scripts/tests/test_*.sh, .method/scripts/tests/test_*.py and
 #:          .claude/hooks/tests/test_*.sh. When .github/validate-repo.sh exists,
 #:          it runs after those tests and its exit code counts: that is where
 #:          the repository puts its own checks, without editing this file.
@@ -18,7 +18,7 @@
 #: Affected tests: in a phase (branch with issue-<n>, outside the CI) the tests run are
 #: the ones the diff against the merge-base with AI_METHOD_LINT_BASE reaches, plus the
 #: gate tests (file names with "gate") and test_pipefail.sh, which scans every script. The map is read from the tests themselves: a
-#: test is affected when its text mentions a changed file; for a file in scripts/lib,
+#: test is affected when its text mentions a changed file; for a file in .method/scripts/lib,
 #: also when it mentions a script that mentions the library. Docs and root .md
 #: files the suite does not read (the rule of ci.yml) need no test. A changed file
 #: that no test reaches means there is no map: everything runs. The output says
@@ -43,7 +43,7 @@
 #: report keeps the fixed order of the tests.
 #:
 #: Progress (for the owner and the dashboard, never printed): each step goes to
-#: ~/.cache/ai-method/progress/<repo>-<issue>.jsonl (scripts/progress.sh reads it).
+#: ~/.cache/ai-method/progress/<repo>-<issue>.jsonl (.method/scripts/progress.sh reads it).
 #:
 #: Orphans: every test runs with TMPDIR inside a folder of this run. At the end, and on
 #: INT/TERM, a process still alive there (cwd or command line in that folder) is stopped
@@ -56,15 +56,15 @@
 #: so close-phase.sh --prepare can reuse it.
 set -euo pipefail
 HERE="$(cd "$(dirname "$0")" && pwd)"
-# shellcheck source=scripts/lib/common.sh
+# shellcheck source=.method/scripts/lib/common.sh
 source "$HERE/lib/common.sh"
-# shellcheck source=scripts/lib/slots.sh
+# shellcheck source=.method/scripts/lib/slots.sh
 source "$HERE/lib/slots.sh"
-# shellcheck source=scripts/lib/progress.sh
+# shellcheck source=.method/scripts/lib/progress.sh
 source "$HERE/lib/progress.sh"
-# shellcheck source=scripts/lib/procs.sh
+# shellcheck source=.method/scripts/lib/procs.sh
 source "$HERE/lib/procs.sh"
-ROOT="$(cd "$HERE/.." && pwd)"
+ROOT="$(cd "$HERE/../.." && pwd)"
 cd "$ROOT"
 
 lint=0 tests=0 full=0
@@ -89,7 +89,7 @@ incremental=0
 # --prepare, check-env.sh or directly) would run the suite inside the suite, without
 # end. The mark travels in the environment of every test.
 if [ -n "${PROCESS_VALIDATE_RUNNING:-}" ]; then
-  die "validate.sh is already running: a test called it again (PROCESS_VALIDATE_RUNNING is set); stub scripts/validate.sh in the temporary repo of the test" 3
+  die "validate.sh is already running: a test called it again (PROCESS_VALIDATE_RUNNING is set); stub .method/scripts/validate.sh in the temporary repo of the test" 3
 fi
 export PROCESS_VALIDATE_RUNNING=1
 
@@ -128,16 +128,16 @@ select_tests() {
     [ -n "$f" ] || continue
     inert_path "$f" && continue
     case "$f" in
-      scripts/tests/test_*|.claude/hooks/tests/test_*)
+      .method/scripts/tests/test_*|.claude/hooks/tests/test_*)
         [ ! -e "$f" ] || sel="$sel"$'\n'"$f"
         continue ;;
     esac
-    # The tests read the files they exercise; a shared library (scripts/lib) is
+    # The tests read the files they exercise; a shared library (.method/scripts/lib) is
     # exercised through the scripts that load it, so their tests count too.
     names="$(basename "$f")"
     case "$f" in
-      scripts/lib/*)
-        for r in $(git grep -lF -e "$names" -- scripts .claude .github ':(exclude)scripts/tests' ':(exclude).claude/hooks/tests' 2>/dev/null || true); do
+      .method/scripts/lib/*)
+        for r in $(git grep -lF -e "$names" -- .method/scripts .claude .github ':(exclude).method/scripts/tests' ':(exclude).claude/hooks/tests' 2>/dev/null || true); do
           names="$names $(basename "$r")"
         done ;;
     esac
@@ -241,7 +241,7 @@ for f in sys.argv[1:]:
 
   if [ "$tests" = 1 ]; then
     local list=() n_total rdir pid n_seen=0 line runner alive
-    for t in scripts/tests/test_*.sh .claude/hooks/tests/test_*.sh scripts/tests/test_*.py; do
+    for t in .method/scripts/tests/test_*.sh .claude/hooks/tests/test_*.sh .method/scripts/tests/test_*.py; do
       [ -e "$t" ] && list+=("$t")
     done
     n_total=${#list[@]}

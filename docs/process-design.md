@@ -16,11 +16,11 @@ São cinco. Cada uma tem uma trava que roda sozinha. A trava saiu com o código 
 
 | Regra | Script e hook que barram | Código de saída | O que o agente faz |
 |---|---|---|---|
-| 1. Plan obrigatório: a fase só abre com spec no git que cita a issue | `scripts/phase-start.sh` | 1 | Carrega a skill `plan`, escreve a spec, pede o ok do dono e roda `scripts/phase-start.sh <n>` de novo |
-| 2. Fase em sessão filha: a sessão que abriu a fase não escreve nela | `.claude/hooks/block-phase-commit.sh` e `.claude/hooks/block-phase-edit.sh`; `.githooks/reference-transaction`; `scripts/close-phase.sh` | 2 nos hooks do agente; 1 no hook do git; 9 no `close-phase.sh` | Manda o pedido à sessão filha por `send_message` e para com o bloco de status |
-| 3. Deploy único pela sessão principal | `scripts/deploy.sh`; `.claude/hooks/block-dangerous-git.sh` | 1 no `deploy.sh`; 2 no hook | A sessão de fase termina sem deploy. A sessão principal roda `scripts/deploy.sh` no passo único de fim |
-| 4. Conflito mecânico sem cartão: PR em conflito com a `main` é refeito por script | `scripts/close-phase.sh --check`, que chama `scripts/redo-phase.sh` | 0 com o PR novo; 4 com conflito real | Com 0, segue do PR novo. Com 4, resolve os arquivos listados, faz `git add` pelo nome, `git cherry-pick --continue` e roda `scripts/redo-phase.sh` de novo |
-| 5. Fim coerente: `pronto` só com o fim limpo | `scripts/status.sh --state pronto`, que roda `scripts/end-check.sh` | 1 | Corrige cada linha `fail:` e roda de novo. Até lá o Estado é `trabalhando` |
+| 1. Plan obrigatório: a fase só abre com spec no git que cita a issue | `.method/scripts/phase-start.sh` | 1 | Carrega a skill `plan`, escreve a spec, pede o ok do dono e roda `.method/scripts/phase-start.sh <n>` de novo |
+| 2. Fase em sessão filha: a sessão que abriu a fase não escreve nela | `.claude/hooks/block-phase-commit.sh` e `.claude/hooks/block-phase-edit.sh`; `.githooks/reference-transaction`; `.method/scripts/close-phase.sh` | 2 nos hooks do agente; 1 no hook do git; 9 no `close-phase.sh` | Manda o pedido à sessão filha por `send_message` e para com o bloco de status |
+| 3. Deploy único pela sessão principal | `.method/scripts/deploy.sh`; `.claude/hooks/block-dangerous-git.sh` | 1 no `deploy.sh`; 2 no hook | A sessão de fase termina sem deploy. A sessão principal roda `.method/scripts/deploy.sh` no passo único de fim |
+| 4. Conflito mecânico sem cartão: PR em conflito com a `main` é refeito por script | `.method/scripts/close-phase.sh --check`, que chama `.method/scripts/redo-phase.sh` | 0 com o PR novo; 4 com conflito real | Com 0, segue do PR novo. Com 4, resolve os arquivos listados, faz `git add` pelo nome, `git cherry-pick --continue` e roda `.method/scripts/redo-phase.sh` de novo |
+| 5. Fim coerente: `pronto` só com o fim limpo | `.method/scripts/status.sh --state pronto`, que roda `.method/scripts/end-check.sh` | 1 | Corrige cada linha `fail:` e roda de novo. Até lá o Estado é `trabalhando` |
 
 Onde cada regra está descrita: 1 e 2 na §4.3; 3 na §9.4; 4 na §6.1; 5 na §2, regra 4.
 
@@ -39,12 +39,12 @@ Onde cada regra está descrita: 1 e 2 na §4.3; 3 na §9.4; 4 na §6.1; 5 na §2
 
 ## 2. Regras para todo agente
 
-1. **O dono do repo nunca roda script do método nem mexe em configuração do método.** O ambiente local do projeto, quando a regra do projeto é o dono operar, continua com o dono. O setup do método (labels, proteção de branch, configurações) é pré-aprovado: o agente roda `scripts/setup-repo.sh` sozinho sempre que algo sair do padrão. **O setup é obrigatório:** nada do método funciona antes dele. A conferência é uma só, `scripts/setup-repo.sh --check`: lê uma vez as labels, os ajustes do repo, a proteção da `main` e as ofertas (§8.3) e sai 0 só com tudo conferido e nenhuma oferta sem resposta. Faltou algo, sai 7 com uma linha `missing:` por parte e a frase a dizer, "configurar o repo" (skill `setup`); plano sem proteção de branch, sai 7 até o ok do dono gravar o modo (§10.5). Travas: o `scripts/phase-start.sh` roda a conferência antes de tudo e recusa sem criar nada (nenhuma opção a pula, nem `--no-check`); o `scripts/open-issue.sh` dá a mesma mensagem quando o `gh` recusa a issue por falta das labels; o hook `session-setup-check.sh` avisa o agente no início da sessão (§6.2).
+1. **O dono do repo nunca roda script do método nem mexe em configuração do método.** O ambiente local do projeto, quando a regra do projeto é o dono operar, continua com o dono. O setup do método (labels, proteção de branch, configurações) é pré-aprovado: o agente roda `.method/scripts/setup-repo.sh` sozinho sempre que algo sair do padrão. **O setup é obrigatório:** nada do método funciona antes dele. A conferência é uma só, `.method/scripts/setup-repo.sh --check`: lê uma vez as labels, os ajustes do repo, a proteção da `main` e as ofertas (§8.3) e sai 0 só com tudo conferido e nenhuma oferta sem resposta. Faltou algo, sai 7 com uma linha `missing:` por parte e a frase a dizer, "configurar o repo" (skill `setup`); plano sem proteção de branch, sai 7 até o ok do dono gravar o modo (§10.5). Travas: o `.method/scripts/phase-start.sh` roda a conferência antes de tudo e recusa sem criar nada (nenhuma opção a pula, nem `--no-check`); o `.method/scripts/open-issue.sh` dá a mesma mensagem quando o `gh` recusa a issue por falta das labels; o hook `session-setup-check.sh` avisa o agente no início da sessão (§6.2).
 2. **Idioma** conforme a §1.
 3. **Toda decisão do dono é um quadro de escolha** (`AskUserQuestion`), uma pergunta por decisão, que começa por `Fase #n — título`. O hook `block-card-title.sh` barra o quadro sem esse começo quando há fase aberta. Nunca peça ao dono para digitar o número de um item.
    - Só a sessão principal pergunta. A sessão filha manda a dúvida por mensagem e recebe `respondido: <decisão>`.
    - A sessão filha abre quadro para uma coisa só: a autorização da ação sensível que ela mesma executa (merge com `needs-owner-ok`; `close-phase.sh --abort --discard`). O ok do dono não atravessa sessões.
-4. **Bloco de status em toda parada e em toda mensagem final de turno.** Rode `scripts/status.sh` e cole a saída como está, fora de bloco de código. São três linhas em negrito:
+4. **Bloco de status em toda parada e em toda mensagem final de turno.** Rode `.method/scripts/status.sh` e cole a saída como está, fora de bloco de código. São três linhas em negrito:
 
    **Estado:** trabalhando | esperando você | pronto
 
@@ -55,7 +55,7 @@ Onde cada regra está descrita: 1 e 2 na §4.3; 3 na §9.4; 4 na §6.1; 5 na §2
    - Exceção: o batimento da gerenciadora (§4.3) que acha o mesmo estado do batimento anterior (mesmas fases, mesmos estados, mesmo "Você precisa") termina o turno vazio, sem mensagem, sem o bloco e sem "Sem mudança."; com todas as fases só esperando o dono, o batimento é apagado nesse turno. Mudou algo (sessão iniciada, pergunta de filha, PR em outro estado, ação pendente nova): escreve e cola o bloco.
    - `trabalhando`: em andamento; `Você precisa: nada`.
    - `esperando você`: só com uma ação do dono em `--need`. Sem `--need`, o `status.sh` troca o estado para `trabalhando`.
-   - `pronto`: o trabalho da sessão acabou. O `status.sh` roda o `scripts/end-check.sh` e sai 1 enquanto sobrar algo; `pronto` com `--need` também sai 1.
+   - `pronto`: o trabalho da sessão acabou. O `status.sh` roda o `.method/scripts/end-check.sh` e sai 1 enquanto sobrar algo; `pronto` com `--need` também sai 1.
    - Na sessão principal, o `status.sh` lista antes do bloco cada fase aberta como `#n — título — estado` e põe em "Você precisa" a ação que uma fase espera do dono.
 5. **Paralelo é o modo preferido.** A sessão de planejamento abre as sessões das fases.
 6. **O que carrega sempre é pequeno.** Skills carregam só na etapa; `integration.md` só em fase paralela; regra de pasta (`<pasta>/CLAUDE.md`) só quando a pasta é tocada.
@@ -94,15 +94,15 @@ Baseados nas observações de Andrej Karpathy ([andrej-karpathy-skills](https://
 |---|---|
 | Nunca commitar na `main`; toda fase tem branch e worktree próprios | `.githooks/pre-commit`, `block-dangerous-git.sh` |
 | Nunca `git add -A`, `git add .`, `git add --all`, `git commit -a`; adicione arquivos pelo nome | `block-dangerous-git.sh` |
-| Merge só por `scripts/close-phase.sh --merge`, que usa `gh pr merge --auto --rebase --delete-branch`. Nunca `gh pr merge` direto, `--squash` nem `--admin` | deny do `.claude/settings.json`, `block-dangerous-git.sh` |
+| Merge só por `.method/scripts/close-phase.sh --merge`, que usa `gh pr merge --auto --rebase --delete-branch`. Nunca `gh pr merge` direto, `--squash` nem `--admin` | deny do `.claude/settings.json`, `block-dangerous-git.sh` |
 | Nunca `git push --force` nem `git reset --hard` | deny do `.claude/settings.json`, `block-dangerous-git.sh` |
-| No fim da fase, `git branch` mostra só a `main` atualizada | `scripts/end-check.sh` |
+| No fim da fase, `git branch` mostra só a `main` atualizada | `.method/scripts/end-check.sh` |
 
 ---
 
 ## 3. Modelo e esforço
 
-1. **Os pares ficam num arquivo.** `scripts/lib/weights.tsv` guarda o modelo e o esforço de cada peso; `scripts/weights.sh <peso>` imprime o par. Nenhum agente, skill ou script cita nome de modelo. Para mudar um par, edite esse arquivo e só ele.
+1. **Os pares ficam num arquivo.** `.method/scripts/lib/weights.tsv` guarda o modelo e o esforço de cada peso; `.method/scripts/weights.sh <peso>` imprime o par. Nenhum agente, skill ou script cita nome de modelo. Para mudar um par, edite esse arquivo e só ele.
 
    | Peso | Quando |
    |---|---|
@@ -112,10 +112,10 @@ Baseados nas observações de Andrej Karpathy ([andrej-karpathy-skills](https://
    | `reviewer` | o agente `close-reviewer` (revisão independente) |
    | `triage` | o agente `triage` |
 
-2. **A spec traz o par.** Cada fase e cada etapa da spec tem uma linha `modelo: <modelo> · esforço: <esforço> · motivo: <motivo>`, com o par que `scripts/weights.sh <peso>` imprime.
+2. **A spec traz o par.** Cada fase e cada etapa da spec tem uma linha `modelo: <modelo> · esforço: <esforço> · motivo: <motivo>`, com o par que `.method/scripts/weights.sh <peso>` imprime.
 3. **O par da sessão de planejamento.** Trabalho `light` e `medium` fica no par da sessão. Com item `strong` ou ambiguidade que muda o escopo, a sessão mostra num quadro o par atual e o do peso `strong`, antes de qualquer `start_session`, e o dono troca no mesmo chat, uma vez.
 4. **Todo agente e subagente é aberto com `model` e `effort` explícitos**, inclusive o ajudante avulso. O `close-reviewer` abre com o par do peso `reviewer` e o `triage` com o do peso `triage`. Trava: `block-agent-pair.sh` (saída 2).
-5. **O par da sessão filha é conferido, não presumido.** A sessão principal passa o par da spec ao `start_session`, mas o app não garante que a sessão nasce nesse par. A trava é o `scripts/check-env.sh`, que a filha roda antes da primeira etapa. Ele lê o par real da sessão e compara:
+5. **O par da sessão filha é conferido, não presumido.** A sessão principal passa o par da spec ao `start_session`, mas o app não garante que a sessão nasce nesse par. A trava é o `.method/scripts/check-env.sh`, que a filha roda antes da primeira etapa. Ele lê o par real da sessão e compara:
 
    | Par real da filha | O que o `check-env.sh` faz | O que a filha faz |
    |---|---|---|
@@ -126,7 +126,7 @@ Baseados nas observações de Andrej Karpathy ([andrej-karpathy-skills](https://
    Sem `phase_session` da sessão, o `.githooks/pre-commit` recusa o commit de etapa no worktree (ou avisa a falta quando não há id de sessão). Fase que atualiza o próprio método: o `phase_session` gravado no início continua válido se o `check-env.sh` mudar no meio; o commit que altera esse script não precisa rodá-lo de novo antes de entrar.
 
 6. **Etapa com par diferente do da sessão.** O `check-env.sh` imprime, para cada etapa da spec, onde ela roda: par igual ao da sessão, na própria sessão; par diferente, num subagente aberto com o par da etapa.
-7. **A tabela do PR é do script.** O `close-phase.sh --prepare` escreve a seção "Modelo e esforço" do PR com a saída de `scripts/trace-view.py --pairs <issue>` (pedido × usado, com `(diverge)` onde difere). Ninguém a preenche à mão.
+7. **A tabela do PR é do script.** O `close-phase.sh --prepare` escreve a seção "Modelo e esforço" do PR com a saída de `.method/scripts/trace-view.py --pairs <issue>` (pedido × usado, com `(diverge)` onde difere). Ninguém a preenche à mão.
 
 ---
 
@@ -134,19 +134,19 @@ Baseados nas observações de Andrej Karpathy ([andrej-karpathy-skills](https://
 
 Diagrama das raias: [`docs/diagrams/process-flow.html`](diagrams/process-flow.html).
 
-0. **Pedido sem issue.** O planejamento faz o grilling do pedido, abre as issues com `scripts/open-issue.sh` e segue no mesmo chat.
+0. **Pedido sem issue.** O planejamento faz o grilling do pedido, abre as issues com `.method/scripts/open-issue.sh` e segue no mesmo chat.
 1. **Entrada.** O trabalho entra como issue por template (§8.2). As labels são aplicadas na criação pelo workflow `issues-label.yml`.
-2. **Triagem.** O agente `triage` lê só títulos e labels (`scripts/triage.sh`). Issue sem label é rotulada; a que não dá para classificar recebe `needs-context`.
+2. **Triagem.** O agente `triage` lê só títulos e labels (`.method/scripts/triage.sh`). Issue sem label é rotulada; a que não dá para classificar recebe `needs-context`.
 3. **Sugestão.** A triagem devolve uma linha com os grupos, o modo de cada um e o peso do planejamento. Grupos sem arquivo de código em comum rodam em paralelo; arquivos gerados não contam. O quadro ao dono só aparece com arquivo de código em comum, dependência entre issues, pedido expresso de modo, ou par que precisa subir.
 4. **Grilling e spec.** O planejamento lê por inteiro só as issues escolhidas. Faz um grilling único, antes de abrir qualquer filha: pergunta ao dono só o que muda alguma spec; o resto vira suposição escrita. Depois escreve uma spec curta por fase em `docs/specs/`: objetivo, pronto quando, arquivos previstos, etapas com o par (§3) e modo de fim.
 5. **Aprovação.** Um ok para a spec inteira, num quadro de escolha. A label `approved`, posta pelo dono no GitHub, vale como o mesmo ok.
-6. **Abertura.** `scripts/phase-start.sh <n> [<n>…]` (§4.3). Uma issue abre fase solo; duas ou mais abrem o grupo paralelo.
-7. **Execução.** A sessão filha roda `scripts/check-env.sh` e executa as etapas, um commit por etapa (skill `execute`). Achados seguem a §4.2.
+6. **Abertura.** `.method/scripts/phase-start.sh <n> [<n>…]` (§4.3). Uma issue abre fase solo; duas ou mais abrem o grupo paralelo.
+7. **Execução.** A sessão filha roda `.method/scripts/check-env.sh` e executa as etapas, um commit por etapa (skill `execute`). Achados seguem a §4.2.
 8. **Modo de fim.**
    - `end:auto-close`: a filha segue direto para o fecho.
    - `end:lab-test`: a filha para antes do fecho com `status.sh --state esperando --need "testar no lab …"`. A spec separa a prova da parada, a do fecho e a do pós-merge; o brief não pede na parada prova que só existe depois. Pós-merge pode dizer "issue fica aberta até a prova": o PR usa `Refs` e o quadro só vai a Done com a issue fechada. A `integrate` fecha essa issue, com as provas, antes do `gen-docs.sh`. O dono testa, itera pela sessão principal e diz "fechar fase". "Fechar fase" vale dito em qualquer sessão; quem fecha é a sessão da fase.
-9. **Fecho.** A filha fecha pelo `scripts/close-phase.sh` (§6.1), com a revisão independente (§10.2) e o merge pelo portão (§10).
-10. **Fim do grupo.** Depois do último merge do grupo, solo e paralelo, a sessão principal faz o passo único de fim, uma vez. Os passos e a ordem estão na skill `integrate`: tempo (só citado) e achados leves, depois `scripts/gen-docs.sh`, `scripts/deploy.sh`, arquivamento das sessões filhas, remoção do batimento (§4.3), `scripts/end-check.sh`. Nada que muda o roadmap acontece depois do `gen-docs.sh`. A spec do grupo sai da `main` aqui: o PR do `gen-docs.sh` remove cada spec de `docs/specs/` cujas issues citadas estão todas fechadas, a que o fecho das fases (§6.1) deixou.
+9. **Fecho.** A filha fecha pelo `.method/scripts/close-phase.sh` (§6.1), com a revisão independente (§10.2) e o merge pelo portão (§10).
+10. **Fim do grupo.** Depois do último merge do grupo, solo e paralelo, a sessão principal faz o passo único de fim, uma vez. Os passos e a ordem estão na skill `integrate`: tempo (só citado) e achados leves, depois `.method/scripts/gen-docs.sh`, `.method/scripts/deploy.sh`, arquivamento das sessões filhas, remoção do batimento (§4.3), `.method/scripts/end-check.sh`. Nada que muda o roadmap acontece depois do `gen-docs.sh`. A spec do grupo sai da `main` aqui: o PR do `gen-docs.sh` remove cada spec de `docs/specs/` cujas issues citadas estão todas fechadas, a que o fecho das fases (§6.1) deixou.
 
 Espera acima de ~2 minutos: diga o que espera e onde (o run, o PR).
 
@@ -164,7 +164,7 @@ Espera acima de ~2 minutos: diga o que espera e onde (o run, o PR).
 
 ### 4.2 Achados durante o trabalho
 
-O agente abre a issue com `scripts/open-issue.sh --type finding --size small|medium|large`.
+O agente abre a issue com `.method/scripts/open-issue.sh --type finding --size small|medium|large`.
 
 | Tamanho | O que acontece |
 |---|---|
@@ -181,11 +181,11 @@ A sessão que o dono abre é a de planejamento. Depois de abrir as fases ela vir
 **Abertura (regras-base 1 e 2).**
 
 1. "executar #n" sempre passa pela skill `plan`. O hook `prompt-phase-entry.sh` põe esse caminho no contexto do pedido. Issue sem spec, de qualquer tipo e tamanho, ganha uma spec curta na hora.
-2. A fase só abre por `scripts/phase-start.sh <n>`. Ele sai 1, sem criar nada, em três casos: issue fechada; nenhuma spec em `docs/specs` cita `#n`; a spec não tem a linha do par. Com spec, ele grava `phase_opened` no trace, cria branch e worktree (`.worktrees/issue-<n>`), commita a spec na branch e imprime os argumentos do `start_session`.
+2. A fase só abre por `.method/scripts/phase-start.sh <n>`. Ele sai 1, sem criar nada, em três casos: issue fechada; nenhuma spec em `docs/specs` cita `#n`; a spec não tem a linha do par. Com spec, ele grava `phase_opened` no trace, cria branch e worktree (`.worktrees/issue-<n>`), commita a spec na branch e imprime os argumentos do `start_session`.
    - **A abertura não roda a suíte de testes.** Antes de criar qualquer coisa, o `phase-start.sh` lê pelo GitHub o check `CI` do commit base (`origin/main`); vermelho ou ausente, ele recusa sem criar nada e diz o run; em andamento (a rodada de `push` na `main`), ele espera por ela com o progresso e o prazo `PHASE_START_CI_WAIT` (900 s) e recusa se estourar. Sem check no commit (merge feito antes da CI na `main`), aceita o PR mergeado que o contém com `CI` verde e a mesma árvore; não há rodada para esperar, então não espera nada. O portão já exige `CI` verde em todo merge, então a `main` é confiável e rodar a suíte de novo a cada fase (e a cada filha) custava minutos e carga da máquina sem fato novo. O `check-env.sh` da filha confere só o par real (ADR-005) e o ambiente: ferramentas do método (`shellcheck`) e dependências declaradas do produto (`requirements*.txt`, `package.json`), dizendo o que falta e o comando. A suíte roda no fim (`close-phase.sh --prepare`) e na CI.
    - **Falha no meio desfaz.** Se um passo falha depois de criar o worktree e a branch (spec não commitada, `check-env.sh` recusando; o quadro sem escrita não desfaz: a fase já está aberta e a mensagem diz o conserto), o `new-phase.sh` remove os dois e devolve a vaga; no grupo, o `open-parallel.sh` desfaz as fases já abertas e não deixa linha no registro. A reabertura funciona sem limpeza à mão.
 3. A gerenciadora abre todas as filhas do grupo no mesmo turno do "executar", um `start_session` por fase, com os campos: `initiation: "user_asked"`, `context: "fresh"`, `use_worktree: false`, `title`, `prompt`, `background`, `model` e `effort` da spec.
-4. O app recusou o `start_session` (turno sem mensagem do dono): a gerenciadora abre de novo com `initiation: "own_initiative"` (cartão) ou espera a fala; não roda `scripts/start-headless.sh`. Headless fica desligado por padrão (`.github/headless` ou `PROCESS_HEADLESS=on`); só entra se o dono o ligou para aquela abertura ou se o app não existe. A filha headless não ganha `--allowedTools Bash` além da filha do app. Quando ligada, `scripts/start-headless.sh <n>` abre a filha como `claude -p` em segundo plano no worktree, com o par da spec (`--model`, `--effort`), o brief da gerenciadora (`--brief` ou `--brief-file`: o mesmo `background` do `start_session`, que a filha headless não recebe de outro modo; o trace guarda `brief=yes|no`), `--session-id` próprio, log em `.worktrees/issue-<n>/.process/headless.log` (fora do git) e o evento `phase_headless` (pid, `child_session`, log) no trace. A filha roda o `check-env.sh` e grava o `phase_session` como a do app; o portão do merge não muda. Ela não tem quadro: pergunta ao dono vai como comentário na issue, e a gerenciadora devolve a resposta por `CLAUDE_CODE_PRINT_BG_WAIT_CEILING_MS=0 claude -p "<resposta>" --resume <child_session>` no worktree (o prompt logo depois do `-p`; depois de `--allowedTools` ele vira nome de ferramenta e a retomada falha). A filha sobe com a mesma variável, para o `claude -p` esperar tarefas em segundo plano. Só com saída 3 (sem `claude`) ou 4 (a filha morreu logo) a gerenciadora repete o `start_session` com `initiation: "own_initiative"`, que vira um cartão que o dono abre com um clique, e então para em `esperando você`. Todo "Você precisa" que manda o dono agir em outra sessão (clicar num cartão, responder a um quadro) diz o título exato dela, lido de volta do app e nunca chutado (sem como ler, "a sessão que abriu a fase"), e onde ela fica: "na barra lateral, dentro do agrupamento da sessão principal; se não aparecer, abra o agrupamento". Depois de abrir as filhas, a gerenciadora lê de volta o par de cada uma (`get_session`) e o cita ao dono por fase; o `scripts/status.sh` mostra o par real (do `phase_session`) na lista de fases, ou o pedido da spec marcado "(pedido)" enquanto a filha não rodou o `check-env.sh`. Fase sem `phase_session` aparece como "aberta, sem sessão", nunca `trabalhando`; cartão que já virou sessão fica `trabalhando`. A fase nunca roda na gerenciadora nem num subagente dela.
+4. O app recusou o `start_session` (turno sem mensagem do dono): a gerenciadora abre de novo com `initiation: "own_initiative"` (cartão) ou espera a fala; não roda `.method/scripts/start-headless.sh`. Headless fica desligado por padrão (`.github/headless` ou `PROCESS_HEADLESS=on`); só entra se o dono o ligou para aquela abertura ou se o app não existe. A filha headless não ganha `--allowedTools Bash` além da filha do app. Quando ligada, `.method/scripts/start-headless.sh <n>` abre a filha como `claude -p` em segundo plano no worktree, com o par da spec (`--model`, `--effort`), o brief da gerenciadora (`--brief` ou `--brief-file`: o mesmo `background` do `start_session`, que a filha headless não recebe de outro modo; o trace guarda `brief=yes|no`), `--session-id` próprio, log em `.worktrees/issue-<n>/.process/headless.log` (fora do git) e o evento `phase_headless` (pid, `child_session`, log) no trace. A filha roda o `check-env.sh` e grava o `phase_session` como a do app; o portão do merge não muda. Ela não tem quadro: pergunta ao dono vai como comentário na issue, e a gerenciadora devolve a resposta por `CLAUDE_CODE_PRINT_BG_WAIT_CEILING_MS=0 claude -p "<resposta>" --resume <child_session>` no worktree (o prompt logo depois do `-p`; depois de `--allowedTools` ele vira nome de ferramenta e a retomada falha). A filha sobe com a mesma variável, para o `claude -p` esperar tarefas em segundo plano. Só com saída 3 (sem `claude`) ou 4 (a filha morreu logo) a gerenciadora repete o `start_session` com `initiation: "own_initiative"`, que vira um cartão que o dono abre com um clique, e então para em `esperando você`. Todo "Você precisa" que manda o dono agir em outra sessão (clicar num cartão, responder a um quadro) diz o título exato dela, lido de volta do app e nunca chutado (sem como ler, "a sessão que abriu a fase"), e onde ela fica: "na barra lateral, dentro do agrupamento da sessão principal; se não aparecer, abra o agrupamento". Depois de abrir as filhas, a gerenciadora lê de volta o par de cada uma (`get_session`) e o cita ao dono por fase; o `.method/scripts/status.sh` mostra o par real (do `phase_session`) na lista de fases, ou o pedido da spec marcado "(pedido)" enquanto a filha não rodou o `check-env.sh`. Fase sem `phase_session` aparece como "aberta, sem sessão", nunca `trabalhando`; cartão que já virou sessão fica `trabalhando`. A fase nunca roda na gerenciadora nem num subagente dela.
 5. Depois de abrir as filhas e de `list_sessions` mostrar ao menos uma rodando (app ou headless), a gerenciadora cria o **batimento**, uma tarefa recorrente do agente que a cada 4 minutos lê o estado das sessões ligadas e dos PRs das fases abertas e faz o próximo passo. Só escreve ao dono quando o estado mudou desde o último batimento; igual, termina o turno sem mensagem e sem o bloco de status (a resposta mínima é um turno vazio, sem "Sem mudança."). Com todas as fases só esperando o dono, apaga o batimento neste turno — a fala do dono e o fim de turno da filha já acordam a gerenciadora — e ele é recriado quando uma fase volta a trabalhar. Com todas as filhas em cartão esperando, não há batimento: a gerenciadora retoma quando o dono escrever. Ela apaga o batimento, se criado, no passo único de fim, porque só age quando algo a acorda e o aviso de fim da filha nem sempre chega (instrução impressa pelo `phase-start.sh`, sem trava que a confira).
 
 **Emenda de spec aprovada.** A filha escreve a emenda na spec da branch e cita o ok (quadro, label `approved` ou comentário) no PR. A cópia solta no checkout principal não segura o `--cleanup`: a spec mergeada fica. O revisor separa essa decisão do dono, com a fonte, do que a filha decidiu sozinha.
@@ -227,21 +227,21 @@ Opcional. Os bots atuam nas pontas: abrem issues, respondem quando perguntados e
 
 ### 5.1 O agente pergunta a um bot
 
-`scripts/ask-bot.sh <bot> <issue> "texto"` faz os três passos:
+`.method/scripts/ask-bot.sh <bot> <issue> "texto"` faz os três passos:
 
 1. Comenta a pergunta na issue com a marca `<!-- ask:<bot>:<id> -->`.
-2. Chama o webhook do bot com o link do comentário (`scripts/notify-bot.sh`): três tentativas, `--max-time 10` cada. Sem sucesso, põe a label `ask:<bot>` na issue e o `ask-bot.sh` sai 4 sem esperar a resposta; o agente avisa o dono no bloco de status e segue com o que não depende dela.
-3. Espera a resposta (`scripts/wait-reply.sh`, 15 minutos; sem resposta no prazo sai 3): só vale o comentário com a marca `<!-- bot:<slug> reply-to:<id> -->` postado depois da pergunta. A resposta é reconhecida pela marca, não pelo autor.
+2. Chama o webhook do bot com o link do comentário (`.method/scripts/notify-bot.sh`): três tentativas, `--max-time 10` cada. Sem sucesso, põe a label `ask:<bot>` na issue e o `ask-bot.sh` sai 4 sem esperar a resposta; o agente avisa o dono no bloco de status e segue com o que não depende dela.
+3. Espera a resposta (`.method/scripts/wait-reply.sh`, 15 minutos; sem resposta no prazo sai 3): só vale o comentário com a marca `<!-- bot:<slug> reply-to:<id> -->` postado depois da pergunta. A resposta é reconhecida pela marca, não pelo autor.
 
 - `ask-bot.sh --retry` refaz o aviso e a espera sem repostar a pergunta. `ask-bot.sh --append <id> "texto" --issue <n>` leva informação nova sobre pergunta em aberto (marca `ask-append`, avisa o bot de novo, evento `bot_append`); nunca por `gh issue comment` solto, que o bot não vê e o `block-bot-comment.sh` barra.
-- URL e segredo do webhook vêm do `scripts/lib/secret.sh` na hora da chamada, nunca de arquivo do repo, argumento nem log. Ele procura nesta ordem: variável de ambiente, conta de serviço do gerenciador de senhas (CLI `op`), `.env` fora do repo (`~/.<repo-slug>/.env`, criado vazio pelo `scripts/init-env.sh`). Sem provedor, o `ask-bot.sh` para. O agente lê segredo só pelos scripts: o `.claude/settings.json` nega a chamada direta do `op`.
+- URL e segredo do webhook vêm do `.method/scripts/lib/secret.sh` na hora da chamada, nunca de arquivo do repo, argumento nem log. Ele procura nesta ordem: variável de ambiente, conta de serviço do gerenciador de senhas (CLI `op`), `.env` fora do repo (`~/.<repo-slug>/.env`, criado vazio pelo `.method/scripts/init-env.sh`). Sem provedor, o `ask-bot.sh` para. O agente lê segredo só pelos scripts: o `.claude/settings.json` nega a chamada direta do `op`.
 - O segredo vai em dois headers, `Authorization: Bearer <secret>` e `X-Automation-Key: <secret>`. Corpo:
   ```json
   {"source": "ask-bot", "bot": "<slug>", "repo": "<owner>/<name>", "issue": 11,
    "comment_url": "<link do comentário>", "ask_id": "<id>",
    "reply_marker": "<!-- bot:<slug> reply-to:<id> -->"}
   ```
-- Depois de ~10 comentários, o `scripts/summarize-thread.sh` mantém um comentário fixo (`<!-- agreed-summary -->`) editado no lugar.
+- Depois de ~10 comentários, o `.method/scripts/summarize-thread.sh` mantém um comentário fixo (`<!-- agreed-summary -->`) editado no lugar.
 
 ### 5.2 `docs/BOTS.md`
 
@@ -249,59 +249,59 @@ No máximo 450 palavras (conferido pelo `check-docs.sh`). Uma linha por bot: slu
 
 ### 5.3 Autoria visível
 
-Dono, gerenciadora, filhas e bots comentam como a mesma conta do GitHub. Todo comentário de agente ou bot abre com uma linha: `**De:** <papel> · **Para:** <papel> · **Pedido:** <ask_id> · **Responde a:** <link ou —>`, com papéis dono, gerenciadora, `fase #n`, revisor e `bot <nome>`. Comentário sem o cabeçalho é do dono. O cabeçalho identifica o papel e não é assinatura de IA: segue sem emoji e sem "Generated with" (regra 9 das regras para todo agente). O `scripts/lib/author.sh` gera a linha (`author_header`; `AUTHOR_FROM` troca o "De", padrão `fase #<n>` ou `gerenciadora`) e o `block-bot-comment.sh` cobra. O `--body-file` é um caminho literal de um arquivo que já existe. O `ask-bot.sh` já posta com ele; `ask-bot.sh --append <id> "texto"` acrescenta à pergunta aberta (marca `<!-- ask-append:<bot>:<id> -->`) e avisa o bot de novo. O `wait-reply.sh` avisa logo, no stderr, quando a pergunta não tem o cabeçalho (não foi postada pelo `ask-bot.sh`), e depois de `--warn-after` segundos sem resposta (padrão 180) avisa que o bot não reagiu e sugere `--retry`, sem parar de esperar. Uma conta por papel: o dono cria a GitHub App do agente do método e a de cada bot (issues e pull requests, escrita) e guarda o token no provedor de segredo (`GH_APP_METHOD_TOKEN`, `GH_APP_BOT_<SLUG>_TOKEN`, ambiente ou `.env`). Com o token, o comentário sai como a App; sem ele, sai com o `gh` do dono. `ROLE_APP_REQUIRE=1` recusa até a App existir. O agente não cria App nem segredo.
+Dono, gerenciadora, filhas e bots comentam como a mesma conta do GitHub. Todo comentário de agente ou bot abre com uma linha: `**De:** <papel> · **Para:** <papel> · **Pedido:** <ask_id> · **Responde a:** <link ou —>`, com papéis dono, gerenciadora, `fase #n`, revisor e `bot <nome>`. Comentário sem o cabeçalho é do dono. O cabeçalho identifica o papel e não é assinatura de IA: segue sem emoji e sem "Generated with" (regra 9 das regras para todo agente). O `.method/scripts/lib/author.sh` gera a linha (`author_header`; `AUTHOR_FROM` troca o "De", padrão `fase #<n>` ou `gerenciadora`) e o `block-bot-comment.sh` cobra. O `--body-file` é um caminho literal de um arquivo que já existe. O `ask-bot.sh` já posta com ele; `ask-bot.sh --append <id> "texto"` acrescenta à pergunta aberta (marca `<!-- ask-append:<bot>:<id> -->`) e avisa o bot de novo. O `wait-reply.sh` avisa logo, no stderr, quando a pergunta não tem o cabeçalho (não foi postada pelo `ask-bot.sh`), e depois de `--warn-after` segundos sem resposta (padrão 180) avisa que o bot não reagiu e sugere `--retry`, sem parar de esperar. Uma conta por papel: o dono cria a GitHub App do agente do método e a de cada bot (issues e pull requests, escrita) e guarda o token no provedor de segredo (`GH_APP_METHOD_TOKEN`, `GH_APP_BOT_<SLUG>_TOKEN`, ambiente ou `.env`). Com o token, o comentário sai como a App; sem ele, sai com o `gh` do dono. `ROLE_APP_REQUIRE=1` recusa até a App existir. O agente não cria App nem segredo.
 
 ---
 
 ## 6. Scripts
 
-Todo script tem `--help`, um teste em `scripts/tests/` e saída curta em inglês. As regras da pasta estão em `scripts/CLAUDE.md`. A tabela lista os arquivos de `.github/method-files.txt` que ficam em `scripts/`; o `check-docs.sh` confere. Arquivo da aplicação na mesma pasta não entra no manifesto e não precisa da tabela.
+Todo script tem `--help`, um teste em `.method/scripts/tests/` e saída curta em inglês. As regras da pasta estão em `.method/scripts/CLAUDE.md`. A tabela lista os arquivos de `.github/method-files.txt` que ficam em `.method/scripts/`; o `check-docs.sh` confere. Arquivo da aplicação na mesma pasta não entra no manifesto e não precisa da tabela.
 
 | Script | O que faz | Quem chama |
 |---|---|---|
-| `scripts/setup-repo.sh` | Idempotente: sincroniza as labels do `.github/labels.tsv`, aplica a proteção e as configurações do repo (§10.1) e as lê de volta; `--check` é a conferência do setup obrigatório (§2, regra 1); `--offers`, `--project` e `--decline` na §8.3 | o agente, em qualquer desvio do padrão |
-| `scripts/setup-runner.sh` | Registra o runner próprio (§9.3) | sessão principal |
-| `scripts/init-env.sh` | Cria o `.env` fora do repo só com as chaves vazias; nunca lê nem escreve valores | skill `setup` |
-| `scripts/triage.sh` | Issues abertas em JSON curto: número, título, labels; marca as sem label | agente `triage` |
-| `scripts/label-issue.sh` | Aplica tipo, área, prioridade, grupo, tamanho e fim | triagem, agentes |
-| `scripts/auto-label.py` | Lê as seções `##` do corpo da issue e gera as labels; seção obrigatória vazia vira `needs-context` | `issues-label.yml` |
-| `scripts/open-issue.sh` | Monta o corpo a partir do arquivo de template, exige as seções obrigatórias do tipo, aplica as labels | agentes, bots |
-| `scripts/weights.sh` | Lê `scripts/lib/weights.tsv`: lista os pesos, imprime o par de um peso, confere o arquivo (`--check`) | skills, `block-agent-pair.sh` |
-| `scripts/phase-start.sh` | Entrada única da fase (§4.3) | sessão principal |
-| `scripts/start-headless.sh` | Abre a filha como `claude -p` no worktree só com headless ligado (§4.3); desligado por padrão | sessão principal |
-| `scripts/new-phase.sh` | Branch e worktree de uma fase solo; sai 1 sem spec | `phase-start.sh` |
-| `scripts/open-parallel.sh` | Worktrees do grupo paralelo e o registro `.worktrees/parallel-active.tsv`; sai 1 com sobra no registro | `phase-start.sh` |
-| `scripts/check-env.sh` | Confere o ambiente da fase: fora da `main`, spec da issue no git, par real da sessão (§3) e git hooks instalados; não roda a suíte (§4.3) | sessão filha, antes da primeira etapa |
-| `scripts/status.sh` | Imprime o bloco de status (§2, regra 4) | todo agente, em toda parada |
-| `scripts/end-check.sh` | Confere o fim sem consertar nada e sai 1 listando cada sobra em linhas `fail:`. Do grupo: branch e worktree no padrão de fase (`issue-<n>`), registro não vazio, branch remota sem PR aberto, spec de issue fechada, mudança não commitada, `ROADMAP.md` diferente do gerado, deploy não conferido. Worktree, branch local e arquivo não rastreado que a fase não criou são `warn:`, não falha: ninguém apaga isso para deixar o check verde. Com `--issue <n>`: só a fase | `status.sh --state pronto`; sessão principal |
-| `scripts/close-phase.sh` | Fecha a fase (§6.1) | sessão filha |
-| `scripts/redo-phase.sh` | Refaz a fase cujo PR conflita com a `main` (§6.1, passo 3) | `close-phase.sh --check` |
-| `scripts/integrate-parallel.sh` | Só espera todas as fases do registro entrarem e faz um build; não faz deploy | sessão principal |
-| `scripts/gen-docs.sh` | Geração única de `CHANGELOG.md` e `ROADMAP.md` e remoção das specs cujas issues citadas estão todas fechadas: PR só com os dois arquivos e essas remoções, `review/independent` publicado pelo script, merge por rebase lido de volta. Outro arquivo, spec adicionada ou modificada, spec removida com issue aberta: sai 1 sem status e sem merge | sessão principal, no passo único de fim |
-| `scripts/gen-changelog.py` | `CHANGELOG.md` a partir dos PRs com merge, agrupado por `type:*` | `gen-docs.sh` |
-| `scripts/gen-roadmap.py` | `ROADMAP.md` das issues abertas por área e prioridade | `gen-docs.sh`, `end-check.sh` |
-| `scripts/deploy.sh` | O único deploy (§9.4) | sessão principal, no passo único de fim |
-| `scripts/validate.sh` | Lint e todos os testes; único lugar onde roda o shellcheck. Pega vaga `validate` (fila com "waiting for a validate slot"), um por worktree (o segundo espera e devolve o resultado do primeiro); `--lint` sozinho fora da CI olha só os arquivos alterados contra a `main`; na fase, os testes são só os afetados pelo diff contra a base mais os do portão (arquivo `*gate*`); `--full`, a CI e a falta de mapa para um arquivo alterado rodam tudo | agentes, CI |
-| `scripts/machine-slots.sh` | Vagas da máquina (§6.4): `--status` (vagas, quem ocupa, carga), `--check <classe> [n]` (sai 75 sem vaga), `--report [--days N]` (mediana e p90 de espera e duração por classe e repositório) | agentes, `open-parallel.sh` |
-| `scripts/progress.sh` | O que os scripts longos estão fazendo (§6.4): `[--repo r] [--issue n] [--all] [--follow]` mostra o script rodando, o passo, a contagem e o tempo; é para o dono e o painel, nunca para o agente | dono, painel, `status.sh` |
-| `scripts/sessions.sh` | Sessões e MCPs da máquina (§6.4): `--list` (por repo: tipo, PID, idade, CPU, RAM, MCPs), `--stale` (sessões do app não arquivadas e paradas há mais de N horas, para o dono arquivar), `--close-idle` (padrão: este checkout e os worktrees dele; `--under` só estreita e pasta fora sai 2; idade do processo, `etime`, com CPU abaixo de 1%; nunca `claude` filho do `Claude.app`) | agentes, `close-phase.sh --cleanup` |
-| `scripts/check-docs.sh` | Limites de palavras (`AGENTS.md` 300–800, `docs/STATE.md` ≤800, `docs/BOTS.md` ≤450, skill `plan` ≤400); `CLAUDE.md` só com `@AGENTS.md`; uma linha por ADR no índice; nenhuma seção de histórico; este desenho contra o repositório: tabela das regras-base, tabela de scripts, tabela de hooks e tabela de arquivos; nenhum nome só de um repositório (lista das notas dele, quando existem) neste desenho, no `AGENTS.md` nem nas skills; nenhum formulário de issue em YAML (§8.2) | CI, `close-phase.sh` |
-| `scripts/check-workflows.py` | Padrão dos workflows (§9) além do `actionlint` | CI |
-| `scripts/check-attribution.sh` | Reprova assinatura de IA abrindo uma linha nos commits e no corpo do PR | CI `policy`, `close-phase.sh --merge`, `.githooks/commit-msg` |
-| `scripts/ci-gate.sh` | Decide o resultado do job `CI` a partir dos outros jobs (§9.2) | `ci.yml` |
-| `scripts/ci-already-green.sh` | Diz se o SHA ou a mesma árvore já tem CI verde; o deploy pula a suíte só nesse caso | `deploy-*.yml` |
-| `scripts/rerun-ci.sh` | Repete só o job falho de um run do `ci.yml` no HEAD do PR; recusa outro workflow | agente, no PR |
-| `scripts/archive-adr.sh` | Marca a ADR como substituída no índice e a move para `docs/adr/archive/` | agente que cria a ADR nova |
-| `scripts/search-history.sh` | Busca um termo na ordem da §7.1 e devolve lista curta com links | qualquer agente |
-| `scripts/ask-bot.sh` | Pergunta a um bot e espera a resposta (§5.1) | agentes |
-| `scripts/notify-bot.sh` | Chama o webhook do bot (§5.1) | `ask-bot.sh` |
-| `scripts/wait-reply.sh` | Espera a resposta marcada (§5.1) | `ask-bot.sh` |
-| `scripts/summarize-thread.sh` | Mantém o comentário de resumo de um fio longo (§5.1) | agentes |
-| `scripts/trace-view.py` | Lê o trace (§6.3): árvore de agentes, tabela de pares do PR e tempo por fase | `close-phase.sh --prepare`, agentes |
-| `scripts/measure-session.py` | Mede palavras lidas, toques do dono e acerto da triagem de uma sessão | sessão principal, sob pedido |
-| `scripts/method-diff.sh` | Compara o repo com o commit do template em `.github/method-origin`: idêntico, desatualizado (`outdated`), adaptado, faltante (também arquivo novo do destino fora do manifest), `deleted` (o repo apagou de propósito: nunca volta), removido e só do repo; `--notice` lista só o `adapted` que o template mudou no intervalo | atualização do método, `close-reviewer` |
-| `scripts/fetch-template.sh` | Traz o commit de destino do template para `.process/template` do worktree (sem worktree extra nem clone); `--apply` roda o `method-diff.sh` do destino, copia só `outdated` e `missing`, acrescenta `missing-label`, roda `--remove` e imprime o `--notice` | atualização do método, filha headless |
-| `scripts/CLAUDE.md` | Regras da pasta `scripts/` | lido ao tocar a pasta |
+| `.method/scripts/setup-repo.sh` | Idempotente: sincroniza as labels do `.github/labels.tsv`, aplica a proteção e as configurações do repo (§10.1) e as lê de volta; `--check` é a conferência do setup obrigatório (§2, regra 1); `--offers`, `--project` e `--decline` na §8.3 | o agente, em qualquer desvio do padrão |
+| `.method/scripts/setup-runner.sh` | Registra o runner próprio (§9.3) | sessão principal |
+| `.method/scripts/init-env.sh` | Cria o `.env` fora do repo só com as chaves vazias; nunca lê nem escreve valores | skill `setup` |
+| `.method/scripts/triage.sh` | Issues abertas em JSON curto: número, título, labels; marca as sem label | agente `triage` |
+| `.method/scripts/label-issue.sh` | Aplica tipo, área, prioridade, grupo, tamanho e fim | triagem, agentes |
+| `.method/scripts/auto-label.py` | Lê as seções `##` do corpo da issue e gera as labels; seção obrigatória vazia vira `needs-context` | `issues-label.yml` |
+| `.method/scripts/open-issue.sh` | Monta o corpo a partir do arquivo de template, exige as seções obrigatórias do tipo, aplica as labels | agentes, bots |
+| `.method/scripts/weights.sh` | Lê `.method/scripts/lib/weights.tsv`: lista os pesos, imprime o par de um peso, confere o arquivo (`--check`) | skills, `block-agent-pair.sh` |
+| `.method/scripts/phase-start.sh` | Entrada única da fase (§4.3) | sessão principal |
+| `.method/scripts/start-headless.sh` | Abre a filha como `claude -p` no worktree só com headless ligado (§4.3); desligado por padrão | sessão principal |
+| `.method/scripts/new-phase.sh` | Branch e worktree de uma fase solo; sai 1 sem spec | `phase-start.sh` |
+| `.method/scripts/open-parallel.sh` | Worktrees do grupo paralelo e o registro `.worktrees/parallel-active.tsv`; sai 1 com sobra no registro | `phase-start.sh` |
+| `.method/scripts/check-env.sh` | Confere o ambiente da fase: fora da `main`, spec da issue no git, par real da sessão (§3) e git hooks instalados; não roda a suíte (§4.3) | sessão filha, antes da primeira etapa |
+| `.method/scripts/status.sh` | Imprime o bloco de status (§2, regra 4) | todo agente, em toda parada |
+| `.method/scripts/end-check.sh` | Confere o fim sem consertar nada e sai 1 listando cada sobra em linhas `fail:`. Do grupo: branch e worktree no padrão de fase (`issue-<n>`), registro não vazio, branch remota sem PR aberto, spec de issue fechada, mudança não commitada, `ROADMAP.md` diferente do gerado, deploy não conferido. Worktree, branch local e arquivo não rastreado que a fase não criou são `warn:`, não falha: ninguém apaga isso para deixar o check verde. Com `--issue <n>`: só a fase | `status.sh --state pronto`; sessão principal |
+| `.method/scripts/close-phase.sh` | Fecha a fase (§6.1) | sessão filha |
+| `.method/scripts/redo-phase.sh` | Refaz a fase cujo PR conflita com a `main` (§6.1, passo 3) | `close-phase.sh --check` |
+| `.method/scripts/integrate-parallel.sh` | Só espera todas as fases do registro entrarem e faz um build; não faz deploy | sessão principal |
+| `.method/scripts/gen-docs.sh` | Geração única de `CHANGELOG.md` e `ROADMAP.md` e remoção das specs cujas issues citadas estão todas fechadas: PR só com os dois arquivos e essas remoções, `review/independent` publicado pelo script, merge por rebase lido de volta. Outro arquivo, spec adicionada ou modificada, spec removida com issue aberta: sai 1 sem status e sem merge | sessão principal, no passo único de fim |
+| `.method/scripts/gen-changelog.py` | `CHANGELOG.md` a partir dos PRs com merge, agrupado por `type:*` | `gen-docs.sh` |
+| `.method/scripts/gen-roadmap.py` | `ROADMAP.md` das issues abertas por área e prioridade | `gen-docs.sh`, `end-check.sh` |
+| `.method/scripts/deploy.sh` | O único deploy (§9.4) | sessão principal, no passo único de fim |
+| `.method/scripts/validate.sh` | Lint e todos os testes; único lugar onde roda o shellcheck. Pega vaga `validate` (fila com "waiting for a validate slot"), um por worktree (o segundo espera e devolve o resultado do primeiro); `--lint` sozinho fora da CI olha só os arquivos alterados contra a `main`; na fase, os testes são só os afetados pelo diff contra a base mais os do portão (arquivo `*gate*`); `--full`, a CI e a falta de mapa para um arquivo alterado rodam tudo | agentes, CI |
+| `.method/scripts/machine-slots.sh` | Vagas da máquina (§6.4): `--status` (vagas, quem ocupa, carga), `--check <classe> [n]` (sai 75 sem vaga), `--report [--days N]` (mediana e p90 de espera e duração por classe e repositório) | agentes, `open-parallel.sh` |
+| `.method/scripts/progress.sh` | O que os scripts longos estão fazendo (§6.4): `[--repo r] [--issue n] [--all] [--follow]` mostra o script rodando, o passo, a contagem e o tempo; é para o dono e o painel, nunca para o agente | dono, painel, `status.sh` |
+| `.method/scripts/sessions.sh` | Sessões e MCPs da máquina (§6.4): `--list` (por repo: tipo, PID, idade, CPU, RAM, MCPs), `--stale` (sessões do app não arquivadas e paradas há mais de N horas, para o dono arquivar), `--close-idle` (padrão: este checkout e os worktrees dele; `--under` só estreita e pasta fora sai 2; idade do processo, `etime`, com CPU abaixo de 1%; nunca `claude` filho do `Claude.app`) | agentes, `close-phase.sh --cleanup` |
+| `.method/scripts/check-docs.sh` | Limites de palavras (`AGENTS.md` 300–800, `docs/STATE.md` ≤800, `docs/BOTS.md` ≤450, skill `plan` ≤400); `CLAUDE.md` só com `@AGENTS.md`; uma linha por ADR no índice; nenhuma seção de histórico; este desenho contra o repositório: tabela das regras-base, tabela de scripts, tabela de hooks e tabela de arquivos; nenhum nome só de um repositório (lista das notas dele, quando existem) neste desenho, no `AGENTS.md` nem nas skills; nenhum formulário de issue em YAML (§8.2) | CI, `close-phase.sh` |
+| `.method/scripts/check-workflows.py` | Padrão dos workflows (§9) além do `actionlint` | CI |
+| `.method/scripts/check-attribution.sh` | Reprova assinatura de IA abrindo uma linha nos commits e no corpo do PR | CI `policy`, `close-phase.sh --merge`, `.githooks/commit-msg` |
+| `.method/scripts/ci-gate.sh` | Decide o resultado do job `CI` a partir dos outros jobs (§9.2) | `ci.yml` |
+| `.method/scripts/ci-already-green.sh` | Diz se o SHA ou a mesma árvore já tem CI verde; o deploy pula a suíte só nesse caso | `deploy-*.yml` |
+| `.method/scripts/rerun-ci.sh` | Repete só o job falho de um run do `ci.yml` no HEAD do PR; recusa outro workflow | agente, no PR |
+| `.method/scripts/archive-adr.sh` | Marca a ADR como substituída no índice e a move para `docs/adr/archive/` | agente que cria a ADR nova |
+| `.method/scripts/search-history.sh` | Busca um termo na ordem da §7.1 e devolve lista curta com links | qualquer agente |
+| `.method/scripts/ask-bot.sh` | Pergunta a um bot e espera a resposta (§5.1) | agentes |
+| `.method/scripts/notify-bot.sh` | Chama o webhook do bot (§5.1) | `ask-bot.sh` |
+| `.method/scripts/wait-reply.sh` | Espera a resposta marcada (§5.1) | `ask-bot.sh` |
+| `.method/scripts/summarize-thread.sh` | Mantém o comentário de resumo de um fio longo (§5.1) | agentes |
+| `.method/scripts/trace-view.py` | Lê o trace (§6.3): árvore de agentes, tabela de pares do PR e tempo por fase | `close-phase.sh --prepare`, agentes |
+| `.method/scripts/measure-session.py` | Mede palavras lidas, toques do dono e acerto da triagem de uma sessão | sessão principal, sob pedido |
+| `.method/scripts/method-diff.sh` | Compara o repo com o commit do template em `.github/method-origin`: idêntico, desatualizado (`outdated`), adaptado, faltante (também arquivo novo do destino fora do manifest), `deleted` (o repo apagou de propósito: nunca volta), removido e só do repo; `--notice` lista só o `adapted` que o template mudou no intervalo | atualização do método, `close-reviewer` |
+| `.method/scripts/fetch-template.sh` | Traz o commit de destino do template para `.process/template` do worktree (sem worktree extra nem clone); `--apply` roda o `method-diff.sh` do destino, copia só `outdated` e `missing`, acrescenta `missing-label`, roda `--remove` e imprime o `--notice` | atualização do método, filha headless |
+| `.method/scripts/CLAUDE.md` | Regras da pasta `.method/scripts/` | lido ao tocar a pasta |
 
 ### 6.1 `close-phase.sh`
 
@@ -324,7 +324,7 @@ Roda só na sessão filha; na sessão que abriu a fase, `--prepare`, `--publish-
    | 7 | nenhum check no HEAD em ~3 min | investiga o CI e diz no status |
    | 8 | `mergeable` segue `UNKNOWN` após 5 leituras | olha o PR no GitHub e diz no status |
 
-3. **PR em conflito com a `main` (regra-base 4).** O `--check` chama o `scripts/redo-phase.sh` sem esperar CI e sem pergunta ao dono: branch nova a partir da `main`, cherry-pick dos commits da fase, PR novo com `Closes #n`, PR antigo fechado, branch remota antiga apagada, linha do registro paralelo regravada; cada passo lido de volta, sem push forçado. Conflito só em arquivo gerado é resolvido pelo script. Conflito real para o cherry-pick e sai 4: a filha resolve os arquivos listados, faz `git add` pelo nome, `git cherry-pick --continue` e roda `scripts/redo-phase.sh` de novo. PR só atrasado, sem conflito, não é refeito.
+3. **PR em conflito com a `main` (regra-base 4).** O `--check` chama o `.method/scripts/redo-phase.sh` sem esperar CI e sem pergunta ao dono: branch nova a partir da `main`, cherry-pick dos commits da fase, PR novo com `Closes #n`, PR antigo fechado, branch remota antiga apagada, linha do registro paralelo regravada; cada passo lido de volta, sem push forçado. Conflito só em arquivo gerado é resolvido pelo script. Conflito real para o cherry-pick e sai 4: a filha resolve os arquivos listados, faz `git add` pelo nome, `git cherry-pick --continue` e roda `.method/scripts/redo-phase.sh` de novo. PR só atrasado, sem conflito, não é refeito.
 4. **Revisão independente** (§10.2) e **`--publish-review <arquivo> [--verdict success|failure]`**: publica o status `review/independent` no SHA do HEAD e o parecer como comentário. O arquivo tem de ser a saída gravada do `close-reviewer` (`.process/reviewer-<sha>.md`), que a sessão da fase grava inteira e literal; o agente não grava mais nada. O script lê a linha `Veredito:` do parecer (`aprovado` é `success`, `mudanças pedidas` é `failure`; sem a linha, recusa), grava o `.process/reviewer-<sha>.verdict` e recusa texto reescrito ou `--verdict` diferente do parecer. Recusa parecer sem rodada do `close-reviewer` desta sessão posterior ao último push (lê `phase_push` e `SubagentStart` no trace).
 5. **`--merge --wait`**. Recusa se um destes itens falhar:
    - a regra da sessão filha (§4.3);
@@ -352,7 +352,7 @@ Os hooks do agente saem 2 quando barram; os do git saem 1. Todo hook tem teste. 
 | `.claude/hooks/block-bot-comment.sh` | PreToolUse, Bash | `gh issue\|pr comment` e `gh issue\|pr close --comment` sem o cabeçalho de autoria (§5.3), e o que cita um bot do `.github/bots.tsv` (slug ou nome) ou leva a marca `<!-- ask:` fora do `ask-bot.sh` |
 | `.claude/hooks/block-phase-commit.sh` | PreToolUse, Bash | Todo comando git fora da lista de leitura (`status`, `log`, `diff`, `show`, `fetch`…) que rodaria em `.worktrees/issue-<n>`, quando a sessão é a que gravou o `phase_opened` da issue; e, para essa mesma sessão, `git push` da branch da fase a partir de qualquer diretório, o checkout principal incluído (destino da refspec, branch atual quando não há refspec, `--all`, `--mirror`, `--branches` ou padrão). Para qualquer sessão: comando que define ou apaga `CLAUDE_CODE_SESSION_ID` ou `PROCESS_EVENTS_FILE`, e escrita à mão em `.process/events.jsonl`. Falha fechado: sem `session_id`, sem trace ou com linha do trace que não é JSON, a escrita no worktree e o push da branch de fase são barrados |
 | `.claude/hooks/block-phase-edit.sh` | PreToolUse, Edit, Write, NotebookEdit | A edição de arquivo em `.worktrees/issue-<n>` pela sessão que gravou o `phase_opened` da issue; falha fechado igual. Para qualquer sessão: `.process/events.jsonl` |
-| `.claude/hooks/block-agent-pair.sh` | PreToolUse, Agent | A chamada de `Agent` sem `model` ou sem `effort`; a do `close-reviewer` e a do `triage` com par diferente do peso em `scripts/lib/weights.tsv` |
+| `.claude/hooks/block-agent-pair.sh` | PreToolUse, Agent | A chamada de `Agent` sem `model` ou sem `effort`; a do `close-reviewer` e a do `triage` com par diferente do peso em `.method/scripts/lib/weights.tsv` |
 | `.claude/hooks/block-card-title.sh` | PreToolUse, AskUserQuestion | Com fase aberta, o quadro cuja pergunta não começa por `Fase #<n> — <título>`; na sessão da fase, o número é o da fase dela |
 | `.claude/hooks/prompt-phase-entry.sh` | UserPromptSubmit | Nada: põe no contexto de "executar #<n>" o caminho único (skill `plan`, depois `phase-start.sh`) |
 | `.claude/hooks/session-setup-check.sh` | SessionStart | Nada: com o setup pendente (`setup-repo.sh --check` sai 7 ou 6), põe no contexto, uma vez por sessão, que o primeiro passo é a skill `setup`. Sem `gh`, sem remoto, sem rede ou passados 5 segundos, não diz nada. Conferência limpa fica em `.process/setup-ok` e as sessões seguintes não leem o GitHub de novo (a trava do `phase-start.sh` confere sempre) |
@@ -379,7 +379,7 @@ Os hooks do git são instalados pelo `check-env.sh` (`core.hooksPath=.githooks`)
 8. `git clean` com `-f` ou `--force`;
 9. `git branch -D` (e `--delete --force`);
 10. merge de PR direto: `gh pr merge`, `gh api … pulls/N/merge`, `gh api graphql` com mutation de merge e de proteção; toda escrita em `branches/*/protection`;
-11. deploy fora do `deploy.sh`: `gh workflow run`, `gh run rerun`, `gh api` em `…/dispatches` e `…/rerun`. O `scripts/rerun-ci.sh` repete só o job falho de um run do `ci.yml` no HEAD do PR, com limite de tentativas e oferta de issue; o `gh run rerun` cru, inclusive o de deploy, continua barrado;
+11. deploy fora do `deploy.sh`: `gh workflow run`, `gh run rerun`, `gh api` em `…/dispatches` e `…/rerun`. O `.method/scripts/rerun-ci.sh` repete só o job falho de um run do `ci.yml` no HEAD do PR, com limite de tentativas e oferta de issue; o `gh run rerun` cru, inclusive o de deploy, continua barrado;
 12. os mesmos casos dentro de `bash -c`, `eval`, heredoc entregue a shell, `echo … | bash`, `$(…)`, depois de `env`, `command`, `nice`, `timeout` e `sudo`, em blocos e com caminho absoluto;
 13. falha fechado: comando ilegível ou grande demais (>256 KB ou >400 partes) que cita git ou gh é barrado.
 
@@ -395,7 +395,7 @@ O hook `trace-event.sh` acrescenta uma linha JSON por evento em `.process/events
 | `phase_push` | `close-phase.sh --prepare`, `redo-phase.sh` | marca o push; a revisão precisa vir depois dele |
 | eventos do harness | `trace-event.sh` | sessões e subagentes abertos, com o par |
 
-`scripts/trace-view.py` gera `.process/tree.html`; com `--text`, a árvore em texto; com `--pairs <issue>`, a tabela pedido × usado do PR; com `--timings [--issue n]`, onde foi o tempo de cada fase (abertura, trabalho, espera pelo dono, `validate.sh` do `--prepare`, cada rodada de CI e revisão, merge, limpeza). O `--prepare` grava `phase_validate` (sha, secs) e não roda a suíte de novo no mesmo HEAD limpo. O `effort` do `SubagentStart` vem sempre "medium"; o valor pedido está no `PreToolUse` do Agent.
+`.method/scripts/trace-view.py` gera `.process/tree.html`; com `--text`, a árvore em texto; com `--pairs <issue>`, a tabela pedido × usado do PR; com `--timings [--issue n]`, onde foi o tempo de cada fase (abertura, trabalho, espera pelo dono, `validate.sh` do `--prepare`, cada rodada de CI e revisão, merge, limpeza). O `--prepare` grava `phase_validate` (sha, secs) e não roda a suíte de novo no mesmo HEAD limpo. O `effort` do `SubagentStart` vem sempre "medium"; o valor pedido está no `PreToolUse` do Agent.
 
 ---
 
@@ -403,11 +403,11 @@ O hook `trace-event.sh` acrescenta uma linha JSON por evento em `.process/events
 
 Todos os projetos, bots e pessoas da máquina dividem as mesmas vagas, em `~/.cache/ai-method/slots/` (um diretório por vaga, criado com `mkdir`; guarda repositório, issue, PID e início). Duas classes: `validate` (execuções do `validate.sh`) e `fase` (fases abertas por `new-phase.sh` e `open-parallel.sh`; sem vaga, saem 75 sem criar nada e dizem quem ocupa; o `phase-start.sh` espera a vaga no mesmo turno, `PHASE_START_SLOT_WAIT` segundos, e só então abre as sessões: fase que espera vaga não vira cartão). Vaga de PID morto ou de worktree que não existe mais se libera sozinha. A vaga de fase é liberada no fim da fase (`close-phase.sh --cleanup` e `--abort`), que grava a duração naquele momento: a de relógio (`wall_s`) e a de trabalho (`duration_s`), que desconta a espera pelo dono (os intervalos `phase_status` `esperando` do trace, os mesmos do `trace-view.py --timings`) e o intervalo entre um `phase_closed` e o `phase_opened` seguinte da mesma issue. Uma vaga cujo worktree já sumiu ainda se libera sozinha, com o mesmo cálculo. Carga (load1, memória livre, swap) só avisa, em `machine-slots.sh --status` e no início da fase; o portão de carga é a issue FHDumont/ai-engineering-team-template#12.
 
-**Testes afetados.** Na fase (branch com `issue-<n>`, fora da CI, sem `--full`) o `validate.sh` roda os testes que o diff contra a base alcança: o mapa é lido dos próprios testes (o teste cita o arquivo alterado; para um arquivo de `scripts/lib`, também o que cita um script que o carrega, um nível só), mais os testes do portão. Docs inertes (regra do `ci.yml`) não pedem teste; arquivo alterado que nenhum teste alcança roda tudo. A saída diz `tests: affected only (n of m)`; o verde parcial grava `phase_validate` com `scope=affected` e o `--prepare` não roda a suíte de novo nesse SHA. O merge segue exigindo o check `Tests` verde no HEAD, que a CI roda sempre completo.
+**Testes afetados.** Na fase (branch com `issue-<n>`, fora da CI, sem `--full`) o `validate.sh` roda os testes que o diff contra a base alcança: o mapa é lido dos próprios testes (o teste cita o arquivo alterado; para um arquivo de `.method/scripts/lib`, também o que cita um script que o carrega, um nível só), mais os testes do portão. Docs inertes (regra do `ci.yml`) não pedem teste; arquivo alterado que nenhum teste alcança roda tudo. A saída diz `tests: affected only (n of m)`; o verde parcial grava `phase_validate` com `scope=affected` e o `--prepare` não roda a suíte de novo nesse SHA. O merge segue exigindo o check `Tests` verde no HEAD, que a CI roda sempre completo.
 
 O fim do `validate.sh` lista os 5 testes mais lentos, o tempo do lint (o shellcheck completo roda em paralelo, `AI_METHOD_TEST_JOBS` arquivos por vez) e o do bloco do repo.
 
-O histórico `~/.cache/ai-method/history.tsv` (espera e duração de cada validação e fase) alimenta `scripts/machine-slots.sh --report`, para comparar antes e depois de uma mudança. Meta de tempo aceita pelo dono (FHDumont/ai-engineering-team-template#39): mediana da fase abaixo de 45 min, sem contar a espera pelo dono (`trace-view.py --timings`), e mediana do `validate.sh` abaixo de 240 s; base de 21/11/2026: fase 4354 s (p90 4773 s) e `validate.sh` 480 s (p90 539 s). **Meta por projeto.** Aquela é o padrão do método; cada projeto pode ter a sua em `.github/time-targets.tsv` (medida, valor, unidade separados por tab: `phase` em `min`, `validate` em `s`; `validate-repo` em `s`, o tempo do `.github/validate-repo.sh`, que o `validate.sh` grava como medida própria (padrão 60 s) para cobrar o repo só pela parte dele; linha ausente vale o padrão), que a atualização do template nunca sobrescreve. `machine-slots.sh --report` compara a mediana do repositório com a meta — a da fase é a duração de trabalho gravada no fim, sem a espera pelo dono (o `--report` mostra também a de relógio) — e imprime `info: time <medida> median <n> s, target <v> <unidade>` por medida, com `(above)` quando passa dela, e sai sempre 0. Tempo é só informativo: a skill `integrate`, no fim do grupo, cita essas linhas na mensagem final e não abre quadro nem issue por tempo; o dono edita o arquivo se quiser outra meta, e a skill `setup` não pergunta a meta. Os limites ficam em `~/.config/ai-method/machine-limits.env`, criado na primeira execução de `scripts/lib/machine-limits.env.example` (cada parâmetro comentado lá); variável do ambiente vence o arquivo.
+O histórico `~/.cache/ai-method/history.tsv` (espera e duração de cada validação e fase) alimenta `.method/scripts/machine-slots.sh --report`, para comparar antes e depois de uma mudança. Meta de tempo aceita pelo dono (FHDumont/ai-engineering-team-template#39): mediana da fase abaixo de 45 min, sem contar a espera pelo dono (`trace-view.py --timings`), e mediana do `validate.sh` abaixo de 240 s; base de 21/11/2026: fase 4354 s (p90 4773 s) e `validate.sh` 480 s (p90 539 s). **Meta por projeto.** Aquela é o padrão do método; cada projeto pode ter a sua em `.github/time-targets.tsv` (medida, valor, unidade separados por tab: `phase` em `min`, `validate` em `s`; `validate-repo` em `s`, o tempo do `.github/validate-repo.sh`, que o `validate.sh` grava como medida própria (padrão 60 s) para cobrar o repo só pela parte dele; linha ausente vale o padrão), que a atualização do template nunca sobrescreve. `machine-slots.sh --report` compara a mediana do repositório com a meta — a da fase é a duração de trabalho gravada no fim, sem a espera pelo dono (o `--report` mostra também a de relógio) — e imprime `info: time <medida> median <n> s, target <v> <unidade>` por medida, com `(above)` quando passa dela, e sai sempre 0. Tempo é só informativo: a skill `integrate`, no fim do grupo, cita essas linhas na mensagem final e não abre quadro nem issue por tempo; o dono edita o arquivo se quiser outra meta, e a skill `setup` não pergunta a meta. Os limites ficam em `~/.config/ai-method/machine-limits.env`, criado na primeira execução de `.method/scripts/lib/machine-limits.env.example` (cada parâmetro comentado lá); variável do ambiente vence o arquivo.
 
 | Parâmetro | Padrão | Unidade | Efeito |
 |---|---|---|---|
@@ -428,7 +428,7 @@ O histórico `~/.cache/ai-method/history.tsv` (espera e duração de cada valida
 Prazo de desempenho (o esperado) avisa `warn: over-expected <o quê> <medido> <esperado>`, sai 0 e, na CI, vira annotation `::warning::`. O fim da validação, do fecho e do grupo junta esses avisos num bloco `over-expected:`. Só o limite de travamento muda o código de saída. Tempo é só informativo: a skill `integrate` cita o bloco e as linhas `info: time` na mensagem final, sem quadro nem issue.
 | `AI_METHOD_IDLE_HOURS` | 4 | horas | headless deste checkout com idade maior que isso (`etime`, não o tempo sem atividade) e CPU abaixo de 1%: `sessions.sh --close-idle` encerra; o fim da fase lista as do app não arquivadas |
 
-**Progresso dos scripts longos.** `validate.sh` (o lint e cada teste), `phase-start.sh` e `new-phase.sh` (cada passo da abertura) e `close-phase.sh` (`--prepare`, `--check` e `--merge --wait`: validação, push, PR, espera do CI e do merge) gravam o andamento em `~/.cache/ai-method/progress/<repo>-<issue>.jsonl` (`AI_METHOD_CACHE` troca a pasta; sem fase, `<repo>-main.jsonl`), por `scripts/lib/progress.sh`. O agente não lê esses arquivos (economia de token): a saída dele continua só com o resultado. Quem lê é o dono, por `scripts/progress.sh`, e o painel (claude-runs-painel). Contrato para o painel:
+**Progresso dos scripts longos.** `validate.sh` (o lint e cada teste), `phase-start.sh` e `new-phase.sh` (cada passo da abertura) e `close-phase.sh` (`--prepare`, `--check` e `--merge --wait`: validação, push, PR, espera do CI e do merge) gravam o andamento em `~/.cache/ai-method/progress/<repo>-<issue>.jsonl` (`AI_METHOD_CACHE` troca a pasta; sem fase, `<repo>-main.jsonl`), por `.method/scripts/lib/progress.sh`. O agente não lê esses arquivos (economia de token): a saída dele continua só com o resultado. Quem lê é o dono, por `.method/scripts/progress.sh`, e o painel (claude-runs-painel). Contrato para o painel:
 
 - Só append, uma linha JSON por evento, nunca reescrita: dá para ler por streaming (`tail -F`, um offset por arquivo). O arquivo sem escrita há mais de 7 dias é apagado no início do próximo script que grava progresso.
 - Campos: `ts` (UTC, `2026-11-21T14:03:09Z`), `repo` (pasta do checkout principal), `issue` (número, ou `null` fora de fase), `script` (`validate.sh`, `phase-start.sh`, `new-phase.sh`, `close-phase.sh`), `pid` (do script), `step` (texto curto em inglês; vazio em `start` e `end`), `done` e `total` (números, ou `null` sem contagem), `elapsed_s` (segundos desde o início do script, até o evento), `state`.
@@ -436,7 +436,7 @@ Prazo de desempenho (o esperado) avisa `warn: over-expected <o quê> <medido> <e
 - Uma execução é o par `pid` + `script`. Está rodando quando o último evento dela é `start` ou `step` e o `pid` está vivo; sem `end` nem `fail` e com `pid` morto, a execução morreu. O tempo corrente é `elapsed_s` mais a idade do último `ts`.
 - Escrever nunca derruba o script: sem `jq` ou com a pasta sem escrita, nada é gravado.
 
-**Nenhum processo órfão.** Processo de fundo criado por script ou teste é encerrado por quem o criou. `scripts/tests/lib.sh` guarda a pasta temporária do teste e, em EXIT, INT e TERM (também com asserção falhando), encerra o que o teste deixou: filhos, processo com cwd na pasta ou com ela na linha de comando; teste com `trap` próprio chama `test_sweep`. `validate.sh` roda cada teste com `TMPDIR` dentro de uma pasta da execução e, no fim (e em INT/TERM), encerra e lista o que sobrou ali (`orphan process <pid>`), saindo 1: a suíte falha. `sessions.sh --list` marca `orphan` a sessão com pai 1 e cwd em pasta temporária de teste ou em worktree que não existe mais; a marca só informa. O `--cleanup` não varre a máquina e não encerra órfão de fora da fase. `AI_METHOD_ORPHAN_ROOT`, quando definida, limita também esse ramo do worktree que já não existe.
+**Nenhum processo órfão.** Processo de fundo criado por script ou teste é encerrado por quem o criou. `.method/scripts/tests/lib.sh` guarda a pasta temporária do teste e, em EXIT, INT e TERM (também com asserção falhando), encerra o que o teste deixou: filhos, processo com cwd na pasta ou com ela na linha de comando; teste com `trap` próprio chama `test_sweep`. `validate.sh` roda cada teste com `TMPDIR` dentro de uma pasta da execução e, no fim (e em INT/TERM), encerra e lista o que sobrou ali (`orphan process <pid>`), saindo 1: a suíte falha. `sessions.sh --list` marca `orphan` a sessão com pai 1 e cwd em pasta temporária de teste ou em worktree que não existe mais; a marca só informa. O `--cleanup` não varre a máquina e não encerra órfão de fora da fase. `AI_METHOD_ORPHAN_ROOT`, quando definida, limita também esse ramo do worktree que já não existe.
 
 Fim da fase e processos: o `close-phase.sh --cleanup` encerra só os processos cujo diretório atual está no worktree da fase (servidor de teste, watcher, `validate.sh`) e a filha headless do trace (`phase_headless`, conferida pelo id da sessão na linha de comando) com os MCPs dela; nunca um `claude` filho do `Claude.app`, nem a própria sessão que roda o script, nem um órfão de outra pasta. Poupa o grupo de processos de quem chamou (o leitor de um pipe) e o processo de outra sessão que só tem o worktree como pasta atual. Cada processo encerrado fica no trace antes do sinal, com pid, comando e pasta. O script não repassa as linhas `hint:` do `gh`; a última linha da saída é o resultado. `--merge` e `--check` não vão em pipe: a saída vai para um arquivo. O ok do arquivamento é pedido uma vez, no ok da spec ou num quadro no fim do grupo. Com ele a gerenciadora chama `set_remote_control` e `archive_session`; se o app devolver um campo, repete uma vez com esse campo, nas duas. Nunca deletar (o histórico some) nem só fechar a aba (o processo segue). A mensagem de fim lista as outras sessões do repo não arquivadas e paradas há mais de `AI_METHOD_IDLE_HOURS` (`sessions.sh --stale`).
 
@@ -478,7 +478,7 @@ A tabela é a árvore de arquivos do método. Caminho sem `<…>` precisa existi
 | `.claude/agents/close-reviewer.md` | agente da revisão independente (peso `reviewer`) |
 | `.claude/hooks/` | hooks do agente (§6.2) e os testes deles em `.claude/hooks/tests/` |
 | `.cursor/rules/base.mdc` | aponta para o `AGENTS.md` |
-| `.cursor/rules/scripts.mdc` | aponta para o `scripts/CLAUDE.md` |
+| `.cursor/rules/scripts.mdc` | aponta para o `.method/scripts/CLAUDE.md` |
 | `.githooks/` | hooks do git (§6.2) |
 | `.github/ISSUE_TEMPLATE/feature.md` | template de issue |
 | `.github/ISSUE_TEMPLATE/bug.md` | template de issue |
@@ -499,16 +499,16 @@ A tabela é a árvore de arquivos do método. Caminho sem `<…>` precisa existi
 | `.github/workflows/ci.yml` | o CI único (§9.2) |
 | `.github/workflows/issues-label.yml` | labels automáticas das issues |
 | `.github/workflows/deploy-<alvo>.yml` | deploy, só quando há app (§9.4) |
-| `scripts/` | scripts do método (§6) |
-| `scripts/lib/` | código comum e `weights.tsv` |
+| `.method/scripts/` | scripts do método (§6) |
+| `.method/scripts/lib/` | código comum e `weights.tsv` |
 | `.github/bots.tsv` | bots do repositório: slug, nome e referência do webhook (§5.2) |
-| `scripts/tests/` | testes dos scripts |
+| `.method/scripts/tests/` | testes dos scripts |
 | `<checkout principal>/.worktrees/issue-<n>` | worktree da fase, fora do git |
 | `<checkout principal>/.process/events.jsonl` | trace, fora do git (§6.3) |
 
 ### 7.1 Pesquisa de histórico
 
-`scripts/search-history.sh "termo"` busca nesta ordem: `docs/STATE.md` e índice de ADRs → ADRs, inclusive arquivadas → git (`log --grep`, `log -S`, `blame`; cada commit aponta para o PR e a issue) → issues, PRs e comentários no GitHub. Leia o índice e abra só o que importa.
+`.method/scripts/search-history.sh "termo"` busca nesta ordem: `docs/STATE.md` e índice de ADRs → ADRs, inclusive arquivadas → git (`log --grep`, `log -S`, `blame`; cada commit aponta para o PR e a issue) → issues, PRs e comentários no GitHub. Leia o índice e abra só o que importa.
 
 ---
 
@@ -560,8 +560,8 @@ São duas ofertas opcionais, feitas uma vez pela skill `setup`, nunca em reposit
 
 - `setup-repo.sh --offers` lista as ofertas sem resposta. O "não" fica numa variável do repositório (`setup-repo.sh --decline project|runner`), fora do git.
 - **Quadro aceito:** `setup-repo.sh --project`, idempotente: cria o quadro se não houver, vincula ao repo, cria as views que faltam e lê tudo de volta. O que a API não faz sai em linhas `pending:`, e a sessão faz no navegador. Sem o escopo `project` no token do `gh`, o script sai 1 com a linha `fix:`; o passo de login é do dono (skill `setup`).
-- **Escopo do `gh`:** toda correção de escopo é um comando só, rodado pelo dono, com a lista completa de escopos que o método usa: `gh auth login -h github.com -p https -w -s gist,project,read:org,repo,workflow` (a lista fica num lugar só, `scripts/lib/project.sh`). Pedir um escopo avulso derruba os outros de um login que outras sessões podem usar. O agente só roda `gh auth status`; nunca pede nem roda `gh auth refresh`, `gh auth logout`, `gh auth setup-git` ou `--with-token`, e nunca define `GH_TOKEN=` ou `GITHUB_TOKEN=` (o `ci.yml` usa o token do próprio job). O `test_gh_login.sh` recusa esses textos no repositório.
-- **Escrita no quadro** (`scripts/lib/project.sh`): repo sem quadro não tenta nada. Repo com quadro lê cada escrita de volta; a que não confirma faz o script sair ≠ 0 com `error:` (a causa) e `fix:` (o comando de correção).
+- **Escopo do `gh`:** toda correção de escopo é um comando só, rodado pelo dono, com a lista completa de escopos que o método usa: `gh auth login -h github.com -p https -w -s gist,project,read:org,repo,workflow` (a lista fica num lugar só, `.method/scripts/lib/project.sh`). Pedir um escopo avulso derruba os outros de um login que outras sessões podem usar. O agente só roda `gh auth status`; nunca pede nem roda `gh auth refresh`, `gh auth logout`, `gh auth setup-git` ou `--with-token`, e nunca define `GH_TOKEN=` ou `GITHUB_TOKEN=` (o `ci.yml` usa o token do próprio job). O `test_gh_login.sh` recusa esses textos no repositório.
+- **Escrita no quadro** (`.method/scripts/lib/project.sh`): repo sem quadro não tenta nada. Repo com quadro lê cada escrita de volta; a que não confirma faz o script sair ≠ 0 com `error:` (a causa) e `fix:` (o comando de correção).
 - **Status movido pelos scripts:** `open-issue.sh` → `Todo`; `phase-start.sh` → `In Progress`; `close-phase.sh --cleanup` → `Done`; `close-phase.sh --abort` → `Todo`.
 
 | View | Layout | Filtro e agrupamento |
@@ -582,7 +582,7 @@ São duas ofertas opcionais, feitas uma vez pela skill `setup`, nunca em reposit
 
 - Nome do arquivo: `ci.yml` para o CI único; para os outros, prefixo da categoria (`deploy-`, `issues-`, `release-`, `bot-`) mais a finalidade. Workflow da aplicação (agendado, retenção de imagem, scan de pull request) não entra nesses prefixos: o `check-workflows.py` não o confere. Scan que deve barrar o merge vira job do `ci.yml`.
 - `name` legível em inglês, `run-name` que explica a execução, `name` em todo job e passo.
-- Conferido no CI pelo `actionlint` e pelo `scripts/check-workflows.py`.
+- Conferido no CI pelo `actionlint` e pelo `.method/scripts/check-workflows.py`.
 
 ### 9.2 `ci.yml`
 
@@ -607,7 +607,7 @@ O arquivo é a fonte. Jobs: `changes`, `policy`, `lint`, `tests`, `workflows` e 
 
 O passo da label lê a lista de caminhos uma por linha, para qualquer verificador da base (o de `c1b76da` não lê lista separada por NUL). Um verificador da base que não conhece as classes lista tudo como `owner-ok`: o PR de atualização vindo de uma base antiga recebe `needs-owner-ok`; vindo de uma base com as classes, recebe `needs-gate-review` ao trocar o `ci.yml` e os verificadores.
 
-**Modo `pr` (`.github/ci-mode`).** Sem `push` na `main`, a soma de dois PRs mergeados em sequência não é testada na hora: a proteção não exige branch atualizada. A garantia é esta: o PR seguinte testa a soma (a árvore dele inclui o merge anterior) e o `deploy-*.yml` roda `scripts/validate.sh` na `main` antes de publicar; nada vai à produção sem a soma testada. O `strict: true` ou a recusa do merge por base velha fechariam a lacuna ao custo de um rebase e uma rodada a mais por PR; não são feitos, e quem precisa da `main` sempre verde fica no modo `push`. Os testes de `ci.yml` leem `.github/ci-mode` e, no modo `pr`, afirmam a ausência do `push`.
+**Modo `pr` (`.github/ci-mode`).** Sem `push` na `main`, a soma de dois PRs mergeados em sequência não é testada na hora: a proteção não exige branch atualizada. A garantia é esta: o PR seguinte testa a soma (a árvore dele inclui o merge anterior) e o `deploy-*.yml` roda `.method/scripts/validate.sh` na `main` antes de publicar; nada vai à produção sem a soma testada. O `strict: true` ou a recusa do merge por base velha fechariam a lacuna ao custo de um rebase e uma rodada a mais por PR; não são feitos, e quem precisa da `main` sempre verde fica no modo `push`. Os testes de `ci.yml` leem `.github/ci-mode` e, no modo `pr`, afirmam a ausência do `push`.
 
 Na atualização, quando o `.github/workflows/ci.yml` muda e a aplicação não, o filtro `app` pula o build: o job sai `skipped` e o `CI` verde não prova o build. No PR, inclua `.github/workflows/ci.yml` no filtro `app`, ou rode o build numa cópia local e registre o resultado.
 
@@ -615,8 +615,8 @@ Execução sem fato novo é defeito, mesmo verde. A detecção fica nos scripts 
 
 | Cenário | Detecção |
 |---|---|
-| `--prepare` cujo commit não muda o que a suíte lê | `no-new-fact: nothing the suite reads` em `scripts/close-phase.sh` |
-| `--prepare` sem push | `no-new-fact: already on origin` em `scripts/close-phase.sh` |
+| `--prepare` cujo commit não muda o que a suíte lê | `no-new-fact: nothing the suite reads` em `.method/scripts/close-phase.sh` |
+| `--prepare` sem push | `no-new-fact: already on origin` em `.method/scripts/close-phase.sh` |
 | push cuja árvore o PR já testou | `no-new-fact: already tested in the PR` em `.github/workflows/ci.yml` |
 | job de `Tests` reaproveitado | `no-new-fact: tests already passed` em `.github/workflows/ci.yml` |
 
@@ -624,13 +624,13 @@ O `issues-label.yml` roda em `opened` e em `edited` só quando o corpo mudou, co
 
 ### 9.3 Runner próprio
 
-O registro é só `scripts/setup-runner.sh --register`. Ele recusa repo público e repo de visibilidade ilegível, porque o runner rodaria o código de qualquer PR. Um runner recusado no setup só volta a ser oferecido pelo gatilho da triagem (`triage.sh --runner-offer`): média de run acima de 5 minutos ou cota acima de 50%.
+O registro é só `.method/scripts/setup-runner.sh --register`. Ele recusa repo público e repo de visibilidade ilegível, porque o runner rodaria o código de qualquer PR. Um runner recusado no setup só volta a ser oferecido pelo gatilho da triagem (`triage.sh --runner-offer`): média de run acima de 5 minutos ou cota acima de 50%.
 
 Num runner próprio sem `actions/*` e sem `gh` (FHDumont/ai-engineering-team-template#247): defina `CI_RUNS_ON` e, se o runner não baixa actions, `CI_CHECKOUT_CMD` antes de abrir o PR de adoção. O `runs-on` padrão fica `ubuntu-latest` no template; o repositório não o troca no arquivo. Job extra de `.github/ci-extra-jobs` que precisa de outro runner tem `runs-on` próprio e roda sempre, porque o `ci-gate.sh` reprova job extra `skipped`: em PR só de doc (`docs_only`), são os passos do job que pulam, não o job. `CI_CHECKOUT_CMD` é código executado na CI, definido só pelo dono do repositório; com `CI_CHECKOUT_FULL=true` o checkout traz o histórico completo, que inclui o commit base.
 
 ### 9.4 Deploy (regra-base 3)
 
-Um deploy por grupo de fases, disparado só pelo `scripts/deploy.sh`, rodado pela sessão principal no checkout principal, no passo único de fim, depois do `gen-docs.sh`. Nenhuma sessão de fase faz deploy, e o `close-phase.sh` não dispara nada.
+Um deploy por grupo de fases, disparado só pelo `.method/scripts/deploy.sh`, rodado pela sessão principal no checkout principal, no passo único de fim, depois do `gen-docs.sh`. Nenhuma sessão de fase faz deploy, e o `close-phase.sh` não dispara nada.
 
 O `deploy.sh`:
 
@@ -645,7 +645,7 @@ O `deploy.sh`:
 | 3 | o run não terminou no prazo | lê o run pela URL e roda `deploy.sh` de novo |
 | 4 | o run falhou | lê o run, corrige e roda `deploy.sh` de novo |
 
-Rollback e prova da imagem ficam no desenho, sem alvo novo de produção. Um workflow com a linha `# deploy-manual:` (rollback, ou um deploy que o dono dispara na tela do Actions) não é chamado pelo `deploy.sh`. Um run cujo título contém `rollback` não conta como deploy daquele SHA: o deploy normal do mesmo SHA ainda dispara. Antes do merge, a prova da imagem é um run de workflow manual que publica a imagem candidata e a lê de volta; o merge não espera esse run. O `deploy-*.yml` que o `deploy.sh` dispara roda só por `workflow_dispatch`; o primeiro job roda o `scripts/validate.sh` na `main` só quando o SHA, ou a mesma árvore, não tem `CI` verde (`scripts/ci-already-green.sh`; falha de API ou check ausente roda a suíte) e todos os outros dependem dele; `concurrency` com `cancel-in-progress: false`. A linha `# deploy-paths:` aceita exclusão (`!caminho`). O `check-workflows.py` recusa deploy com outro gatilho, sem a linha `# deploy-paths:` e sem o job de validação, e exige o gate: o job de validação roda o `ci-already-green.sh`, tem `permissions: checks: read` e só roda o `validate.sh` com `skip != 'true'` (o caminho de emergência é o próprio `skip=false`). Vale também para o `deploy-*.yml` próprio de cada adotante (FHDumont/ai-engineering-team-template#270). Disparo fora do `deploy.sh` é barrado pelo `block-dangerous-git.sh` (§6.2, item 9) e pelo deny do `.claude/settings.json`.
+Rollback e prova da imagem ficam no desenho, sem alvo novo de produção. Um workflow com a linha `# deploy-manual:` (rollback, ou um deploy que o dono dispara na tela do Actions) não é chamado pelo `deploy.sh`. Um run cujo título contém `rollback` não conta como deploy daquele SHA: o deploy normal do mesmo SHA ainda dispara. Antes do merge, a prova da imagem é um run de workflow manual que publica a imagem candidata e a lê de volta; o merge não espera esse run. O `deploy-*.yml` que o `deploy.sh` dispara roda só por `workflow_dispatch`; o primeiro job roda o `.method/scripts/validate.sh` na `main` só quando o SHA, ou a mesma árvore, não tem `CI` verde (`.method/scripts/ci-already-green.sh`; falha de API ou check ausente roda a suíte) e todos os outros dependem dele; `concurrency` com `cancel-in-progress: false`. A linha `# deploy-paths:` aceita exclusão (`!caminho`). O `check-workflows.py` recusa deploy com outro gatilho, sem a linha `# deploy-paths:` e sem o job de validação, e exige o gate: o job de validação roda o `ci-already-green.sh`, tem `permissions: checks: read` e só roda o `validate.sh` com `skip != 'true'` (o caminho de emergência é o próprio `skip=false`). Vale também para o `deploy-*.yml` próprio de cada adotante (FHDumont/ai-engineering-team-template#270). Disparo fora do `deploy.sh` é barrado pelo `block-dangerous-git.sh` (§6.2, item 9) e pelo deny do `.claude/settings.json`.
 
 ---
 
@@ -691,7 +691,7 @@ O agente `close-reviewer`, aberto com o par do peso `reviewer` (§3), lê a issu
 Lista: cobrança, autenticação, migração de banco, credenciais, infraestrutura de produção, dependências e lockfiles, mais o próprio portão. Vale mesmo com `end:auto-close`. Duas classes, marcadas em `.github/sensitive-paths` por linhas `# class: owner-ok` e `# class: gate` (glob antes de qualquer linha é `owner-ok`; caminho nas duas é `owner-ok`; lista antiga, sem linha de classe, é toda `owner-ok`): `owner-ok` (migrações, `.env*`, `secrets/`, `credentials/`, `auth/`, `billing/`, `payments/`, `infra/production/`, mais os caminhos do método do item 2) pede o ok do dono; `gate` (dependências e lockfiles, `deploy-*.yml`, `ci.yml`, os verificadores, `close-phase.sh` e a própria lista) recebe `needs-gate-review` e pede, no lugar do dono, uma segunda revisão do `close-reviewer` focada em "o PR enfraquece o portão?", gravada em `.process/reviewer-gate-<sha>.md`, publicada com `--publish-review <arquivo> --gate` e com veredito `success` no HEAD. Sem ela o `--merge` sai 5. Uma classe só não basta para o portão se enfraquecer a si mesmo: o dono ainda aprova qualquer mudança de caminho `owner-ok`. Três camadas:
 
 1. As labels `area:billing`, `area:auth`, `area:migration` e `area:credentials` são aplicadas pela triagem e pelo workflow.
-2. Os caminhos do método (hooks, `.claude/settings.json`, `.githooks/`, `.github/actions/`, workflows com token de escrita, `scripts/lib/procs.sh`, `scripts/sessions.sh`, `scripts/start-headless.sh`, `scripts/setup-repo.sh`) valem no código (`scripts/lib/sensitive_paths.py`). `.github/sensitive-paths` só acrescenta os globs do projeto e os arquivos do próprio portão (`close-phase.sh`, workflows de deploy, `ci.yml`, os verificadores lidos da base e a própria lista); a atualização soma caminho novo do método sem apagar o do repo. O job `policy` do CI põe `needs-owner-ok` quando o diff toca um da classe `owner-ok` e `needs-gate-review` quando toca um da classe `gate`. O `close-phase.sh --merge` decide pela união da lista da base (`origin/main`) com a do PR: tirar uma entrada no próprio PR não dispensa o ok, e base sem lista legível recusa o merge.
+2. Os caminhos do método (hooks, `.claude/settings.json`, `.githooks/`, `.github/actions/`, workflows com token de escrita, `.method/scripts/lib/procs.sh`, `.method/scripts/sessions.sh`, `.method/scripts/start-headless.sh`, `.method/scripts/setup-repo.sh`) valem no código (`.method/scripts/lib/sensitive_paths.py`). `.github/sensitive-paths` só acrescenta os globs do projeto e os arquivos do próprio portão (`close-phase.sh`, workflows de deploy, `ci.yml`, os verificadores lidos da base e a própria lista); a atualização soma caminho novo do método sem apagar o do repo. O job `policy` do CI põe `needs-owner-ok` quando o diff toca um da classe `owner-ok` e `needs-gate-review` quando toca um da classe `gate`. O `close-phase.sh --merge` decide pela união da lista da base (`origin/main`) com a do PR: tirar uma entrada no próprio PR não dispensa o ok, e base sem lista legível recusa o merge.
 3. O `close-phase.sh --merge` sai 5 com `needs-owner-ok` ou com label de área sensível. A filha pede o ok do dono num quadro `Fase #<n> — <título>:` cujas opções dizem a ação inteira e o SHA do HEAD, e roda `--merge --owner-ok <sha> --wait`. O `--owner-ok` recebe o SHA e só vale se for o HEAD e se a label `needs-owner-ok` já estiver no PR: sem ela, a recusa põe a label e sai 5. Quadros de sessões diferentes sobre o mesmo merge não ficam abertos juntos.
 
 Para todo o resto, `end:auto-close` vale como ok prévio do dono para o merge.
@@ -701,7 +701,7 @@ Para todo o resto, `end:auto-close` vale como ok prévio do dono para o merge.
 O arquivo é a fonte. Ele precisa ter:
 
 - `attribution` com `commit` e `pr` vazios;
-- `allow` para cada script do método pelo nome (nunca `scripts/*`), para a leitura e escrita de issues e PRs com `gh` e para os comandos de git do dia a dia, sem `git push` genérico;
+- `allow` para cada script do método pelo nome (nunca `.method/scripts/*`), para a leitura e escrita de issues e PRs com `gh` e para os comandos de git do dia a dia, sem `git push` genérico;
 - `deny` para `gh pr merge`, push forçado, `git reset --hard`, apagar o repo, disparo de workflow e leitura direta de segredo; o deny vence o allow;
 - os hooks da §6.2, cada um no evento da tabela.
 
@@ -716,7 +716,7 @@ Um PR cuja branch não é uma dessas recebe o status e faz merge só por `close-
 - `--publish-review <arquivo> [--verdict success|failure]` publica `review/independent` no SHA do head desse PR. O arquivo tem de ser o parecer salvo daquele SHA (`.process/reviewer-<sha>.md`) e o veredito é o da sua linha `Veredito:`.
 - `--merge --owner-ok <SHA>` só mergeia quando esse SHA é o HEAD do PR, o check run `CI` desse SHA terminou com `success` e o parecer independente salvo desse SHA tem veredito `success`. SHA diferente, CI ausente e head de fase (`fix/issue-*` e os outros três prefixos) são recusados.
 
-O `scripts/setup-repo.sh` e o README avisam isso antes de a proteção ser ligada.
+O `.method/scripts/setup-repo.sh` e o README avisam isso antes de a proteção ser ligada.
 
 ---
 
