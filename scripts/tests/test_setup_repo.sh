@@ -3,6 +3,10 @@
 # shellcheck source=scripts/tests/lib.sh
 source "$(dirname "$0")/lib.sh"
 SETUP="$SCRIPTS/setup-repo.sh"
+# #272: this test must never write the real .github/required-checks. A test running at the
+# same time (test_setup_check.sh) reads it through setup-repo.sh --check and saw an extra
+# check ("missing: protection"). The marker proves the file was not touched.
+touch "$TMP/start-marker"
 
 # "Already conforming" state: every label of the tsv, settings and protection right.
 labels_json="$(bash -c 'source "$1/lib/common.sh"; label_rows "$2"' _ "$SCRIPTS" "$REPO/.github/labels.tsv" | jq -R -s -c 'split("\n") | map(select(length > 0) | split("\t") | {name: .[0], color: .[1], description: .[2]})')"
@@ -134,29 +138,34 @@ J
   "api -X PUT"*) cat >"$FAKE_GH_LOG.body.$RANDOM"; touch "$TMP/protected"; rm -f "$TMP/strict" "$TMP/keep-security" ;;
 esac
 H
+# A private copy of the scripts: its .github/required-checks is the one these steps write.
+XREPO="$(make_repo)"
+copy_scripts "$XREPO"
+mkdir -p "$XREPO/.github"
+XSETUP="$XREPO/scripts/setup-repo.sh"
 export TMP
 use_fake_gh "$TMP/extra-prot.sh"
 touch "$TMP/protected" "$TMP/keep-security"
 : >"$FAKE_GH_LOG"
-assert_status 7 "dropping an extra required check needs owner ok" "$SETUP" --only protection
+assert_status 7 "dropping an extra required check needs owner ok" "$XSETUP" --only protection
 assert_contains "$(last_output)" "missing: owner ok to drop required check Security" "lists the check it would drop"
 assert_not_contains "$(gh_calls)" "-X PUT" "does not drop the check without owner ok"
 : >"$FAKE_GH_LOG"
-assert_status 0 "owner ok may drop the extra check" "$SETUP" --only protection --owner-ok
+assert_status 0 "owner ok may drop the extra check" "$XSETUP" --only protection --owner-ok
 assert_contains "$(gh_calls)" "-X PUT" "applies protection after owner ok"
-printf 'Security\n' >"$REPO/.github/required-checks"
+printf 'Security\n' >"$XREPO/.github/required-checks"
 touch "$TMP/protected" "$TMP/keep-security"
 : >"$FAKE_GH_LOG"
 use_fake_gh "$TMP/extra-prot.sh"
-out="$("$SETUP" --only protection --dry-run 2>&1)"
+out="$("$XSETUP" --only protection --dry-run 2>&1)"
 assert_contains "$out" "no changes" "an extra check in the repo file is kept"
 assert_not_contains "$out" "drop required check Security" "the repo file check is not listed as a drop"
-printf '# Extra required status checks, one GitHub context per line.\n# CI and review/independent are always required by the method.\n# This file is of the repository: a template update does not overwrite it.\n' >"$REPO/.github/required-checks"
+printf '# Extra required status checks, one GitHub context per line.\n# CI and review/independent are always required by the method.\n# This file is of the repository: a template update does not overwrite it.\n' >"$XREPO/.github/required-checks"
 touch "$TMP/protected" "$TMP/strict"
 rm -f "$TMP/keep-security"
 : >"$FAKE_GH_LOG"
 use_fake_gh "$TMP/extra-prot.sh"
-assert_status 7 "loosening strict needs owner ok" "$SETUP" --only protection
+assert_status 7 "loosening strict needs owner ok" "$XSETUP" --only protection
 assert_contains "$(last_output)" "missing: owner ok to loosen strict" "lists the strict it would loosen"
 assert_not_contains "$(gh_calls)" "-X PUT" "does not loosen strict without owner ok"
 
@@ -363,4 +372,6 @@ for write in "project create" "variable set" "project link" "-X POST"; do
   assert_not_contains "$calls" "$write" "dry-run --project on an existing board never runs: $write"
 done
 assert_status 2 "decline rejects unknown offers" "$SETUP" --decline bogus
+if [ "$REPO/.github/required-checks" -nt "$TMP/start-marker" ]; then rc_touched=yes; else rc_touched=no; fi
+assert_eq "no" "$rc_touched" "the test leaves the real .github/required-checks alone (#272)"
 finish
