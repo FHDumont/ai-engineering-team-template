@@ -36,6 +36,8 @@
 #: or a bot slug from .github/bots.tsv as @slug. A name in backticks is not a citation.
 set -euo pipefail
 HERE="$(cd "$(dirname "$0")" && pwd)"
+# Logical root: "$HERE/.." would resolve through the scripts link to .method.
+ROOT="$(cd "$HERE/.." && pwd)"
 # shellcheck source=scripts/lib/common.sh
 source "$HERE/lib/common.sh"
 # shellcheck source=scripts/lib/secret.sh
@@ -138,7 +140,7 @@ echo "ok: branch $branch"
 # A phase branch only works with its spec in git (phase-start.sh commits it).
 phase_issue="$(issue_from_branch "$branch")"
 if [ -n "$phase_issue" ]; then
-  [ -n "$(specs_citing "$phase_issue" "$HERE/..")" ] ||
+  [ -n "$(specs_citing "$phase_issue" "$ROOT")" ] ||
     die "no spec in docs/specs cites #$phase_issue: the phase opens only through scripts/phase-start.sh"
   echo "ok: spec cites #$phase_issue"
 fi
@@ -164,7 +166,7 @@ check_session_pair() {
     return 0
   fi
   # shellcheck disable=SC2046  # spec paths have no space
-  asked="$(spec_pairs "$phase_issue" $(specs_citing "$phase_issue" "$HERE/.." | sed "s#^#$HERE/../#"))" ||
+  asked="$(spec_pairs "$phase_issue" $(specs_citing "$phase_issue" "$ROOT" | sed "s#^#$ROOT/#"))" ||
     die "the spec of #$phase_issue has no 'modelo: ... · esforço: ...' pair"
   real="$(session_pair)"
   case " $real " in
@@ -215,7 +217,7 @@ spec_cites_bots() {
   issue="$(issue_from_branch "$branch")"
   [ -n "$issue" ] || return 1
   slugs="$(bot_slugs | paste -sd'|' -)"
-  for spec in "$HERE"/../docs/specs/*.md; do
+  for spec in "$ROOT"/docs/specs/*.md; do
     [ -f "$spec" ] || continue
     grep -q -E "#$issue([^0-9]|$)" "$spec" || continue
     # Only the general header (before the first phase section) and this phase's section count.
