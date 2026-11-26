@@ -60,6 +60,8 @@
 
 ## Outros
 
+- fix: compare the saved review opinion with its own reviewer stop ([#284](https://github.com/FHDumont/ai-engineering-team-template/pull/284)) · 2026-11-25
+- test: stop test_setup_repo.sh writing the real required-checks ([#282](https://github.com/FHDumont/ai-engineering-team-template/pull/282)) · 2026-11-25
 - test: make the time-based tests robust under machine load ([#276](https://github.com/FHDumont/ai-engineering-team-template/pull/276)) · 2026-11-25
 - fix: hash the close-reviewer opinion from its transcript ([#243](https://github.com/FHDumont/ai-engineering-team-template/pull/243)) · 2026-11-24
 - feat: time is informative, never a cut for the owner ([#240](https://github.com/FHDumont/ai-engineering-team-template/pull/240)) · 2026-11-24
