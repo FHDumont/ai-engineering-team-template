@@ -2,10 +2,6 @@
 
 <!-- Gerado por scripts/gen-roadmap.py; não editar à mão. -->
 
-## ci
-
-- [#270](https://github.com/FHDumont/ai-engineering-team-template/issues/270) Deploy dos adotantes ainda repete o validate.sh depois do CI verde · alta · end:auto-close · group:correcoes-scripts
-
 ## scripts
 
 - [#269](https://github.com/FHDumont/ai-engineering-team-template/issues/269) Scripts do template · sem prioridade · end:auto-close
