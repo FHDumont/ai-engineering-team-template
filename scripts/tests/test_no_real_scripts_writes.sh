@@ -2,6 +2,8 @@
 # No test writes into the real scripts/ (#281): a file created there is seen by a test that runs
 # at the same time (a copy of scripts/, a git ls-files, a count) and fails it under parallel load.
 # A test builds what it needs in a copy (copy_scripts), never in $SCRIPTS or $REPO/scripts.
+# The check is a heuristic grep: redirections, touch, chmod, mkdir, rm and a sentinel= assignment aimed at the real
+# scripts/. A cp or tee to it is not caught (a cp FROM it is a read and common).
 # shellcheck source=scripts/tests/lib.sh
 source "$(dirname "$0")/lib.sh"
 
