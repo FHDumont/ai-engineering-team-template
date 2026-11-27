@@ -4,6 +4,8 @@
 
 ## Funcionalidades
 
+- feat: warn about old .env folders with the command to migrate or remove them ([#333](https://github.com/FHDumont/ai-engineering-team-template/pull/333)) · 2026-11-27
+- feat(secret): honor DUMONTECH_HOME for the repo .env and shared bots.env ([#331](https://github.com/FHDumont/ai-engineering-team-template/pull/331)) · 2026-11-27
 - fix(close-phase): keep the PR body under the limit and let the spec ok cover the merge ([#314](https://github.com/FHDumont/ai-engineering-team-template/pull/314)) · 2026-11-26
 - fix: harden rerun-ci count, sensitive subfolder globs and deploy gate permission ([#313](https://github.com/FHDumont/ai-engineering-team-template/pull/313)) · 2026-11-26
 - refactor: move method script paths to .method/scripts and drop the scripts link ([#293](https://github.com/FHDumont/ai-engineering-team-template/pull/293)) · 2026-11-26
@@ -22,6 +24,8 @@
 
 ## Correções
 
+- fix: fetch-template.sh --apply survives replacing itself ([#329](https://github.com/FHDumont/ai-engineering-team-template/pull/329)) · 2026-11-27
+- test: accept an app scripts/lib folder in test_method_folder ([#325](https://github.com/FHDumont/ai-engineering-team-template/pull/325)) · 2026-11-27
 - fix: read files from the logical root in check-env and machine-slots ([#291](https://github.com/FHDumont/ai-engineering-team-template/pull/291)) · 2026-11-26
 - fix: require the CI gate in deploy workflows ([#274](https://github.com/FHDumont/ai-engineering-team-template/pull/274)) · 2026-11-25
 - fix: ask-bot --append waits only for replies posted after the follow-up ([#271](https://github.com/FHDumont/ai-engineering-team-template/pull/271)) · 2026-11-25
@@ -65,6 +69,7 @@
 
 ## Outros
 
+- fix(status): ignore .DS_Store when checking for pending edits on main ([#327](https://github.com/FHDumont/ai-engineering-team-template/pull/327)) · 2026-11-27
 - test: make the method tests load-proof and lint the load patterns ([#319](https://github.com/FHDumont/ai-engineering-team-template/pull/319)) · 2026-11-27
 - feat: versioned method releases by tag ([#318](https://github.com/FHDumont/ai-engineering-team-template/pull/318)) · 2026-11-27
 - feat: open all waves on spec approval, no heartbeat ([#317](https://github.com/FHDumont/ai-engineering-team-template/pull/317)) · 2026-11-27
