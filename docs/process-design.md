@@ -43,7 +43,7 @@ Onde cada regra está descrita: 1 e 2 na §4.3; 3 na §9.4; 4 na §6.1; 5 na §2
 2. **Idioma** conforme a §1.
 3. **Toda decisão do dono é um quadro de escolha** (`AskUserQuestion`), uma pergunta por decisão, que começa por `Fase #n — título`. O hook `block-card-title.sh` barra o quadro sem esse começo quando há fase aberta. Nunca peça ao dono para digitar o número de um item.
    - Só a sessão principal pergunta. A sessão filha manda a dúvida por mensagem e recebe `respondido: <decisão>`.
-   - A sessão filha abre quadro para uma coisa só: a autorização da ação sensível que ela mesma executa (merge com `needs-owner-ok`; `close-phase.sh --abort --discard`). O ok do dono não atravessa sessões.
+   - A sessão filha abre quadro para uma coisa só: a autorização da ação sensível que ela mesma executa (merge com `needs-owner-ok`; `close-phase.sh --abort --discard`). O ok do dono não atravessa sessões. Exceção (ADR-006): a spec aprovada (quadro ou label `approved`) que declara a área sensível numa linha `Área sensível:` da seção da fase já é o ok do merge dela; o `--prepare` grava o evento `spec_ok` (SHA do HEAD e palavras declaradas) e o `--merge` dispensa o quadro só para o caminho ou a label de área que a spec declarou, naquele HEAD. O que a spec não declarou, e o `--abort --discard`, continuam pedindo o ok.
 4. **Bloco de status em toda parada e em toda mensagem final de turno.** Rode `.method/scripts/status.sh` e cole a saída como está, fora de bloco de código. São três linhas em negrito:
 
    **Estado:** trabalhando | esperando você | pronto
@@ -158,7 +158,7 @@ Espera acima de ~2 minutos: diga o que espera e onde (o run, o PR).
 | Item `strong` na spec | 1 troca de modelo e esforço no chat do planejamento |
 | `end:lab-test` | testar no lab, iterar, "fechar fase" |
 | `end:auto-close` | nada |
-| PR com `needs-owner-ok` | 1 ok no quadro do merge |
+| PR com `needs-owner-ok` | 1 ok no quadro do merge; nenhum se a spec aprovada declarou a área (ADR-006) |
 | PR com `needs-gate-review` | nenhum: uma segunda revisão do `close-reviewer` |
 | Achado `size:large` | 1 quadro: agora ou na próxima triagem |
 
@@ -329,7 +329,7 @@ Roda só na sessão filha; na sessão que abriu a fase, `--prepare`, `--publish-
 5. **`--merge --wait`**. Recusa se um destes itens falhar:
    - a regra da sessão filha (§4.3);
    - o `--check` (com PR refeito sai 6: o PR novo ainda não tem CI nem revisão);
-   - `needs-owner-ok` e label de área sensível (§10.3; sai 5);
+   - `needs-owner-ok` e label de área sensível (§10.3; sai 5), salvo o que a spec aprovada declarou para este HEAD (`spec_ok` no trace, ADR-006);
    - diff na classe `gate` da lista sensível sem a segunda revisão publicada com `--publish-review <arquivo> --gate` (§10.3; sai 5);
    - `review/independent` verde, com a rodada do revisor no trace depois do push do HEAD;
    - a proteção da branch base com `CI` e `review/independent`;
