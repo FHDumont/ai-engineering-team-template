@@ -46,6 +46,7 @@ rm -rf "$HOME/.outro"
 
 # Old-folder notices (stderr, once per run, never a value, nothing moved or deleted).
 export TMPDIR="$TMP/tmpdir"; mkdir -p "$TMPDIR"
+# shellcheck disable=SC2069 # stderr only, on purpose
 notice() { (cd "$TMP/repo" && bash -c 'source "$1/lib/secret.sh"; secret_env_file >/dev/null; _secret_env_file_check; _secret_env_file_check; echo "rc=$?" >&2' _ "$SCRIPTS" 2>&1 >/dev/null); }
 snap() { find "$HOME" -type f -exec cksum {} + 2>/dev/null | sort; }
 rm -rf "$HOME/.outro" "$HOME/.config/outro" "$NEW/outro"
