@@ -26,6 +26,7 @@
 # Functions:
 #   secret_env_file                            path of this repo's .env
 #   secret_shared_file                         path of the shared bots.env
+#   secret_old_dirs_notice                     stderr notice about old .env folders
 #   secret_file_for_var <VAR_NAME>             file to read VAR_NAME from (empty: none)
 #   secret_get <VAR_NAME> [<op://reference>]   prints the value on stdout
 #   secret_ready <VAR_NAME>...                 checks there is a provider, prints no secret
@@ -212,16 +213,42 @@ _secret_file_check() {
   return 0
 }
 
-# The repo .env (with the legacy warning).
+# Notice about the old .env folders (~/.<slug>, legacy ~/.config/<slug>), on
+# stderr, once per execution (marker keyed on $$, which subshells share). Prints
+# only paths and commands, never a value; moves and deletes nothing: the owner
+# runs the command shown. Silent with PROCESS_ENV_FILE (an explicit choice).
+#   new path and old folder together: the old folder is not read any more;
+#   only the old folder: it is still read, with the command that migrates it.
+secret_old_dirs_notice() {
+  [ -z "${PROCESS_ENV_FILE:-}" ] || return 0
+  local slug home new d label marker msg="" lines=""
+  slug="$(secret_repo_slug)"; home="$(secret_home)"
+  new="$home/projetos/$slug/.env"
+  marker="${TMPDIR:-/tmp}/method-env-notice.$$"
+  [ ! -e "$marker" ] || return 0
+  for d in "$HOME/.$slug" "$HOME/.config/$slug"; do
+    [ -d "$d" ] || continue
+    label="old"; case "$d" in "$HOME"/.config/*) label="legacy" ;; esac
+    if [ -e "$new" ]; then
+      lines="${lines}warning: the $label folder $d is not read any more (the .env is $new); remove it with: rm -r $(printf '%q' "$d")
+"
+    elif [ -f "$d/.env" ] && [ -z "$msg" ]; then
+      msg=1
+      lines="${lines}warning: using the $label .env $d/.env, a path that will stop being read. Migrate it with: mkdir -p $(printf '%q' "$home/projetos/$slug") && chmod 700 $(printf '%q' "$home") $(printf '%q' "$home/projetos") $(printf '%q' "$home/projetos/$slug") && mv $(printf '%q' "$d/.env") $(printf '%q' "$new") && chmod 600 $(printf '%q' "$new") && rm -r $(printf '%q' "$d")
+"
+    fi
+  done
+  [ -n "$lines" ] || return 0
+  : >"$marker" 2>/dev/null || true
+  printf '%s' "$lines" >&2
+}
+
+# The repo .env (with the old-folder notice).
 _secret_env_file_check() {
   local f
   f="$(secret_env_file)"
+  secret_old_dirs_notice
   [ -f "$f" ] || return 1
-  if [ -z "${PROCESS_ENV_FILE:-}" ]; then
-    case "$f" in
-      "$HOME"/.config/*/.env) _secret_err "warning: using the legacy $f; move it to $(secret_home)/projetos/$(secret_repo_slug)/.env" ;;
-    esac
-  fi
   _secret_file_check "$f"
 }
 
