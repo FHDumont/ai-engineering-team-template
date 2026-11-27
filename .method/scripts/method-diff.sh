@@ -210,7 +210,7 @@ case "$origin_verifier" in
 esac
 echo "- [ ] O verificador da origem põe \`$label\` neste PR. A label nova do portão entra no merge pelo \`close-phase.sh\` (FHDumont/ai-engineering-team-template#220), sem passo manual."
 # The base of the PR runs its own check-docs.sh: lower limits there fail a doc the new one accepts (FHDumont/ai-engineering-team-template#216).
-# The origin may predate the .method/ folder (#301): use the path that exists there.
+# The origin may predate the .method/ folder (FHDumont/ai-engineering-team-template#301): use the path that exists there.
 cd_path=.method/scripts/check-docs.sh
 git -C "$template" cat-file -e "$from:$cd_path" 2>/dev/null || cd_path=scripts/check-docs.sh
 if ! diff <(git -C "$template" show "$from:$cd_path" 2>/dev/null | grep '^limit ') \

@@ -43,16 +43,19 @@ while read -r short _; do
   assert_eq "yes" "$([ -x "$adopter/.method/scripts/validate.sh" ] && echo yes || echo no)" "$short: the adopter has .method/scripts/validate.sh"
   assert_eq "scripts/app-task.sh" "$(git -C "$adopter" ls-files scripts)" "$short: only the application script stays in scripts/"
 
-  # What the notice asks of the adopter by hand: the origin recorded and the CI mode.
+  # What the notice asks of the adopter by hand: repo-notes.md from the model, the old STATE sentence out, the origin recorded and the CI mode.
+  [ -f "$adopter/docs/repo-notes.md" ] || git -C "$REPO" show "$tip:docs/repo-notes.md" >"$adopter/docs/repo-notes.md"
+  grep -vF 'o job `tests` roda em todo PR' "$adopter/docs/STATE.md" >"$adopter/docs/STATE.md.new" || true
+  mv "$adopter/docs/STATE.md.new" "$adopter/docs/STATE.md"
   (cd "$adopter" && bash .method/scripts/setup-repo.sh --record-origin "$tip") >"$TMP/rec-$short.out" 2>&1 || { tail -5 "$TMP/rec-$short.out"; bad "$short: --record-origin"; }
   printf 'pr\n' >"$adopter/.github/ci-mode"
   git -C "$adopter" add -A
   git -C "$adopter" commit --quiet -m "chore: update the method" || true
   if (cd "$adopter" && env -u PROCESS_VALIDATE_RUNNING AI_METHOD_TEST_JOBS="${AI_METHOD_TEST_JOBS:-4}" .method/scripts/validate.sh --full) >"$TMP/validate-$short.out" 2>&1; then ok; else
-    grep -E 'FAIL |not ok:|error' "$TMP/validate-$short.out" | head -20; bad "$short: validate.sh --full passes after the update"
+    grep -E -A12 'FAIL |not ok:' "$TMP/validate-$short.out" | head -60; bad "$short: validate.sh --full passes after the update"
   fi
   if (cd "$adopter" && .method/scripts/check-docs.sh) >"$TMP/docs-$short.out" 2>&1; then ok; else
     head -20 "$TMP/docs-$short.out"; bad "$short: check-docs.sh passes after the update"
   fi
-done <"$TESTS_DIR/update-origins.txt"
+done <"${UPDATE_ORIGINS_FILE:-$TESTS_DIR/update-origins.txt}"
 finish
