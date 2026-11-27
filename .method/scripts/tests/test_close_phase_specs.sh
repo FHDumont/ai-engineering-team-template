@@ -69,6 +69,37 @@ spec_round '[{"number":1},{"number":3}]' 2026-01-18-g.md 'Fases #1 e #3.'
 assert_contains "$(last_output)" "removed docs/specs/2026-01-18-g.md" "issues closed by the PR do not keep the spec"
 printf 'Resumo\n\nCloses #1\n' >"$TMP/body.md"
 
+# Specs that add up to more than the GitHub body limit (65536): the text that does not
+# fit becomes a link to the blob, and every spec is still cited.
+big_round() {
+  git -C "$repo" switch --quiet -c "chore/issue-1-big-$RANDOM" origin/main
+  mkdir -p "$repo/docs/specs"
+  for n in a b c; do
+    { printf '# Spec\n\nFase #1 e #2.\n\n'; head -c 30000 /dev/zero | tr '\0' 'x'; echo; } >"$repo/docs/specs/2026-01-19-big-$n.md"
+  done
+  git -C "$repo" add docs
+  git -C "$repo" commit --quiet -m "docs: big specs"
+  cat >"$TMP/handler.sh" <<'H'
+case "$*" in
+  "pr list"*"--state open"*) echo 12 ;;
+  "issue view 1"*) printf 'type:chore\ngroup:g\n' ;;
+  "issue list"*"--state open"*) echo 1 ;;
+  "pr view 12"*) echo '{"number":12,"title":"chore: x","body":"","labels":[],"url":"u"}' ;;
+  "pr list"*"merged"*) echo '[]' ;;
+  "issue list"*) echo '[]' ;;
+esac
+H
+  use_fake_gh "$TMP/handler.sh"
+  assert_status 0 "prepare with specs that add up to more than the body limit" sh -c "cd '$repo' && .method/scripts/close-phase.sh --prepare --title 'chore: x' --body-file '$TMP/body.md'"
+}
+big_round
+body_arg="$(gh_calls | sed -n 's/.*pr edit 12 --repo owner\/repo --title chore: x --body-file \([^ ]*\).*/\1/p' | tail -1)"
+[ "$(wc -c <"$body_arg")" -lt 65536 ] && ok || bad "body stays under 65536 characters ($(wc -c <"$body_arg"))"
+for n in a b c; do
+  assert_contains "$(cat "$body_arg")" "docs/specs/2026-01-19-big-$n.md" "body cites big spec $n"
+done
+assert_contains "$(cat "$body_arg")" "/blob/" "the spec that does not fit is a blob link"
+
 git -C "$repo" switch --quiet main
 assert_status 1 "refuses to run on main" sh -c "cd '$repo' && '$CLOSE' --merge"
 finish
