@@ -20,7 +20,7 @@ description: Planejamento nível 2 — lê por inteiro só as issues escolhidas 
 7. **Antes de `start_session`:** linha com o par atual e o da spec; nunca execute aqui. Abertura: só `.method/scripts/phase-start.sh <n> [<n>…]`.
    - **Filhas:** no mesmo turno do "executar", um `start_session` por fase, com: `initiation: "user_asked"`, `context: "fresh"`, `use_worktree: false`, `title`, `prompt`, `background`, `model`/`effort` da spec. O `check-env.sh` confere.
    - **Sem batimento, todas as ondas no ok:** nada recorrente; o fim de turno da filha acorda a gerenciadora. Abra as ondas no turno do ok: `phase-start.sh <n> --after <anterior>`, colando no `background` o texto que ele imprime (a filha espera o merge em tarefa própria).
-   - **Sem vaga**: `phase-start.sh` espera; nunca cartão por vaga. Faltando: ondas; pendente: cartão ou batimento. Acima: 76.
+   - **Sem vaga**: `phase-start.sh` espera; nunca cartão por vaga. Faltando: ondas; pendente: cartão. Acima: 76.
    - **Recusado** (último recurso): `initiation: "own_initiative"` (cartão); pare com `--state esperando --need` do `phase-start.sh` ("abrir a #n" numa mensagem nova, vale pelo Remote Control). Headless só se o dono ligou; nunca subagente.
 8. Vira a **gerenciadora**: não edita; nunca `cd` no worktree (`git -C`, caminho absoluto); só ela pergunta ao dono e repassa "fechar fase". Segurar o merge é comentário `Para: fase #n` na issue. Depois: skill `integrate`.
 9. Feito: só lido.
