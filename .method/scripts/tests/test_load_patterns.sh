@@ -9,29 +9,28 @@
 #     own folder. Parallel tests (or the owner's machine) then see each other's files.
 # A line that must keep a pattern ends with `# load-ok: <reason>`; the reason is mandatory.
 # The check is a heuristic grep over comment-free lines, like test_no_real_scripts_writes.sh.
+# shellcheck disable=SC2016  # the patterns are regexes, not expansions
 # shellcheck source=.method/scripts/tests/lib.sh
 source "$(dirname "$0")/lib.sh"
 
-cd "$TESTS_DIR"
+cd "$TESTS_DIR" || exit 1
 files=(test_*.sh test_*.py phase_start_common.sh close_phase_common.sh)
-hits=""
+unset_home=()
 for f in "${files[@]}"; do
-  [ "$f" != "test_load_patterns.sh" ] || continue
-  uses_home=no
-  grep -qE '^[[:space:]]*export HOME=' "$f" && uses_home=yes
-  while IFS= read -r row; do
-    n="${row%%:*}"; text="${row#*:}"
-    case "$text" in *"# load-ok: "?*) continue ;; esac
-    case "$text" in "#"*|[[:space:]]*"#"*) continue ;; esac
-    why=""
-    if printf '%s\n' "$text" | grep -qE '\| *grep -[a-zA-Z]*q'; then why="pipe into grep -q"
-    elif printf '%s\n' "$text" | grep -qE '"\$i" -lt [0-9]{1,3} \]'; then why="polling loop with a tight bound (use 1200 or more)"
-    elif printf '%s\n' "$text" | grep -qE '[A-Z_]*TIMEOUT[A-Z_]*=([1-9]|[1-5][0-9])([^0-9]|$)'; then why="time limit under 60s"
-    elif printf '%s\n' "$text" | grep -qE '(>>?|touch|mkdir( -p)?|rm( -[a-zA-Z]+)?|cp|mv) +"?/tmp/[A-Za-z]'; then why="write to a fixed /tmp path"
-    elif [ "$uses_home" = no ] && printf '%s\n' "$text" | grep -qE '(>>?|touch|mkdir( -p)?|rm( -[a-zA-Z]+)?) +"?(\$HOME|~)/'; then why="write under the real HOME"
-    fi
-    [ -z "$why" ] || hits="$hits$f:$n: $why: $text"$'\n'
-  done < <(grep -nE '.' "$f")
+  [ "$f" = "test_load_patterns.sh" ] && continue
+  grep -qE '^[[:space:]]*export HOME=' "$f" || unset_home+=("$f")
 done
+sweep() { # sweep <why> <regex> <file>...: lines matching, minus comments and load-ok lines
+  grep -nE -e "$2" "${@:3}" 2>/dev/null | grep -vE '^[^:]+:[0-9]+:[[:space:]]*#' | grep -vF '# load-ok: ' | grep -v '^test_load_patterns.sh:' | awk -v why="$1" '{print why ": " $0}' || true
+}
+checked=()
+for f in "${files[@]}"; do [ "$f" = "test_load_patterns.sh" ] || checked+=("$f"); done
+hits="$(
+  sweep "pipe into grep -q" '\| *grep -[a-zA-Z]*q' "${checked[@]}"
+  sweep "polling loop with a tight bound (use 1200 or more)" '"\$i" -lt [0-9]{1,3} \]' "${checked[@]}"
+  sweep "time limit under 60s" 'TIMEOUT[A-Z_]*=([1-9]|[1-5][0-9])([^0-9]|$)' "${checked[@]}"
+  sweep "write to a fixed /tmp path" '(>>?|touch|mkdir( -p)?|rm( -[a-zA-Z]+)?|cp|mv) +"?/tmp/[A-Za-z]' "${checked[@]}"
+  [ "${#unset_home[@]}" -eq 0 ] || sweep "write under the real HOME" '(>>?|touch|mkdir( -p)?|rm( -[a-zA-Z]+)?) +"?(\$HOME|~)/' "${unset_home[@]}"
+)"
 assert_eq "" "$hits" "no test uses a load-sensitive pattern (add '# load-ok: <reason>' when one must stay)"
 finish
