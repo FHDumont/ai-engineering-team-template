@@ -65,6 +65,9 @@
 
 ## Outros
 
+- test: make the method tests load-proof and lint the load patterns ([#319](https://github.com/FHDumont/ai-engineering-team-template/pull/319)) · 2026-11-27
+- feat: versioned method releases by tag ([#318](https://github.com/FHDumont/ai-engineering-team-template/pull/318)) · 2026-11-27
+- feat: open all waves on spec approval, no heartbeat ([#317](https://github.com/FHDumont/ai-engineering-team-template/pull/317)) · 2026-11-27
 - fix: test the update path from real old origins ([#315](https://github.com/FHDumont/ai-engineering-team-template/pull/315)) · 2026-11-27
 - fix: escape the dot in the check-docs method scripts filter ([#296](https://github.com/FHDumont/ai-engineering-team-template/pull/296)) · 2026-11-26
 - test: build the files of three tests in a copy, never in the real scripts ([#286](https://github.com/FHDumont/ai-engineering-team-template/pull/286)) · 2026-11-26
