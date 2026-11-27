@@ -175,6 +175,23 @@ assert_status 0 "env provider notifies without the credential store or op" env F
   "$SCRIPTS/notify-bot.sh" bot-a 3 "https://x/c/1" --ask-id 20260117100100-1
 assert_contains "$(cat "$FAKE_CURL_LOG")" 'url = "https://env.example/h"' "env webhook URL is used"
 
+# Shared bots file: the webhook of a declared bot comes from it; a declared bot missing from it stops with a clear error.
+export DUMONTECH_HOME="$TMP/dh"
+mkdir -p "$DUMONTECH_HOME/shared"
+printf 'BOT_WEBHOOK_BOT_A_URL=https://shared.example/h\nBOT_WEBHOOK_BOT_A_SECRET=shared-secret\n' >"$DUMONTECH_HOME/shared/bots.env"
+chmod 600 "$DUMONTECH_HOME/shared/bots.env"
+: >"$FAKE_CURL_LOG"
+assert_status 0 "notify reads the webhook of a declared bot from shared/bots.env" env FAKE_SECURITY_MISSING=1 \
+  "$SCRIPTS/notify-bot.sh" bot-a 3 "https://x/c/1" --ask-id 20260117100100-1
+assert_contains "$(cat "$FAKE_CURL_LOG")" 'url = "https://shared.example/h"' "shared webhook URL is used"
+: >"$FAKE_GH_LOG"
+assert_status 1 "ask-bot stops for a declared bot missing from shared/bots.env" env FAKE_SECURITY_MISSING=1 "$SCRIPTS/ask-bot.sh" bot-b 3 "Opinião?"
+assert_contains "$(last_output)" "bot-b" "the error names the missing bot"
+assert_contains "$(last_output)" "$DUMONTECH_HOME/shared/bots.env" "the error names the shared file"
+assert_contains "$(last_output)" "BOT_WEBHOOK_BOT_B_URL" "the error names the missing keys"
+assert_not_contains "$(gh_calls)" "issue comment" "nothing is posted for a missing bot"
+rm -rf "$DUMONTECH_HOME"
+
 # --retry: only notifies again, with no new comment.
 : >"$FAKE_GH_LOG"
 : >"$PROCESS_EVENTS_FILE"
