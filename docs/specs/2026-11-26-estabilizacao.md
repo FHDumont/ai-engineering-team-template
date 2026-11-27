@@ -15,7 +15,7 @@ Decisões do dono (grilling de 26/11/2026):
 
 - Versões: tag automática no fim de cada grupo, só com CI e teste de atualização verdes; o adotante atualiza para a última tag.
 - Ok do merge: aprovar a spec que declara a área sensível vale como ok do merge da fase; sem quadro novo no fim.
-- Abertura de fase: sem batimento; quando o app recusa o `start_session`, a filha abre headless e as perguntas dela chegam ao dono pela sessão principal.
+- Abertura de fase (revista em 27/11/2026): sem batimento; as sessões de todas as ondas abrem no turno do ok da spec, e cada filha espera o merge da onda anterior antes de começar. "Headless na recusa" foi testado na sessão principal em 26/11 e o classificador de permissões do app negou o `start-headless.sh`; headless segue desligado por padrão.
 
 Suposições (sem pergunta): nome da tag `vAAAA.MM.DD-N`; #298 e #300 são a mesma falha e fecham juntas; as issues `type:feature` de #302 a #309 são defeitos e ficam com o rótulo que têm.
 
@@ -83,30 +83,30 @@ Pronto quando:
 3. Registro do ok da spec e leitura dele no `--merge`. modelo: sonnet · esforço: medium · motivo: peso strong de .method/scripts/lib/weights.tsv (regra do portão)
 4. ADR-006, `AGENTS.md`, `process-design` e skill `close-phase`. modelo: sonnet · esforço: medium · motivo: peso medium de .method/scripts/lib/weights.tsv (docs do desenho)
 
-## Fase #308 — fase abre sem pedir nada ao dono: sem batimento, headless na recusa
+## Fase #308 — fase abre sem pedir nada ao dono: sem batimento, todas as ondas no ok da spec
 
 Fecha: #306, #308 e #309.
 
 Objetivo: depois do ok da spec, nenhuma fase fica parada esperando o dono clicar num cartão ou digitar "abrir fase", também pelo Remote Control; e a filha não deixa laço de espera vivo depois do fecho.
 
-Arquivos: `.method/scripts/phase-start.sh` (texto dos passos da gerenciadora), `.method/scripts/start-headless.sh`, `.method/scripts/tests/test_phase_start_*.sh`, `.method/scripts/tests/test_start_headless.sh`, `.claude/skills/plan/SKILL.md`, `.claude/skills/execute/SKILL.md`, `.claude/skills/close-phase/SKILL.md`, `.claude/skills/integrate/SKILL.md`, `docs/process-design.md` (§2, §4.3), `docs/STATE.md`, `docs/adr/ADR-007-*.md` e `docs/adr/INDEX.md`. Área sensível: `start-headless.sh` (classe `owner-ok`); esta spec declara, então o ok dela vale para o merge se a fase #307 já tiver entrado.
+Arquivos: `.method/scripts/phase-start.sh` (texto dos passos da gerenciadora e do brief), `.method/scripts/tests/test_phase_start_*.sh`, `.claude/skills/plan/SKILL.md`, `.claude/skills/execute/SKILL.md`, `.claude/skills/close-phase/SKILL.md`, `.claude/skills/integrate/SKILL.md`, `docs/process-design.md` (§2, §4.3), `docs/STATE.md`, `docs/adr/ADR-007-*.md` e `docs/adr/INDEX.md`. Área sensível: nenhuma (a fase não toca mais o `start-headless.sh`).
 
 Pronto quando:
 
 - Primeiro a prova, antes de mudar o fluxo: a sessão da fase abre um `claude -p` headless de teste e uma espera em segundo plano presa ao pid dele, e mostra que é acordada quando ele termina, sem job agendado. Se a prova falhar, a fase para em `esperando você` com o que viu e não muda nada.
 - O batimento sai: `phase-start.sh`, as skills `plan` e `integrate` e o `process-design` não mandam mais criar tarefa recorrente. A gerenciadora acorda pelo fim de turno da filha do app e pela espera em segundo plano da filha headless.
-- App recusou o `start_session` (turno sem fala do dono, Remote Control): a gerenciadora roda `start-headless.sh` na hora, sem cartão e sem parada. Headless na recusa passa a ser o padrão; `.github/headless` com `off` desliga. Cartão só com saída 3 ou 4 do `start-headless.sh`.
-- Pergunta da filha headless: comentário na issue; a gerenciadora repassa ao dono num quadro `Fase #n — título` e devolve a resposta. O `--need` nunca manda o dono clicar em cartão quando ele está no Remote Control.
+- Todas as ondas abrem no turno do ok da spec: o `phase-start.sh` e a skill `plan` abrem as fases de todas as ondas de uma vez, e o brief de cada filha de onda posterior diz o que esperar (o merge da onda anterior, lido na `origin/main`) e manda atualizar a branch sobre a `main` antes da primeira etapa. A espera é uma tarefa em segundo plano da própria filha, sem job agendado.
+- Headless segue desligado por padrão, como hoje. Cartão fica só como último recurso (fase aberta fora do turno do ok da spec), e o `--need` nesse caso manda o dono escrever "abrir a #n" numa mensagem nova, que funciona pelo Remote Control.
 - Espera do `validate.sh` (#309): as skills `execute` e `close-phase` mandam esperar pelo aviso de término da tarefa ou por pid ou arquivo da própria rodada, nunca `pgrep -f validate.sh`; antes de dizer "tarefas em segundo plano: nenhuma", a filha lista e para as próprias tarefas de shell; a `integrate` cita o caso no arquivamento.
-- Teste que falha no código atual: o texto impresso pelo `phase-start.sh` não cita batimento nem cartão por recusa, e o `start-headless.sh` roda sem `.github/headless`.
+- Teste que falha no código atual: o texto impresso pelo `phase-start.sh` não cita batimento e, para fase de onda posterior, imprime no brief a espera pelo merge da onda anterior.
 - ADR-007 registra a decisão; `docs/STATE.md` (Headless, Fim do grupo) diz o estado novo.
 - Prova na parada (lab-test): a prova do primeiro item, `validate.sh`, `check-docs.sh` e a CI do PR verdes.
 - Prova do fecho: o dono diz "fechar fase" depois de ler a prova da parada.
-- Prova do pós-merge: a onda 3 (#311) abre num turno que não começou por fala do dono, e a filha sobe headless sem pedir nada. A issue #308 fica aberta até a prova. O caso do Remote Control só fica provado quando o dono estiver nele numa abertura; até lá, não verificado.
+- Prova do pós-merge: as fases #311 e #312, abertas à mão em 27/11 no mesmo turno e esperando a onda anterior, começam sozinhas depois do merge, sem fala do dono. A issue #308 fica aberta até a prova.
 
 1. Prova de que a espera em segundo plano acorda a sessão. modelo: sonnet · esforço: medium · motivo: peso strong de .method/scripts/lib/weights.tsv (arquitetura do fluxo de sessões)
 2. Testes que falham no código atual. modelo: sonnet · esforço: medium · motivo: peso strong de .method/scripts/lib/weights.tsv (arquitetura do fluxo de sessões)
-3. `phase-start.sh` e `start-headless.sh`: sem batimento, headless na recusa. modelo: sonnet · esforço: medium · motivo: peso strong de .method/scripts/lib/weights.tsv (arquitetura do fluxo de sessões)
+3. `phase-start.sh`: sem batimento, todas as ondas no turno do ok da spec. modelo: sonnet · esforço: medium · motivo: peso strong de .method/scripts/lib/weights.tsv (arquitetura do fluxo de sessões)
 4. Skills `plan`, `execute`, `close-phase` e `integrate`. modelo: sonnet · esforço: medium · motivo: peso medium de .method/scripts/lib/weights.tsv (texto das skills)
 5. ADR-007, `process-design` e `STATE.md`. modelo: sonnet · esforço: medium · motivo: peso medium de .method/scripts/lib/weights.tsv (docs do desenho)
 
