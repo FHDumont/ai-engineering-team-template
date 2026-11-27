@@ -145,7 +145,7 @@ Diagrama das raias: [`docs/diagrams/process-flow.html`](diagrams/process-flow.ht
    - `end:auto-close`: a filha segue direto para o fecho.
    - `end:lab-test`: a filha para antes do fecho com `status.sh --state esperando --need "testar no lab …"`. A spec separa a prova da parada, a do fecho e a do pós-merge; o brief não pede na parada prova que só existe depois. Pós-merge pode dizer "issue fica aberta até a prova": o PR usa `Refs` e o quadro só vai a Done com a issue fechada. A `integrate` fecha essa issue, com as provas, antes do `gen-docs.sh`. O dono testa, itera pela sessão principal e diz "fechar fase". "Fechar fase" vale dito em qualquer sessão; quem fecha é a sessão da fase.
 9. **Fecho.** A filha fecha pelo `.method/scripts/close-phase.sh` (§6.1), com a revisão independente (§10.2) e o merge pelo portão (§10).
-10. **Fim do grupo.** Depois do último merge do grupo, solo e paralelo, a sessão principal faz o passo único de fim, uma vez. Os passos e a ordem estão na skill `integrate`: tempo (só citado) e achados leves, depois `.method/scripts/gen-docs.sh`, `.method/scripts/deploy.sh`, arquivamento das sessões filhas, `.method/scripts/end-check.sh`. Nada que muda o roadmap acontece depois do `gen-docs.sh`. A spec do grupo sai da `main` aqui: o PR do `gen-docs.sh` remove cada spec de `docs/specs/` cujas issues citadas estão todas fechadas, a que o fecho das fases (§6.1) deixou.
+10. **Fim do grupo.** Depois do último merge do grupo, solo e paralelo, a sessão principal faz o passo único de fim, uma vez. Os passos e a ordem estão na skill `integrate`: tempo (só citado) e achados leves, depois `.method/scripts/gen-docs.sh`, `.method/scripts/deploy.sh`, arquivamento das sessões filhas, `.method/scripts/end-check.sh` e, só no template, `.method/scripts/tag-release.sh` (§6.5). Nada que muda o roadmap acontece depois do `gen-docs.sh`. A spec do grupo sai da `main` aqui: o PR do `gen-docs.sh` remove cada spec de `docs/specs/` cujas issues citadas estão todas fechadas, a que o fecho das fases (§6.1) deixou.
 
 Espera acima de ~2 minutos: diga o que espera e onde (o run, o PR).
 
@@ -299,8 +299,13 @@ Todo script tem `--help`, um teste em `.method/scripts/tests/` e saída curta em
 | `.method/scripts/trace-view.py` | Lê o trace (§6.3): árvore de agentes, tabela de pares do PR e tempo por fase | `close-phase.sh --prepare`, agentes |
 | `.method/scripts/measure-session.py` | Mede palavras lidas, toques do dono e acerto da triagem de uma sessão | sessão principal, sob pedido |
 | `.method/scripts/method-diff.sh` | Compara o repo com o commit do template em `.github/method-origin`: idêntico, desatualizado (`outdated`), adaptado, faltante (também arquivo novo do destino fora do manifest), `deleted` (o repo apagou de propósito: nunca volta), removido e só do repo; `--notice` lista só o `adapted` que o template mudou no intervalo | atualização do método, `close-reviewer` |
-| `.method/scripts/fetch-template.sh` | Traz o commit de destino do template para `.process/template` do worktree (sem worktree extra nem clone); `--apply` roda o `method-diff.sh` do destino, copia só `outdated` e `missing`, acrescenta `missing-label`, roda `--remove` e imprime o `--notice` | atualização do método, filha headless |
+| `.method/scripts/tag-release.sh` | Marca a ponta da `main` como `vAAAA.MM.DD-N` (tag anotada, enviada) só com o check `CI` dela verde; sai 3 sem tag se não estiver; no mesmo commit não cria outra (§6.5) | skill `integrate`, só no template |
+| `.method/scripts/fetch-template.sh` | Traz o destino do template (sem destino, a última tag; sha ou tag explícitos valem como são) para `.process/template` do worktree (sem worktree extra nem clone); `--apply` roda o `method-diff.sh` do destino, copia só `outdated` e `missing`, acrescenta `missing-label`, roda `--remove` e imprime o `--notice` | atualização do método, filha headless |
 | `.method/scripts/CLAUDE.md` | Regras da pasta `.method/scripts/` | lido ao tocar a pasta |
+
+### 6.5 Versões do método
+
+O adotante atualiza para uma versão marcada, não para a ponta da `main`: a `main` recebe dezenas de commits por dia e cada correção chegaria junto com tudo o que mudou. A tag `vAAAA.MM.DD-N` (data UTC; N conta as tags do dia) sai no fim de cada grupo, no passo único da skill `integrate`, depois do `end-check.sh` limpo, pelo `.method/scripts/tag-release.sh`, e só com o check `CI` da ponta da `main` verde (a CI roda o teste de atualização, `test_update_from_origins`). Repo adotante não marca versão do método. `.method/scripts/fetch-template.sh` sem destino traz a última tag e o `--notice` a cita; sha ou tag explícitos seguem como são (ADR-008).
 
 ### 6.1 `close-phase.sh`
 

@@ -11,3 +11,4 @@ Uma linha por ADR. As substituídas ficam em `archive/` (mova com `scripts/archi
 | [ADR-005](ADR-005-weights-and-real-pair.md) | Pesos num arquivo e par real conferido antes da primeira etapa | vigente |
 | [ADR-006](ADR-006-spec-ok-is-merge-ok.md) | O ok da spec que declara a área sensível vale como ok do merge | vigente |
 | [ADR-007](ADR-007-open-all-waves-no-heartbeat.md) | Todas as ondas abrem no ok da spec, sem batimento | vigente |
+| [ADR-008](ADR-008-method-versions-by-tag.md) | O método tem versões marcadas por tag | vigente |

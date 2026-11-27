@@ -11,8 +11,9 @@ Trazer o método do commit de destino, partindo do commit de origem gravado em `
 
 - Commit de origem: `<sha>`
 - Commit de destino: `<sha>`
+- Versão de destino: `<tag>` (a última tag `vAAAA.MM.DD-N` do template; sem destino explícito o `fetch-template.sh` traz essa, nunca a ponta da `main`)
 
-O checkout do template da filha é `.process/template` do worktree. O passo único é `.method/scripts/fetch-template.sh <destino> --apply`: ele traz o destino, roda o `.method/scripts/method-diff.sh` do destino, copia só o `outdated` e o `missing`, acrescenta ao fim de `.github/labels.tsv` cada `missing-label`, roda o `--remove` (`removed` e `template-only`) e imprime o `--notice`. Ele nunca sobrescreve um `adapted` nem um `repo-owned`, e o arquivo que o repo apagou de propósito (`deleted`) não volta.
+O checkout do template da filha é `.process/template` do worktree. O passo único é `.method/scripts/fetch-template.sh [<destino>] --apply` (sem destino, a última tag): ele traz o destino, roda o `.method/scripts/method-diff.sh` do destino, copia só o `outdated` e o `missing`, acrescenta ao fim de `.github/labels.tsv` cada `missing-label`, roda o `--remove` (`removed` e `template-only`) e imprime o `--notice`. Ele nunca sobrescreve um `adapted` nem um `repo-owned`, e o arquivo que o repo apagou de propósito (`deleted`) não volta.
 
 Origem anterior à pasta `.method/` (sem `.method/scripts/fetch-template.sh` neste repo): o `fetch-template.sh` antigo não serve, e ele mora aqui. Rode o do próprio destino, com o SHA completo do destino (o curto não resolve no `fetch`):
 
