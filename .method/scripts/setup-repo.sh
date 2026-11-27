@@ -439,7 +439,7 @@ case "$only" in
   *) die "--only must be labels, settings, protection or gitignore" 2 ;;
 esac
 
-# .gitignore must ignore the method's own folders (#335): appends only the missing lines, at the end.
+# .gitignore must ignore the method's own folders (FHDumont/ai-engineering-team-template#335): appends only the missing lines, at the end.
 append_gitignore_line() { # append_gitignore_line <line>
   local f="$ROOT/.gitignore"
   if [ -s "$f" ] && [ -n "$(tail -c1 "$f")" ]; then echo >>"$f"; fi

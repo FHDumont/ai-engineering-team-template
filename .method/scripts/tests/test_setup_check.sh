@@ -69,7 +69,7 @@ assert_status 0 "check passes in the unprotected mode" "$SETUP" --check
 assert_contains "$(last_output)" "is configured for the method" "unprotected: configured"
 assert_contains "$(last_output)" "mode: unprotected" "unprotected: says the mode"
 
-# #335: .gitignore must have .worktrees/ and .process/; --check names the missing line, the setup appends only those.
+# FHDumont/ai-engineering-team-template#335: .gitignore must have .worktrees/ and .process/; --check names the missing line, the setup appends only those.
 fake_setup ok
 gic="$(make_repo)"
 copy_scripts "$gic"
