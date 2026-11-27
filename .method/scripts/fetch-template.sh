@@ -1,9 +1,13 @@
 #!/usr/bin/env bash
 #: fetch-template.sh: brings a template commit into .process/template of the current worktree.
 #:
-#: Usage: fetch-template.sh <sha> [--url <template>] [--apply]
+#: Usage: fetch-template.sh [<sha>|<tag>] [--url <template>] [--apply]
 #:
-#: Fetches <sha> (and the commit of .github/method-origin, when there is one) from
+#: Without a destination it uses the last method tag of the template (vYYYY.MM.DD-N,
+#: made by tag-release.sh at the end of a group), never the tip of main; no tag is an
+#: error. A sha or a tag given explicitly is used as it is.
+#:
+#: Fetches the destination (and the commit of .github/method-origin, when there is one) from
 #: the template into a small git directory at .process/template, with the files of
 #: <sha> extracted, so method-diff.sh --template .process/template --to <sha> works.
 #: No worktree is registered and nothing is cloned: .process/ is outside git, and the
@@ -28,7 +32,14 @@ while [ $# -gt 0 ]; do
     *) [ -z "$sha" ] || die "one sha only" 2; sha="$1"; shift ;;
   esac
 done
-[ -n "$sha" ] || die "usage: fetch-template.sh <sha> [--url <template>] [--apply]" 2
+tag=""
+if [ -z "$sha" ]; then
+  tag="$(git ls-remote --tags --refs "$url" 'v*' 2>/dev/null |
+    sed -nE 's#^.*refs/tags/(v([0-9]{4})\.([0-9]{2})\.([0-9]{2})-([0-9]+))$#\2\3\4 \5 \1#p' |
+    sort -k1,1n -k2,2n | tail -1 | cut -d' ' -f3)"
+  [ -n "$tag" ] || die "no method tag at $url; pass a sha or a tag" 1
+  sha="$tag"
+fi
 
 root="$(repo_root)" || die "not in a git repository" 2
 dir="$root/.process/template"
@@ -47,6 +58,8 @@ esac
 fetch_rev "$sha" || die "cannot fetch $sha from $url" 1
 dest="$(git -C "$dir" rev-parse --verify --quiet "FETCH_HEAD^{commit}")" || die "no commit $sha at $url" 1
 git -C "$dir" update-ref refs/heads/destination "$dest"
+# The tag of the destination (explicit or last) stays in the extracted template, so the notice can cite it.
+case "$sha" in v[0-9][0-9][0-9][0-9].*-*) git -C "$dir" update-ref "refs/tags/$sha" "$dest" ;; esac
 if [ -f "$root/.github/method-origin" ]; then
   origin="$(tr -d '[:space:]' <"$root/.github/method-origin")"
   case "$origin" in
@@ -55,7 +68,7 @@ if [ -f "$root/.github/method-origin" ]; then
   esac
 fi
 git -C "$dir" checkout --quiet --force --detach "$dest"
-info "template $dest extracted in .process/template"
+info "template $dest${tag:+ ($tag)} extracted in .process/template"
 [ "$apply" = 1 ] || exit 0
 
 origin_ref=""
