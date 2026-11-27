@@ -4,6 +4,8 @@
 
 ## Funcionalidades
 
+- fix(close-phase): keep the PR body under the limit and let the spec ok cover the merge ([#314](https://github.com/FHDumont/ai-engineering-team-template/pull/314)) · 2026-11-26
+- fix: harden rerun-ci count, sensitive subfolder globs and deploy gate permission ([#313](https://github.com/FHDumont/ai-engineering-team-template/pull/313)) · 2026-11-26
 - refactor: move method script paths to .method/scripts and drop the scripts link ([#293](https://github.com/FHDumont/ai-engineering-team-template/pull/293)) · 2026-11-26
 - refactor: move the method scripts to .method/scripts behind a scripts link ([#289](https://github.com/FHDumont/ai-engineering-team-template/pull/289)) · 2026-11-26
 - feat(close-phase): --save-review saves the reviewer opinion from the transcript ([#263](https://github.com/FHDumont/ai-engineering-team-template/pull/263)) · 2026-11-25
@@ -63,6 +65,7 @@
 
 ## Outros
 
+- fix: test the update path from real old origins ([#315](https://github.com/FHDumont/ai-engineering-team-template/pull/315)) · 2026-11-27
 - fix: escape the dot in the check-docs method scripts filter ([#296](https://github.com/FHDumont/ai-engineering-team-template/pull/296)) · 2026-11-26
 - test: build the files of three tests in a copy, never in the real scripts ([#286](https://github.com/FHDumont/ai-engineering-team-template/pull/286)) · 2026-11-26
 - fix: compare the saved review opinion with its own reviewer stop ([#284](https://github.com/FHDumont/ai-engineering-team-template/pull/284)) · 2026-11-25
