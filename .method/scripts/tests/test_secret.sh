@@ -103,6 +103,47 @@ get 13 ".env with 640" MY_SECRET
 chmod 400 "$TMP/p.env"
 get 0 ".env with 400" MY_SECRET
 
+# 3b. Shared bots file ($DUMONTECH_HOME/shared/bots.env): bot keys come only from it, only for declared bots.
+export BOTS_FILE="$TMP/bots.tsv"
+printf 'bot-a\tBot A\nbot-b\tBot B\n' >"$BOTS_FILE"
+export DUMONTECH_HOME="$TMP/dh"
+SH="$DUMONTECH_HOME/shared/bots.env"
+mkdir -p "$DUMONTECH_HOME/shared"
+export PROCESS_ENV_FILE="$TMP/repo.env"
+printf 'BOT_WEBHOOK_BOT_A_URL=old-repo-url\nBOT_WEBHOOK_BOT_B_URL=old-b-url\nGH_APP_METHOD_TOKEN=method-tok\n' >"$PROCESS_ENV_FILE"; chmod 600 "$PROCESS_ENV_FILE"
+# No shared file: the bot keys come from the repo .env as before.
+get 0 "no shared file: bot key from the repo .env" BOT_WEBHOOK_BOT_A_URL
+assert_eq "old-repo-url" "$(cat "$TMP/get.out")" "repo .env value without a shared file"
+printf 'BOT_WEBHOOK_BOT_A_URL=shared-a-url\nBOT_WEBHOOK_BOT_A_SECRET=shared-a-sec\nBOT_WEBHOOK_BOT_C_URL=shared-c-url\n' >"$SH"; chmod 600 "$SH"
+get 0 "declared bot key from the shared file" BOT_WEBHOOK_BOT_A_URL
+assert_eq "shared-a-url" "$(cat "$TMP/get.out")" "shared value wins over the repo .env"
+get 12 "undeclared bot key is refused even if it is in the shared file" BOT_WEBHOOK_BOT_C_URL
+assert_not_contains "$(cat "$TMP/get.err")" "shared-c-url" "undeclared error shows no value"
+get 12 "declared bot missing from the shared file" BOT_WEBHOOK_BOT_B_URL
+for want in "bot-b" "$SH" "BOT_WEBHOOK_BOT_B_URL" "BOT_WEBHOOK_BOT_B_SECRET" "GH_APP_BOT_B_TOKEN" "chmod 600"; do
+  assert_contains "$(cat "$TMP/get.err")" "$want" "missing-bot error names: $want"
+done
+assert_not_contains "$(cat "$TMP/get.err")" "old-b-url" "no fallback to the old .env value"
+assert_eq "" "$(cat "$TMP/get.out")" "nothing printed for a missing bot"
+get 0 "non-bot key still comes from the repo .env" GH_APP_METHOD_TOKEN
+assert_eq "method-tok" "$(cat "$TMP/get.out")" "method token read from the repo .env"
+BOT_WEBHOOK_BOT_B_URL=envval get 0 "environment still wins" BOT_WEBHOOK_BOT_B_URL
+chmod 644 "$SH"
+get 13 "shared file with open permissions" BOT_WEBHOOK_BOT_A_URL
+assert_contains "$(cat "$TMP/get.err")" "chmod 600 $SH" "shared file permission error says how to fix"
+assert_status 13 "secret_ready refuses open shared file" bash -c 'source "$1/lib/secret.sh"; secret_ready BOT_WEBHOOK_BOT_A_URL' _ "$SCRIPTS"
+chmod 600 "$SH"
+assert_status 0 "secret_ready ok with the shared file" bash -c 'source "$1/lib/secret.sh"; secret_ready BOT_WEBHOOK_BOT_A_URL' _ "$SCRIPTS"
+assert_status 12 "secret_ready names a declared bot missing from the shared file" bash -c 'source "$1/lib/secret.sh"; secret_ready BOT_WEBHOOK_BOT_B_URL' _ "$SCRIPTS"
+assert_contains "$(last_output)" "bot-b" "secret_ready explains the missing bot"
+# The role token of a bot also comes from the shared file.
+printf 'GH_APP_BOT_A_TOKEN=shared-tok\n' >>"$SH"
+assert_eq "shared-tok" "$(bash -c 'source "$1/lib/secret.sh"; source "$1/lib/role.sh"; role_read_token bot-a' _ "$SCRIPTS")" "role token of a declared bot from the shared file"
+rm -rf "$DUMONTECH_HOME"
+export PROCESS_ENV_FILE="$TMP/p.env"
+unset BOTS_FILE
+export BOTS_FILE="$TESTS_DIR/fixtures/bots.tsv"
+
 # 4. No provider.
 export PROCESS_ENV_FILE="$TMP/none.env"
 get 10 "no provider" MY_SECRET "op://Vault With Spaces/item/url"
