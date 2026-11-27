@@ -177,7 +177,8 @@ if [ "$notice" = 0 ]; then cat "$report"; exit 0; fi
 
 # --notice: the checklist of this interval only.
 items() { grep "^$1 " "$report" | cut -d' ' -f2- || true; }
-echo "Itens da atualização $from → $to (gerado por .method/scripts/method-diff.sh --notice):"
+dest_tag="$(git -C "$template" tag --points-at "$to" 2>/dev/null | grep -E '^v[0-9]{4}\.[0-9]{2}\.[0-9]{2}-[0-9]+$' | tail -1 || true)"
+echo "Itens da atualização $from → $to${dest_tag:+ (versão $dest_tag)} (gerado por .method/scripts/method-diff.sh --notice):"
 echo
 for c in missing missing-label removed adapted; do
   for f in $(items "$c"); do

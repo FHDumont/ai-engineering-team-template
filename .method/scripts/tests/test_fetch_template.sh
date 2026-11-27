@@ -51,7 +51,7 @@ echo rule1 >"$repo/.cursor/rules/base.mdc"
 echo own1 >"$repo/README.md"
 
 assert_contains "$(bash "$FETCH" --help)" "fetch-template.sh" "--help works"
-assert_status 2 "no sha is a usage error" bash -c "cd '$repo' && '$FETCH' --url '$template'"
+assert_status 1 "no destination and no tag at the template fails" bash -c "cd '$repo' && '$FETCH' --url '$template'"
 
 (cd "$repo" && bash "$FETCH" "$dest" --url "$template") >"$TMP/last.out" 2>&1 || bad "fetch failed: $(last_output)"
 assert_eq "two" "$(cat "$repo/.process/template/.method/scripts/a.sh")" "destination extracted into .process/template"
