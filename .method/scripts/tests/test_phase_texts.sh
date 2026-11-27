@@ -116,7 +116,7 @@ for name in execute close-phase; do
   assert_contains "$text" "leia de volta que as duas listas estão vazias" "$name reads back that no task is left"
   assert_contains "$text" "\`Tarefas em segundo plano e recorrentes: nenhuma\`" "$name says in the final message that it left no task"
 done
-arch="$(printf '%s\n' "$integrate" | awk '/Arquive cada sessão filha/{p=1} /Apague o batimento/{p=0} p')"
+arch="$(printf '%s\n' "$integrate" | awk '/Arquive cada sessão filha/{p=1} /Confira que a gerenciadora não tem tarefa recorrente/{p=0} p')"
 assert_eq "set_remote_control remoteControlState archive_session trabalho vivo quadro ao dono" \
   "$(printf '%s\n' "$arch" | grep -oE 'set_remote_control|remoteControlState|archive_session|trabalho vivo|quadro ao dono' | awk '!seen[$0]++' | paste -sd' ' -)" \
   "integrate archives in one order: Remote Control off, read back, archive, live work, card"
@@ -128,45 +128,28 @@ assert_contains "$arch" "repita uma vez, exatamente com esse campo" "integrate r
 assert_contains "$arch" "mande mensagem à filha (\`send_message\`)" "integrate asks the child to stop its tasks on live work"
 assert_contains "$arch" "Só depois disso" "integrate opens the card only after the other tries"
 assert_contains "$arch" "quadro ao dono (\`AskUserQuestion\`) que começa por \`Fase #n — título\`" "integrate says how the archiving card starts"
-# Manager heartbeat: plan creates it and says what it reads, integrate deletes
-# it in the end step, the design has the rule and the reason and names no app tool.
-assert_contains "$plan" "**Batimento, depois das filhas:**" "plan creates the heartbeat after the sessions"
-assert_eq 1 "$(($(grep -n -F '**Filhas:**' <<<"$plan" | cut -d: -f1) < $(grep -n -F '**Batimento' <<<"$plan" | cut -d: -f1)))" "plan puts the heartbeat after the child sessions"
-assert_eq 1 "$(($(grep -n -F '**Filhas:**' <<<"$plan" | cut -d: -f1) < $(grep -n -F '**Recusado**' <<<"$plan" | cut -d: -f1)))" "plan puts the stop after the child sessions"
-where="na barra lateral, dentro do agrupamento da sessão principal; se não aparecer, abra o agrupamento"
-assert_contains "$plan" "$where" "plan has the sentence that says where the session is"
-assert_contains "$plan" "título exato" "plan asks for the exact title of the session"
-assert_contains "$plan" "só com \`list_sessions\` mostrando filha rodando" "plan creates the heartbeat only with a child running"
-assert_contains "$plan" "só escreve, com o bloco, se o estado mudou" "plan says the heartbeat writes only on change"
-assert_contains "$plan" "faz o próximo passo" "plan says what the heartbeat does"
-assert_contains "$plan" "4 minutos" "plan gives the interval of the heartbeat"
-assert_contains "$plan" "apague o batimento neste turno" "plan deletes the heartbeat while every phase waits for the owner"
-assert_contains "$plan" "volta a trabalhar" "plan recreates the heartbeat when a phase works again"
-assert_contains "$plan" 'sem "Sem mudança."' "plan names the minimum reply when nothing changed"
-assert_contains "$integrate" "4 minutos" "integrate gives the interval of the heartbeat"
-assert_contains "$integrate" "só esperam o dono" "integrate deletes the heartbeat while every phase waits for the owner"
-assert_contains "$integrate" "volta a trabalhar" "integrate recreates the heartbeat when a phase works again"
-assert_contains "$integrate" 'sem "Sem mudança."' "integrate names the minimum reply when nothing changed"
-assert_contains "$integrate" "Apague o batimento" "integrate deletes the heartbeat in the end step"
+# No heartbeat (ADR-007): plan opens every wave on the spec approval, the card is the last
+# resort, integrate creates and deletes nothing recurring, and the design has the rule once.
+assert_contains "$plan" "**Sem batimento, todas as ondas no ok:**" "plan says there is no heartbeat"
+assert_contains "$plan" "--after" "plan opens the later waves with --after"
+assert_contains "$plan" "último recurso" "plan makes the card a last resort"
+assert_contains "$plan" "numa mensagem nova" "plan asks for a new message, not a click"
+assert_not_contains "$plan" "4 minutos" "plan has no heartbeat interval"
+assert_not_contains "$integrate" "Apague o batimento" "integrate deletes no heartbeat"
+assert_contains "$integrate" "pgrep -f validate.sh" "integrate names the wait loop that blocks archiving"
+assert_contains "$integrate" "de shell" "integrate asks the child to stop its shell tasks"
 assert_contains "$integrate" "info: time" "integrate quotes the time lines"
 assert_contains "$integrate" "não abre quadro nem issue por tempo" "integrate never opens a board or issue for time"
 assert_not_contains "$integrate" "Combinar uma meta nova" "integrate no longer asks the owner about time"
 assert_not_contains "$integrate" "Abrir issue para cortar tempo" "integrate no longer opens an issue for time"
-assert_contains "$integrate" "Nenhum script confere" "integrate says no lock checks the heartbeat"
-hb="$(printf '%s\n' "$design" | grep -F '**batimento**')"
-assert_eq 1 "$(printf '%s\n' "$hb" | grep -c .)" "the design states the heartbeat rule in one place"
-assert_contains "$hb" "apaga o batimento, se criado, no passo único de fim" "the design says when the heartbeat goes away"
-assert_contains "$hb" "Depois de abrir as filhas" "the design creates the heartbeat after the sessions"
-assert_contains "$hb" "Com todas as filhas em cartão esperando, não há batimento" "the design creates no heartbeat while every child is a card"
-assert_contains "$hb" "apaga o batimento neste turno" "the design deletes the heartbeat while every phase waits for the owner"
-assert_contains "$hb" "recriado quando uma fase volta a trabalhar" "the design recreates the heartbeat when a phase works again"
-assert_contains "$hb" 'sem "Sem mudança."' "the design names the minimum reply when nothing changed"
-assert_contains "$hb" "Só escreve ao dono quando o estado mudou" "the design says the heartbeat writes only on change"
-assert_eq 1 "$(grep -c -F "$where" <<<"$design")" "the design has the sentence that says where the session is, in one place"
-assert_eq 1 "$(($(grep -n -F 'abre todas as filhas do grupo' <<<"$design" | cut -d: -f1) < $(grep -n -F '**batimento**' <<<"$design" | cut -d: -f1)))" "the design puts the heartbeat after the child sessions"
-assert_contains "$hb" "o aviso de fim da filha nem sempre chega" "the design gives the reason of the heartbeat"
-assert_eq "" "$(printf '%s\n' "$design" | grep -n 'Cron' || true)" "the design names no tool of one app for the heartbeat"
-assert_contains "$hb" "a cada 4 minutos" "the design gives the interval of the heartbeat"
+assert_eq 1 "$(printf '%s\n' "$design" | grep -c -F '**Sem batimento.**')" "the design states the no-heartbeat rule in one place"
+assert_eq "" "$(printf '%s\n' "$design" | grep -n 'Cron' || true)" "the design names no tool of one app"
+for name in execute close-phase; do
+  text="$(cat "$REPO/.claude/skills/$name/SKILL.md")"
+  assert_contains "$text" "nunca \`pgrep -f validate.sh\`" "$name never waits by pgrep -f validate.sh"
+  assert_contains "$text" "aviso de término da tarefa" "$name waits for the end notice of its own task"
+  assert_contains "$text" "tarefas de shell do harness" "$name stops its own shell tasks before saying it left none"
+done
 # The interval is 4 minutes everywhere: no text, script or test keeps the old one.
 # The old number is built here so that this file does not match its own search.
 was=8
