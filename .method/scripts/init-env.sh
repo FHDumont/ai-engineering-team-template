@@ -9,6 +9,7 @@
 #: GH_APP_BOT_<SLUG>_TOKEN= and one GH_APP_METHOD_TOKEN=. An .env that already
 #: exists in an older path (~/.<repo-slug>/, ~/.config/<repo-slug>/) is kept
 #: where it is (nothing is moved or deleted); only the missing keys are appended.
+#: Old folders get a notice on stderr with the exact command to migrate or remove them.
 #: While $DUMONTECH_HOME/shared/bots.env exists the bot keys live there, so only
 #: GH_APP_METHOD_TOKEN= is written; the shared file is never created or edited.
 #: Never reads or writes values and never overwrites an existing .env. The repo
@@ -31,6 +32,7 @@ fi
 
 # An existing .env (any known path) is kept; a new one goes to the new path.
 file="$(secret_env_file)"
+secret_old_dirs_notice
 # Creates the missing folders one by one, each with chmod 700.
 mkdirs() {
   local d="$1"
