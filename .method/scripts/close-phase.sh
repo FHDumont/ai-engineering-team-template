@@ -921,7 +921,7 @@ spec_ok_covers() { # spec_ok_covers <PR head SHA> <labels> <touched paths>
   for a in $SENSITIVE_AREAS; do
     if echo "$2" | stdin_grep -qxF "$a"; then
       any=1
-      printf ',%s,' "$declared" | grep -qF ",$a," || return 1
+      case ",$declared," in *",$a,"*) ;; *) return 1 ;; esac
     fi
   done
   [ "$any" = 1 ] || return 1
