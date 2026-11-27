@@ -43,6 +43,12 @@ while read -r short _; do
   assert_eq "yes" "$([ -x "$adopter/.method/scripts/validate.sh" ] && echo yes || echo no)" "$short: the adopter has .method/scripts/validate.sh"
   assert_eq "scripts/app-task.sh" "$(git -C "$adopter" ls-files scripts)" "$short: only the application script stays in scripts/"
 
+  # The adapted files the notice lists are merged by hand; this adopter changed none, so the merge is the tip's file.
+  while IFS= read -r f; do
+    [ -n "$f" ] || continue
+    mkdir -p "$adopter/$(dirname "$f")"
+    git -C "$REPO" show "$tip:$f" >"$adopter/$f"
+  done < <(sed -n 's/^- \[ \] `adapted`: `\(.*\)`$/\1/p' "$TMP/update-$short.out")
   # What the notice asks of the adopter by hand: repo-notes.md from the model, the old STATE sentence out, the origin recorded and the CI mode.
   [ -f "$adopter/docs/repo-notes.md" ] || git -C "$REPO" show "$tip:docs/repo-notes.md" >"$adopter/docs/repo-notes.md"
   grep -vF 'o job `tests` roda em todo PR' "$adopter/docs/STATE.md" >"$adopter/docs/STATE.md.new" || true
