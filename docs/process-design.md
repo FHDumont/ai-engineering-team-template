@@ -303,10 +303,6 @@ Todo script tem `--help`, um teste em `.method/scripts/tests/` e saída curta em
 | `.method/scripts/fetch-template.sh` | Traz o destino do template (sem destino, a última tag; sha ou tag explícitos valem como são) para `.process/template` do worktree (sem worktree extra nem clone); `--apply` roda o `method-diff.sh` do destino, copia só `outdated` e `missing`, acrescenta `missing-label`, roda `--remove` e imprime o `--notice` | atualização do método, filha headless |
 | `.method/scripts/CLAUDE.md` | Regras da pasta `.method/scripts/` | lido ao tocar a pasta |
 
-### 6.5 Versões do método
-
-O adotante atualiza para uma versão marcada, não para a ponta da `main`: a `main` recebe dezenas de commits por dia e cada correção chegaria junto com tudo o que mudou. A tag `vAAAA.MM.DD-N` (data UTC; N conta as tags do dia) sai no fim de cada grupo, no passo único da skill `integrate`, depois do `end-check.sh` limpo, pelo `.method/scripts/tag-release.sh`, e só com o check `CI` da ponta da `main` verde (a CI roda o teste de atualização, `test_update_from_origins`). Repo adotante não marca versão do método. `.method/scripts/fetch-template.sh` sem destino traz a última tag e o `--notice` a cita; sha ou tag explícitos seguem como são (ADR-008).
-
 ### 6.1 `close-phase.sh`
 
 Roda só na sessão filha; na sessão que abriu a fase, `--prepare`, `--publish-review`, `--check` e `--merge` saem 9.
@@ -443,6 +439,10 @@ Prazo de desempenho (o esperado) avisa `warn: over-expected <o quê> <medido> <e
 **Nenhum processo órfão.** Processo de fundo criado por script ou teste é encerrado por quem o criou. `.method/scripts/tests/lib.sh` guarda a pasta temporária do teste e, em EXIT, INT e TERM (também com asserção falhando), encerra o que o teste deixou: filhos, processo com cwd na pasta ou com ela na linha de comando; teste com `trap` próprio chama `test_sweep`. `validate.sh` roda cada teste com `TMPDIR` dentro de uma pasta da execução e, no fim (e em INT/TERM), encerra e lista o que sobrou ali (`orphan process <pid>`), saindo 1: a suíte falha. `sessions.sh --list` marca `orphan` a sessão com pai 1 e cwd em pasta temporária de teste ou em worktree que não existe mais; a marca só informa. O `--cleanup` não varre a máquina e não encerra órfão de fora da fase. `AI_METHOD_ORPHAN_ROOT`, quando definida, limita também esse ramo do worktree que já não existe.
 
 Fim da fase e processos: o `close-phase.sh --cleanup` encerra só os processos cujo diretório atual está no worktree da fase (servidor de teste, watcher, `validate.sh`) e a filha headless do trace (`phase_headless`, conferida pelo id da sessão na linha de comando) com os MCPs dela; nunca um `claude` filho do `Claude.app`, nem a própria sessão que roda o script, nem um órfão de outra pasta. Poupa o grupo de processos de quem chamou (o leitor de um pipe) e o processo de outra sessão que só tem o worktree como pasta atual. Cada processo encerrado fica no trace antes do sinal, com pid, comando e pasta. O script não repassa as linhas `hint:` do `gh`; a última linha da saída é o resultado. `--merge` e `--check` não vão em pipe: a saída vai para um arquivo. O ok do arquivamento é pedido uma vez, no ok da spec ou num quadro no fim do grupo. Com ele a gerenciadora chama `set_remote_control` e `archive_session`; se o app devolver um campo, repete uma vez com esse campo, nas duas. Nunca deletar (o histórico some) nem só fechar a aba (o processo segue). A mensagem de fim lista as outras sessões do repo não arquivadas e paradas há mais de `AI_METHOD_IDLE_HOURS` (`sessions.sh --stale`).
+
+### 6.5 Versões do método
+
+O adotante atualiza para uma versão marcada, não para a ponta da `main`: a `main` recebe dezenas de commits por dia e cada correção chegaria junto com tudo o que mudou. A tag `vAAAA.MM.DD-N` (data UTC; N conta as tags do dia) sai no fim de cada grupo, no passo único da skill `integrate`, depois do `end-check.sh` limpo, pelo `.method/scripts/tag-release.sh`, e só com o check `CI` da ponta da `main` verde (a CI roda o teste de atualização, `test_update_from_origins`). Repo adotante não marca versão do método. `.method/scripts/fetch-template.sh` sem destino traz a última tag e o `--notice` a cita; sha ou tag explícitos seguem como são (ADR-008).
 
 ## 7. Arquivos
 

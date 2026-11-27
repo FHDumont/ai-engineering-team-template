@@ -7,6 +7,7 @@
 #: completed/success, creates the annotated tag vYYYY.MM.DD-N (UTC date; N counts the
 #: tags of that day, from 1) and pushes it. Exit 0 with "tagged: <tag>"; a commit that
 #: already has a version tag prints "already tagged: <tag>" and creates nothing.
+#: A CI skipped for a tree a merged PR already proved green counts as green.
 #: Exit 3 when the CI is red, running or absent (nothing is created). Exit 1 on a git
 #: or gh failure. Adopters update to the last tag (fetch-template.sh); the template
 #: tags at the end of a group (skill integrate), never an adopter repository.
@@ -38,6 +39,11 @@ slug="$(repo_slug)"
 json="$(gh api "repos/$slug/commits/$sha/check-runs?per_page=100")" || die "cannot read the checks of $sha" 1
 ci="$(printf '%s' "$json" | jq -r '[.check_runs[]? | select(.name == "CI")] | sort_by(.started_at // "") | last
   | if . == null then "absent" else "\(.status)/\(.conclusion // "none")" end')"
+# A push to main whose tree a merged PR already proved has no CI run of its own (skipped or absent):
+# ci-already-green.sh accepts it only with a green CI on the same tree.
+if [ "$ci" != "completed/success" ] && [ "$("$HERE/ci-already-green.sh" "$sha")" = "skip=true" ]; then
+  ci="completed/success"
+fi
 if [ "$ci" != "completed/success" ]; then
   echo "error: CI of $sha is $ci; no tag created (a version needs a green CI)" >&2
   exit 3
