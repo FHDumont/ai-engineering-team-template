@@ -21,7 +21,9 @@ O `.method/scripts/lib/secret.sh` procura a URL e o segredo de cada bot nesta or
 
 **Arquivos (`DUMONTECH_HOME`, padrão `~/.dumontech`; pastas 700, arquivos 600):** `shared/bots.env` (`BOT_WEBHOOK_<SLUG>_URL`, `_SECRET`, `GH_APP_<SLUG>_TOKEN`, para todos os repos) e `projetos/<repo>/.env`. O `.env` do repo é o primeiro que existe de `PROCESS_ENV_FILE`, `projetos/<repo>/.env`, `~/.<repo>/.env`, `~/.config/<repo>/.env` (legado). O `init-env.sh` cria chaves vazias. Com o `shared/bots.env` presente, bot declarado ausente é erro, sem cair no `.env` do repo; sem ele, vale o `.env` do repo. O método nunca edita o `shared/bots.env`. Ver `.env.example`.
 
-**Pastas antigas do `.env`:** o método não apaga nem move nada; avisa no stderr, uma vez por execução (o `init-env.sh` também), e mostra o comando pronto. Pasta antiga junto do caminho novo: não é mais lida, o aviso traz `rm -r <pasta>`. Só a pasta antiga: ainda é lida, o aviso traz o comando que cria a pasta nova (700), move o `.env` (600) e remove a antiga.
+**Chaves comuns (ADR-009):** o método não interfere na subida das aplicações nem carrega chaves para elas. O mesmo valor em várias aplicações fica em `$DUMONTECH_HOME/shared/<assunto>.env` (`login-social.env`; depois `smtp.env`, `pagamento.env`), `NOME=valor`, pasta 700, arquivo 600; o `.env` da aplicação vence. Segredo de uma só aplicação fica só no `.env` dela.
+
+**Pastas antigas do `.env`:** o método só avisa no stderr, com o comando pronto; a antiga só é lida sem a nova.
 
 **Gerenciador de senhas (opcional):** conta de serviço lida pelo CLI `op`: uma conta só de leitura, um item por bot, `op://<cofre>/<item>` em `.github/bots.tsv`. O token fica no cofre do sistema.
 
