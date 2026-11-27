@@ -9,7 +9,7 @@ Repositório criado a partir do template do método (`docs/process-design.md`). 
 - **Modelo e esforço:** os pares de `.method/scripts/lib/weights.tsv` são o padrão do template; ajuste o arquivo ao plano da conta.
 - **App:** `app/` é só um marcador para o workflow de exemplo; troque pelo código do projeto.
 - **Deploy:** `deploy-example.yml` é exemplo: builda `app/` e guarda o artefato, sem publicar. Só `workflow_dispatch`, via `deploy.sh`. Suíte pula com CI verde. `# deploy-paths:` aceita `!caminho`.
-- **Fim do grupo:** skill `integrate`: `gen-docs.sh`, `deploy.sh`, arquivar filhas, `end-check.sh`. Batimento some se todas as fases só esperam o dono.
+- **Fim do grupo:** skill `integrate`: `gen-docs.sh`, `deploy.sh`, arquivar filhas, `end-check.sh`. Sem batimento (ADR-007): a gerenciadora acorda pelo fim de turno da filha.
 - **CI:** um run por rodada; verificadores da base do PR. Docs gerados são inertes; push na `main` só com eles não abre run. Reaproveitamento usa o resultado mais novo. Árvore já testada grava `no-new-fact:` e não sobe o agregador. `ci.yml` e `close-phase.sh` são caminho sensível.
 - **Runner:** hospedado pelo GitHub (`ubuntu-latest`); a variável `CI_RUNS_ON` não está definida.
 - **Bots (caminho B):** nenhum webhook configurado; `docs/BOTS.md` e `.github/bots.tsv` trazem só exemplos.
@@ -28,7 +28,7 @@ Repositório criado a partir do template do método (`docs/process-design.md`). 
 - `close-phase.sh --abort` sai 10 com perda; `--discard` confirma.
 - `close-phase.sh --check`: conflito real no cherry-pick sai 4; `mergeable` UNKNOWN após 5 leituras sai 8; sem check no HEAD em ~180 s sai 7.
 - **Meta de tempo:** fase 45 min e `validate.sh` 240 s; o projeto sobrepõe em `.github/time-targets.tsv`. A vaga libera no fim da fase, sem a espera pelo dono. Tempo é só informativo: `--report` imprime `info: time ...` (com `(above)` acima da meta), sai 0, e o fim do grupo só cita as linhas; travamento bloqueia.
-- **Headless:** desligado por padrão. Recusa por falta de fala do dono vira cartão ou espera, não `start-headless.sh`. Fase sem `phase_session` aparece como "aberta, sem sessão".
+- **Headless:** desligado por padrão. O `start-headless.sh` depois de recusa foi negado pelo modo auto (26/11). Todas as ondas abrem no ok da spec (`phase-start.sh <n> --after <anterior>`); a filha espera o merge da anterior em tarefa de segundo plano. Cartão só como último recurso, com `--need` "abrir a #n" numa mensagem nova. Fase sem `phase_session` aparece como "aberta, sem sessão".
 - **Recado à filha:** comentário na issue com `Para: fase #n` (app e headless, além da mensagem); a filha o relê antes de cada etapa, da parada de lab-test e do `--merge`, que sai 12 até ela responder com `De: fase #n`. O ok do dono no merge vale para um SHA (`--owner-ok <sha>`). Commit de etapa sem `phase_session` é recusado.
 - **Pré-revisão:** antes do `--prepare`, `close-reviewer` só com issue e diff; `close-phase.sh --pre-review --verdict clean|findings` grava `pre_review` no trace; o `--prepare` só avisa sem ela no HEAD.
 - **Atualização testada aqui:** `test_update_from_origins.sh` monta um adotante em cada origem de `.method/scripts/tests/update-origins.txt`, segue o comando do `.github/update-notice.md` (origem anterior à `.method/`) e exige `validate.sh --full` e `check-docs.sh` verdes; demora minutos, então roda na CI e no `--full` (e quando o diff o toca). Origem nova: uma linha no arquivo.
