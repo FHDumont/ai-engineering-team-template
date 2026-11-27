@@ -15,7 +15,7 @@ assert_not_contains "$(last_output)" "passed" "the opening prints no test result
 git -C "$repo" worktree remove --force "$repo/.worktrees/issue-7"
 git -C "$repo" branch -D feat/issue-7-listar-issues >/dev/null
 rm -rf "$AI_METHOD_CACHE"; : >"$PROCESS_EVENTS_FILE"
-git -C "$repo" status --porcelain | grep -q . && git -C "$repo" checkout --quiet -- . || true
+[ -z "$(git -C "$repo" status --porcelain)" ] || git -C "$repo" checkout --quiet -- .
 
 # Closed issue: refused even with a spec.
 spec nine.md 9

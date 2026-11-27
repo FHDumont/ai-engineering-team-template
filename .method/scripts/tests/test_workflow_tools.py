@@ -447,15 +447,15 @@ class CiStepsTests(unittest.TestCase):
         os.makedirs(fake)
         gh = os.path.join(fake, "gh")
         open(gh, "w").write('''#!/bin/sh
-if echo "$*" | grep -q "commits/%s/check-runs"; then
+case "$*" in *"commits/%s/check-runs"*)
   if [ "$GH_TESTS" = 1 ]; then
     printf '{"check_runs":[{"name":"Tests","status":"completed","conclusion":"success","started_at":"2020-01-01T00:00:00Z"}]}\\n'
   else
     printf '{"check_runs":[]}\\n'
-  fi
-else
-  printf '{"check_runs":[]}\\n'
-fi
+  fi ;;
+*)
+  printf '{"check_runs":[]}\\n' ;;
+esac
 ''' % first)
         os.chmod(gh, 0o755)
         env = {"PATH": fake + os.pathsep + os.environ["PATH"]}
