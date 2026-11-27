@@ -132,4 +132,34 @@ assert_not_contains "$(cat "$TMP/apply.out")" "deploy-example.yml" "the notice a
 second="$(cd "$r2" && bash "$SCRIPTS/method-diff.sh" --template .process/template --to "$d2")"
 assert_not_contains "$second" "outdated" "after --apply nothing is outdated"
 assert_not_contains "$second" "missing " "after --apply nothing is missing"
+
+# #322: --apply survives a destination that carries another version of fetch-template.sh itself.
+t3="$(make_repo)"
+mkdir -p "$t3/.method/scripts/lib" "$t3/.github"
+cp "$SCRIPTS/method-diff.sh" "$t3/.method/scripts/method-diff.sh"
+cp "$SCRIPTS/lib/common.sh" "$t3/.method/scripts/lib/common.sh"
+printf '.method/scripts/fetch-template.sh\n.method/scripts/a.sh\n.method/scripts/method-diff.sh\n.method/scripts/lib/common.sh\n' >"$t3/.github/method-files.txt"
+echo a1 >"$t3/.method/scripts/a.sh"
+cp "$SCRIPTS/fetch-template.sh" "$t3/.method/scripts/fetch-template.sh"
+git -C "$t3" add .github .method
+git -C "$t3" commit --quiet -m "chore: origin"
+o3="$(git -C "$t3" rev-parse HEAD)"
+echo a2 >"$t3/.method/scripts/a.sh"
+{ sed -n 1p "$SCRIPTS/fetch-template.sh"; for i in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20; do echo "# padding line $i to change the size of the script in the destination"; done; sed 1d "$SCRIPTS/fetch-template.sh"; } >"$t3/.method/scripts/fetch-template.sh"
+git -C "$t3" add .method
+git -C "$t3" commit --quiet -m "chore: dest"
+d3="$(git -C "$t3" rev-parse HEAD)"
+r3="$(make_repo)"
+mkdir -p "$r3/.method/scripts/lib" "$r3/.github"
+cp "$SCRIPTS/fetch-template.sh" "$r3/.method/scripts/fetch-template.sh"
+cp "$SCRIPTS/lib/common.sh" "$r3/.method/scripts/lib/common.sh"
+echo a1 >"$r3/.method/scripts/a.sh"
+printf '%s\n' "$o3" >"$r3/.github/method-origin"
+git -C "$r3" add .
+git -C "$r3" commit --quiet -m "chore: adopted"
+(cd "$r3" && env -u PROCESS_CI_MODE bash .method/scripts/fetch-template.sh "$d3" --url "$t3" --apply) >"$TMP/self.out" 2>&1 || bad "apply over a changed fetch-template.sh failed: $(cat "$TMP/self.out")"
+assert_not_contains "$(cat "$TMP/self.out")" "syntax error" "apply over a changed fetch-template.sh prints no syntax error"
+assert_eq "a2" "$(cat "$r3/.method/scripts/a.sh")" "apply over a changed fetch-template.sh copies the files"
+assert_contains "$(cat "$TMP/self.out")" "applied" "apply over a changed fetch-template.sh reaches the end"
+assert_contains "$(tail -n 5 "$TMP/self.out")" "$d3" "apply over a changed fetch-template.sh still prints the notice"
 finish
