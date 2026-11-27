@@ -51,6 +51,7 @@ if [ "$count" -ge "$limit" ]; then
   exit 1
 fi
 n=$((count + 1))
+# Count the rerun only once GitHub accepted the request; a refused one (5xx) shows its error.
+gh run rerun "$run" --failed --repo "$slug" || die "GitHub refused the rerun of run $run; it was not counted" 1
 printf '%s\n' "$n" >"$dir/$run"
-gh run rerun "$run" --failed --repo "$slug"
 echo "reran the failed jobs of ci.yml run $run (attempt $n of $limit)"
