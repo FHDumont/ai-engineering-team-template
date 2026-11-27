@@ -4,8 +4,16 @@
 source "$(dirname "$0")/lib.sh"
 
 [ -x "$REPO/.method/scripts/validate.sh" ] && ok || bad ".method/scripts/validate.sh is missing or not executable"
-[ ! -e "$REPO/scripts" ] && [ ! -L "$REPO/scripts" ] && ok || bad "the scripts link is back at the repo root"
-assert_eq "" "$(git -C "$REPO" ls-files scripts)" "git tracks nothing at scripts"
+# scripts/ at the root belongs to the application (#299): only the old link and a copy of a method file are refused.
+[ ! -L "$REPO/scripts" ] && ok || bad "the scripts link is back at the repo root"
+copies=""
+if [ -d "$REPO/scripts" ]; then
+  for f in "$REPO"/scripts/*; do
+    [ -e "$f" ] || continue
+    [ ! -e "$REPO/.method/scripts/$(basename "$f")" ] || copies="$copies $(basename "$f")"
+  done
+fi
+assert_eq "" "$copies" "scripts/ holds no copy of a method file"
 "$REPO/.method/scripts/validate.sh" --help >/dev/null && ok || bad ".method/scripts/validate.sh --help fails"
 
 # The method globs in code cover the new folder, also with an adopter's old one-class list.
