@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Tests of the .env path (secret_env_file) and of init-env.sh: default
-# ~/.<repo-slug>/.env, override through PROCESS_ENV_FILE, permissions 700/600 and empty keys.
+# $DUMONTECH_HOME/projetos/<repo-slug>/.env, older paths, override through PROCESS_ENV_FILE, permissions 700/600 and empty keys.
 # shellcheck source=.method/scripts/tests/lib.sh
 source "$(dirname "$0")/lib.sh"
 
@@ -12,43 +12,71 @@ git -C "$TMP/repo" remote add origin "https://github.com/acme/meu-repo.git"
 
 path() { (cd "$TMP/repo" && bash -c 'source "$1/lib/secret.sh"; secret_env_file' _ "$SCRIPTS"); }
 
-# Default: ~/.<repo-slug>/.env, the slug being the repo name in the remote.
-assert_eq "$HOME/.meu-repo/.env" "$(path)" "default path uses the repo name from the remote"
+NEW="$DUMONTECH_HOME/projetos"
+# Default: $DUMONTECH_HOME/projetos/<repo-slug>/.env (DUMONTECH_HOME defaults to ~/.dumontech).
+assert_eq "$NEW/meu-repo/.env" "$(path)" "default path uses the repo name from the remote"
 git -C "$TMP/repo" remote set-url origin "git@github.com:acme/outro.git"
-assert_eq "$HOME/.outro/.env" "$(path)" "default path with an ssh remote"
+assert_eq "$NEW/outro/.env" "$(path)" "default path with an ssh remote"
+assert_eq "$HOME/.dumontech/projetos/outro/.env" "$(env -u DUMONTECH_HOME bash -c 'cd "$1" && source "$2/lib/secret.sh"; secret_env_file' _ "$TMP/repo" "$SCRIPTS")" "DUMONTECH_HOME defaults to ~/.dumontech"
 
-# The legacy ~/.config/<repo-slug>/.env is used only while the new one is missing.
+# Search order: new path, then ~/.<slug>/.env, then the legacy ~/.config/<slug>/.env.
 mkdir -p "$HOME/.config/outro"; : >"$HOME/.config/outro/.env"
-assert_eq "$HOME/.config/outro/.env" "$(path)" "legacy path is used while the new one is missing"
+assert_eq "$HOME/.config/outro/.env" "$(path)" "legacy ~/.config path is used while the others are missing"
 warn="$(cd "$TMP/repo" && bash -c 'source "$1/lib/secret.sh"; _secret_env_file_check' _ "$SCRIPTS" 2>&1 || true)"
 assert_contains "$warn" "legacy" "legacy .env use prints a warning"
-assert_contains "$warn" "$HOME/.outro/.env" "the warning names the new path"
+assert_contains "$warn" "$NEW/outro/.env" "the warning names the new path"
+mkdir -p "$HOME/.outro"; : >"$HOME/.outro/.env"
+assert_eq "$HOME/.outro/.env" "$(path)" "~/.<slug>/.env wins over ~/.config"
+warn="$(cd "$TMP/repo" && bash -c 'source "$1/lib/secret.sh"; _secret_env_file_check' _ "$SCRIPTS" 2>&1 || true)"
+assert_not_contains "$warn" "legacy" "~/.<slug>/.env works without a warning"
 git -C "$TMP/repo" remote set-url origin "git@github.com:acme/mais-um.git"
-assert_eq "$HOME/.mais-um/.env" "$(path)" "the legacy file of one repo is not used by another"
+assert_eq "$NEW/mais-um/.env" "$(path)" "the old file of one repo is not used by another"
 git -C "$TMP/repo" remote set-url origin "git@github.com:acme/outro.git"
-(cd "$TMP/repo" && "$SCRIPTS/init-env.sh" >/dev/null)
-[ -f "$HOME/.outro/.env" ] && ok || bad "init-env writes to the new path"
+
+# init-env with an old .env: keeps it where it is, appends the missing keys, creates nothing new.
+(cd "$TMP/repo" && "$SCRIPTS/init-env.sh" bot-a >"$TMP/init.out")
+assert_eq "$HOME/.outro/.env" "$(cat "$TMP/init.out")" "init-env works on the existing old file"
+assert_eq "BOT_WEBHOOK_BOT_A_URL=
+BOT_WEBHOOK_BOT_A_SECRET=
+GH_APP_BOT_A_TOKEN=
+GH_APP_METHOD_TOKEN=" "$(cat "$HOME/.outro/.env")" "init-env appends the missing keys to the old file"
+[ ! -e "$NEW/outro" ] && ok || bad "init-env creates nothing in the new path when an old file exists"
+assert_eq "0" "$(wc -c <"$HOME/.config/outro/.env" | tr -d ' ')" "init-env leaves the other old file alone"
+rm -rf "$HOME/.outro"
+
+# No old file: the new path is created, folders 700 and file 600.
+rm -rf "$HOME/.config/outro"
+(cd "$TMP/repo" && "$SCRIPTS/init-env.sh" >"$TMP/init.out")
+f="$NEW/outro/.env"
+assert_eq "$f" "$(cat "$TMP/init.out")" "init-env prints only the new path"
+for d in "$DUMONTECH_HOME" "$NEW" "$NEW/outro"; do
+  assert_eq "700" "$(stat -c %a "$d" 2>/dev/null || stat -f %Lp "$d")" "created folder $d is 700"
+done
+assert_eq "600" "$(stat -c %a "$f" 2>/dev/null || stat -f %Lp "$f")" "file is 600"
 assert_eq "BOT_WEBHOOK_BOT_A_URL=
 BOT_WEBHOOK_BOT_A_SECRET=
 GH_APP_BOT_A_TOKEN=
 BOT_WEBHOOK_BOT_B_URL=
 BOT_WEBHOOK_BOT_B_SECRET=
 GH_APP_BOT_B_TOKEN=
-GH_APP_METHOD_TOKEN=" "$(cat "$HOME/.outro/.env")" "init-env defaults to every bot of the bots file"
-assert_eq "0" "$(wc -c <"$HOME/.config/outro/.env" | tr -d ' ')" "init-env leaves the legacy file alone"
-assert_eq "$HOME/.outro/.env" "$(path)" "new path wins when it exists"
+GH_APP_METHOD_TOKEN=" "$(cat "$f")" "init-env defaults to every bot of the bots file"
+assert_eq "$f" "$(path)" "the new path is found once it exists"
 assert_status 2 "init-env with no bot and no bots file is refused" env BOTS_FILE="$TMP/missing.tsv" sh -c "cd '$TMP/repo' && '$SCRIPTS/init-env.sh'"
-rm -rf "$HOME/.config/outro" "$HOME/.outro"
+
+# With the shared bots file present, the repo .env gets no bot keys; the shared file is not touched.
+rm -rf "$NEW/outro"
+mkdir -p "$DUMONTECH_HOME/shared"; printf 'BOT_WEBHOOK_BOT_A_URL=v\n' >"$DUMONTECH_HOME/shared/bots.env"; chmod 600 "$DUMONTECH_HOME/shared/bots.env"
+(cd "$TMP/repo" && "$SCRIPTS/init-env.sh" >/dev/null)
+assert_eq "GH_APP_METHOD_TOKEN=" "$(cat "$f")" "with shared/bots.env, init-env writes no bot keys"
+assert_eq "BOT_WEBHOOK_BOT_A_URL=v" "$(cat "$DUMONTECH_HOME/shared/bots.env")" "init-env never edits shared/bots.env"
+rm -rf "$NEW/outro" "$DUMONTECH_HOME/shared"
+f="$NEW/outro/.env"
+(cd "$TMP/repo" && "$SCRIPTS/init-env.sh" bot-b >/dev/null)
 
 # Override.
 assert_eq "$TMP/x/custom.env" "$(PROCESS_ENV_FILE="$TMP/x/custom.env" path)" "PROCESS_ENV_FILE overrides the path"
 
 # init-env.sh: folder 700, file 600, empty keys, no overwrite.
-(cd "$TMP/repo" && "$SCRIPTS/init-env.sh" bot-b >"$TMP/init.out")
-f="$HOME/.outro/.env"
-assert_eq "$f" "$(cat "$TMP/init.out")" "init-env prints only the path"
-assert_eq "700" "$(stat -c %a "$HOME/.outro" 2>/dev/null || stat -f %Lp "$HOME/.outro")" "folder is 700"
-assert_eq "600" "$(stat -c %a "$f" 2>/dev/null || stat -f %Lp "$f")" "file is 600"
 assert_eq "BOT_WEBHOOK_BOT_B_URL=
 BOT_WEBHOOK_BOT_B_SECRET=
 GH_APP_BOT_B_TOKEN=
