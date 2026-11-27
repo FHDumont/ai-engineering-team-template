@@ -100,6 +100,29 @@ for n in a b c; do
 done
 assert_contains "$(cat "$body_arg")" "/blob/" "the spec that does not fit is a blob link"
 
+# The spec's ok: approved issue + a spec that declares the sensitive area = spec_ok in the trace.
+git -C "$repo" switch --quiet -c chore/issue-1-specok origin/main
+mkdir -p "$repo/docs/specs"
+printf '# Spec\n\n## Fase #1 — x\n\nÁrea sensível: `scripts/gate.sh` (classe `owner-ok`).\n\n## Fase #9 — y\n\nÁrea sensível: `outro.sh`.\n' >"$repo/docs/specs/2026-01-20-ok.md"
+git -C "$repo" add docs
+git -C "$repo" commit --quiet -m "docs: spec ok"
+cat >"$TMP/handler.sh" <<'H'
+case "$*" in
+  "pr list"*"--state open"*) echo 12 ;;
+  "issue view 1"*) printf 'type:chore\napproved\n' ;;
+  "issue list"*"--state open"*) echo 1 ;;
+  "pr view 12"*) echo '{"number":12,"title":"chore: x","body":"","labels":[],"url":"u"}' ;;
+  "pr list"*"merged"*) echo '[]' ;;
+  "issue list"*) echo '[]' ;;
+esac
+H
+use_fake_gh "$TMP/handler.sh"
+export PROCESS_EVENTS_FILE="$TMP/spec-ok-events.jsonl"
+assert_status 0 "prepare of an approved issue whose spec declares the area" sh -c "cd '$repo' && .method/scripts/close-phase.sh --prepare --title 'chore: x' --body-file '$TMP/body.md'"
+assert_eq "owner-ok,scripts/gate.sh" "$(jq -r 'select(.event == "spec_ok") | .declared' "$PROCESS_EVENTS_FILE" | tail -1)" "records spec_ok with the declared words of the phase section only"
+assert_eq "$(git -C "$repo" rev-parse HEAD)" "$(jq -r 'select(.event == "spec_ok") | .sha' "$PROCESS_EVENTS_FILE" | tail -1)" "spec_ok is bound to the pushed HEAD"
+unset PROCESS_EVENTS_FILE
+
 git -C "$repo" switch --quiet main
 assert_status 1 "refuses to run on main" sh -c "cd '$repo' && '$CLOSE' --merge"
 finish
