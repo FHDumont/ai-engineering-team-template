@@ -9,3 +9,4 @@ Uma linha por ADR. As substituídas ficam em `archive/` (mova com `scripts/archi
 | [ADR-003](ADR-003-generated-files-pr.md) | Arquivos gerados e specs encerradas entram por um PR só deles | vigente |
 | [ADR-004](ADR-004-single-deploy.md) | Um deploy por fecho, só pelo deploy.sh | vigente |
 | [ADR-005](ADR-005-weights-and-real-pair.md) | Pesos num arquivo e par real conferido antes da primeira etapa | vigente |
+| [ADR-006](ADR-006-spec-ok-is-merge-ok.md) | O ok da spec que declara a área sensível vale como ok do merge | vigente |

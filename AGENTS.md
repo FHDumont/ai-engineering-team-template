@@ -14,7 +14,7 @@ Código novo e o do método, comentários, identificadores, nomes de arquivos, l
 ## Regras
 
 1. O dono nunca roda script do método nem mexe na configuração do método. Setup pré-aprovado e obrigatório: sem `.method/scripts/setup-repo.sh --check` limpo nenhuma fase abre; em desvio, rode `.method/scripts/setup-repo.sh`.
-2. Toda decisão do dono é um quadro de escolha (`AskUserQuestion`) que começa por `Fase #n — título`. Só a principal pergunta; a filha pede só o ok da ação sensível (merge `needs-owner-ok`, `--abort --discard`), que não atravessa sessões. "Fechar fase" vale em qualquer sessão.
+2. Toda decisão do dono é um quadro de escolha (`AskUserQuestion`) que começa por `Fase #n — título`. Só a principal pergunta; a filha pede só o ok da ação sensível (merge `needs-owner-ok`, `--abort --discard`), que não atravessa sessões. O ok da spec aprovada que declara a área sensível vale como ok do merge dessa área (ADR-006). "Fechar fase" vale em qualquer sessão.
 3. Toda parada e mensagem final de turno termina com o bloco de `.method/scripts/status.sh` (Estado, Você precisa, Próximo passo); cole a saída como está, fora de bloco de código. Estados: `trabalhando`, `esperando você`, `pronto` (`end-check.sh` limpo).
 4. Paralelo é o preferido; skills carregam só na etapa (`triage`, `plan`, `execute`, `close-phase`, `integrate`, `ask-bot`, `setup`).
 5. Arquivos guardam só o estado atual, nada que o git repete.
