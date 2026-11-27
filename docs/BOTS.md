@@ -2,7 +2,7 @@
 
 Opcional. O `.method/scripts/ask-bot.sh` comenta a pergunta na issue e chama o webhook do bot. A resposta é reconhecida pela marca `<!-- bot:<slug> reply-to:<id> -->`, não pelo autor: funciona mesmo quando todos usam a mesma conta do GitHub.
 
-Os bots abaixo são exemplos. Troque as linhas pelos bots do seu time e mantenha os mesmos slugs em `.github/bots.tsv` (slug, nome e referência do webhook); as labels `ask:<slug>` saem da linha-modelo de `.github/labels.tsv`, uma por bot.
+Os bots abaixo são exemplos. Troque as linhas pelos bots do seu time, com os mesmos slugs em `.github/bots.tsv`; as labels `ask:<slug>` saem da linha-modelo de `.github/labels.tsv`, uma por bot.
 
 | Slug | Nome | Papel | Quando perguntar | Nunca pode |
 |---|---|---|---|---|
@@ -17,14 +17,14 @@ O `.method/scripts/lib/secret.sh` procura a URL e o segredo de cada bot nesta or
 
 1. variáveis de ambiente `BOT_WEBHOOK_<SLUG>_URL` e `BOT_WEBHOOK_<SLUG>_SECRET` (CI);
 2. opcional: conta de serviço do gerenciador de senhas;
-3. padrão: `.env` fora do repo.
+3. padrão: `$DUMONTECH_HOME/shared/bots.env` (bots) e o `.env` do repo.
 
-**`.env` (padrão):** fica em `~/.<nome-do-repo>/.env` (pasta 700, arquivo 600; `PROCESS_ENV_FILE` troca o caminho). O agente cria o arquivo só com as chaves vazias (`.method/scripts/init-env.sh <slug>...`); o dono do repo o abre e cola os valores. O script recusa permissão aberta, e o arquivo fica fora do git.
+**Arquivos (`DUMONTECH_HOME`, padrão `~/.dumontech`; pastas 700, arquivos 600):** `shared/bots.env` (`BOT_WEBHOOK_<SLUG>_URL`, `_SECRET`, `GH_APP_<SLUG>_TOKEN`, para todos os repos) e `projetos/<repo>/.env`. O `.env` do repo é o primeiro que existe de `PROCESS_ENV_FILE`, `projetos/<repo>/.env`, `~/.<repo>/.env`, `~/.config/<repo>/.env` (legado, avisa). O `init-env.sh` cria chaves vazias e não move `.env` antigo. O repo só lê os bots do seu `bots.tsv`. Com o `shared/bots.env` presente, bot declarado ausente é erro (slug, caminho, chaves, chmod 600), sem cair no `.env` antigo; sem ele, vale o `.env` do repo. O método nunca cria nem edita o `shared/bots.env`. Ver `.env.example`.
 
-**Gerenciador de senhas (opcional):** o código aceita uma conta de serviço lida pelo CLI `op`. Crie uma conta só de leitura no cofre dos webhooks, um item por bot (campos `url` e `secret`), e ponha `op://<cofre>/<item>` em `.github/bots.tsv`. O token da conta fica no cofre do sistema, nunca no repo. O agente só chama o `op` pelos scripts.
+**Gerenciador de senhas (opcional):** o código aceita uma conta de serviço lida pelo CLI `op`. Crie uma conta só de leitura no cofre dos webhooks, um item por bot, e ponha `op://<cofre>/<item>` em `.github/bots.tsv`. O token da conta fica no cofre do sistema; o agente só chama o `op` pelos scripts.
 
 ## Identidade
 
-Todo comentário de agente ou bot abre com `**De:** bot <nome> · **Para:** <papel> · **Pedido:** <ask_id> · **Responde a:** <link>` (a resposta também; o papel não é assinatura de IA); sem o cabeçalho, é do dono. Pedido a bot só pelo `ask-bot.sh`. Toda resposta começa com `**<Nome> (bot do time)**`, sem emoji nem assinatura de IA.
+Todo comentário de agente ou bot abre com `**De:** bot <nome> · **Para:** <papel> · **Pedido:** <ask_id> · **Responde a:** <link>`; sem o cabeçalho, é do dono. Pedido a bot só pelo `ask-bot.sh`. Toda resposta começa com `**<Nome> (bot do time)**`.
 
-O dono cria a GitHub App do bot (`<slug>[bot]`, issues e pull requests em escrita). O token de instalação é `GH_APP_BOT_<SLUG>_TOKEN` no ambiente ou no `.env`. Com ele, o bot comenta como a App. Sem ele, o comentário do método usa o `gh` do dono. `ROLE_APP_REQUIRE=1` recusa até a App existir. Nada é criado na conta pelo agente.
+O dono cria a GitHub App do bot (`<slug>[bot]`, issues e pull requests em escrita). O token de instalação é `GH_APP_<SLUG>_TOKEN` no ambiente ou nos arquivos acima. Com ele, o bot comenta como a App. Sem ele, o comentário do método usa o `gh` do dono. `ROLE_APP_REQUIRE=1` recusa até a App existir.

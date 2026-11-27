@@ -233,7 +233,7 @@ Opcional. Os bots atuam nas pontas: abrem issues, respondem quando perguntados e
 3. Espera a resposta (`.method/scripts/wait-reply.sh`, 15 minutos; sem resposta no prazo sai 3): só vale o comentário com a marca `<!-- bot:<slug> reply-to:<id> -->` postado depois da pergunta. A resposta é reconhecida pela marca, não pelo autor.
 
 - `ask-bot.sh --retry` refaz o aviso e a espera sem repostar a pergunta. `ask-bot.sh --append <id> "texto" --issue <n>` leva informação nova sobre pergunta em aberto (marca `ask-append`, avisa o bot de novo, evento `bot_append`); nunca por `gh issue comment` solto, que o bot não vê e o `block-bot-comment.sh` barra.
-- URL e segredo do webhook vêm do `.method/scripts/lib/secret.sh` na hora da chamada, nunca de arquivo do repo, argumento nem log. Ele procura nesta ordem: variável de ambiente, conta de serviço do gerenciador de senhas (CLI `op`), `.env` fora do repo (`~/.<repo-slug>/.env`, criado vazio pelo `.method/scripts/init-env.sh`). Sem provedor, o `ask-bot.sh` para. O agente lê segredo só pelos scripts: o `.claude/settings.json` nega a chamada direta do `op`.
+- URL e segredo do webhook vêm do `.method/scripts/lib/secret.sh` na hora da chamada, nunca de arquivo do repo, argumento nem log. Ele procura nesta ordem: variável de ambiente, conta de serviço do gerenciador de senhas (CLI `op`), arquivos fora do repo: `$DUMONTECH_HOME/shared/bots.env` (padrão `~/.dumontech`; só os bots do `.github/bots.tsv`, e bot declarado ausente é erro, sem cair no `.env` antigo) e o `.env` do repo (`$DUMONTECH_HOME/projetos/<repo-slug>/.env`, depois `~/.<repo-slug>/.env` e `~/.config/<repo-slug>/.env`; criado vazio pelo `.method/scripts/init-env.sh`). Detalhes em `docs/BOTS.md`. Sem provedor, o `ask-bot.sh` para. O agente lê segredo só pelos scripts: o `.claude/settings.json` nega a chamada direta do `op`.
 - O segredo vai em dois headers, `Authorization: Bearer <secret>` e `X-Automation-Key: <secret>`. Corpo:
   ```json
   {"source": "ask-bot", "bot": "<slug>", "repo": "<owner>/<name>", "issue": 11,
@@ -260,7 +260,7 @@ Todo script tem `--help`, um teste em `.method/scripts/tests/` e saída curta em
 |---|---|---|
 | `.method/scripts/setup-repo.sh` | Idempotente: sincroniza as labels do `.github/labels.tsv`, aplica a proteção e as configurações do repo (§10.1) e as lê de volta; `--check` é a conferência do setup obrigatório (§2, regra 1); `--offers`, `--project` e `--decline` na §8.3 | o agente, em qualquer desvio do padrão |
 | `.method/scripts/setup-runner.sh` | Registra o runner próprio (§9.3) | sessão principal |
-| `.method/scripts/init-env.sh` | Cria o `.env` fora do repo só com as chaves vazias; nunca lê nem escreve valores | skill `setup` |
+| `.method/scripts/init-env.sh` | Cria o `.env` fora do repo (em `$DUMONTECH_HOME/projetos/<slug>/`) só com as chaves vazias; nunca lê nem escreve valores | skill `setup` |
 | `.method/scripts/triage.sh` | Issues abertas em JSON curto: número, título, labels; marca as sem label | agente `triage` |
 | `.method/scripts/label-issue.sh` | Aplica tipo, área, prioridade, grupo, tamanho e fim | triagem, agentes |
 | `.method/scripts/auto-label.py` | Lê as seções `##` do corpo da issue e gera as labels; seção obrigatória vazia vira `needs-context` | `issues-label.yml` |
