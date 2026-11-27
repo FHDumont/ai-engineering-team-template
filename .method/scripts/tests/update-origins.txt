@@ -1,0 +1,6 @@
+# Real template commits an adopter may update from, one per line (sha, then a comment).
+# test_update_from_origins.sh builds a fake adopter at each one and updates it to the tip.
+# Add a line when a new shape of origin appears; keep the oldest ones.
+c1b76da  scripts/ real folder, no .github/method-origin yet
+e3c157e  scripts/ real folder, tests/template
+4791675  last origin before the .method/ folder
