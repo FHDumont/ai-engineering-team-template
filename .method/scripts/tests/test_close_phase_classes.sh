@@ -103,6 +103,15 @@ spec_ok_ev "feature.txt"
 handler "type:feature,needs-owner-ok,area:auth" success
 assert_status 5 "an area label the spec did not declare still asks the owner" sh -c "cd '$repo' && '$CLOSE' --merge"
 
+# needs-owner-ok alone, with no declared path or area behind it, is not covered.
+set_list "# class: owner-ok" "nothing-here.txt"
+reset_phase_evidence; export PROCESS_EVENTS_FILE="$TRACE"; child_session 5
+spec_ok_ev "feature.txt"
+handler "type:feature,needs-owner-ok" success
+assert_status 5 "needs-owner-ok alone is not covered by the spec ok" sh -c "cd '$repo' && '$CLOSE' --merge"
+assert_not_contains "$(gh_calls)" "pr merge" "no merge on the label alone"
+set_list "# class: owner-ok" "feature.txt"
+
 # An adopter's old file has one class: every path asks for the owner.
 set_list "feature.txt"
 reset_phase_evidence; export PROCESS_EVENTS_FILE="$TRACE"; child_session 5

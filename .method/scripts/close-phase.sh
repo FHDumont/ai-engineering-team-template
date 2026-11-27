@@ -892,16 +892,20 @@ gate_review_required() { # gate_review_required <pr> <sha> <labels> <gate paths>
 
 # The sensitive area the spec of the phase declares: the backticked words of the line
 # "Área sensível:" in its "## Fase #<n>" section, comma-separated (empty: none declared).
+# Read from origin/main, the text the owner approved: a spec only on the branch, or an
+# edit of that line made on the branch, declares nothing.
 spec_declared_areas() { # spec_declared_areas <issue>
   local f
+  git fetch --quiet origin main 2>/dev/null || true
   for f in $(specs_citing "$1" "$ROOT"); do
-    [ -n "$(git ls-files -- "$f")" ] || continue
-    awk -v h="## Fase #$1 " 'index($0, h) == 1 {on=1; next} /^## / {on=0} on && /^Área sensível:/ {print}' "$ROOT/$f" |
+    git cat-file -e "origin/main:$f" 2>/dev/null || continue
+    git show "origin/main:$f" |
+      awk -v h="## Fase #$1 " 'index($0, h) == 1 {on=1; next} /^## / {on=0} on && /^Área sensível:/ {print}' |
       grep -o '`[^`]*`' | tr -d '`' || true
   done | sort -u | paste -sd, -
 }
 # 0 when every reason to ask the owner is declared by the spec recorded (spec_ok) for this
-# SHA: each touched owner-ok path and each sensitive area label must be one of the declared
+# SHA (at least one path or area label must be there): each touched owner-ok path and each sensitive area label must be one of the declared
 # words. A path or area the spec did not declare is not covered.
 spec_ok_covers() { # spec_ok_covers <PR head SHA> <labels> <touched paths>
   local events declared a p w hit
@@ -911,11 +915,16 @@ spec_ok_covers() { # spec_ok_covers <PR head SHA> <labels> <touched paths>
     '[.[] | select(type == "object" and .event == "spec_ok" and .sha == $sha and .branch == $b)] | last | .declared // empty' \
     "$events" 2>/dev/null || true)"
   [ -n "$declared" ] || return 1
+  # needs-owner-ok alone (no owner-ok path, no area label) is not something a spec declares.
+  local any=0
+  [ -z "$3" ] || any=1
   for a in $SENSITIVE_AREAS; do
     if echo "$2" | stdin_grep -qxF "$a"; then
+      any=1
       printf ',%s,' "$declared" | grep -qF ",$a," || return 1
     fi
   done
+  [ "$any" = 1 ] || return 1
   while IFS= read -r p; do
     [ -n "$p" ] || continue
     hit=0
