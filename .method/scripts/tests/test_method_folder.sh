@@ -6,14 +6,22 @@ source "$(dirname "$0")/lib.sh"
 [ -x "$REPO/.method/scripts/validate.sh" ] && ok || bad ".method/scripts/validate.sh is missing or not executable"
 # scripts/ at the root belongs to the application (#299): only the old link and a copy of a method file are refused.
 [ ! -L "$REPO/scripts" ] && ok || bad "the scripts link is back at the repo root"
-copies=""
-if [ -d "$REPO/scripts" ]; then
-  for f in "$REPO"/scripts/*; do
-    [ -e "$f" ] || continue
-    [ ! -e "$REPO/.method/scripts/$(basename "$f")" ] || copies="$copies $(basename "$f")"
-  done
-fi
-assert_eq "" "$copies" "scripts/ holds no copy of a method file"
+# Names in scripts/ of $1 that are a regular file with the name of a method file (a folder of the app is fine).
+copies_in() {
+  local f out=""
+  if [ -d "$1/scripts" ]; then
+    for f in "$1"/scripts/*; do
+      [ -f "$f" ] || continue
+      [ ! -e "$REPO/.method/scripts/$(basename "$f")" ] || out="$out $(basename "$f")"
+    done
+  fi
+  printf '%s' "$out"
+}
+assert_eq "" "$(copies_in "$REPO")" "scripts/ holds no copy of a method file"
+mkdir -p "$TMP/app/scripts/lib"
+assert_eq "" "$(copies_in "$TMP/app")" "an app scripts/lib folder is not a copy of a method file"
+: >"$TMP/app/scripts/validate.sh"
+assert_eq " validate.sh" "$(copies_in "$TMP/app")" "a regular file named like a method script is still refused"
 "$REPO/.method/scripts/validate.sh" --help >/dev/null && ok || bad ".method/scripts/validate.sh --help fails"
 
 # The method globs in code cover the new folder, also with an adopter's old one-class list.
