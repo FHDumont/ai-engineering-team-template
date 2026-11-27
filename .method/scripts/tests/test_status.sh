@@ -28,6 +28,14 @@ echo code >"$repo/newfile.sh"
 out="$(cd "$repo" && "$SCRIPTS/status.sh" --state trabalhando --offline --next "nada")"
 assert_contains "$out" "não se trabalha na main" "an untracked code file next to .DS_Store still warns"
 rm -f "$repo/newfile.sh" "$repo/.DS_Store"
+# The method's own .worktrees/ is not a code edit (#335), even when .gitignore does not cover it.
+mkdir -p "$repo/.worktrees/issue-1"; echo x >"$repo/.worktrees/issue-1/f.sh"; : >"$repo/.worktrees/parallel-active.tsv"
+out="$(cd "$repo" && "$SCRIPTS/status.sh" --state trabalhando --offline --next "nada")"
+assert_not_contains "$out" "não se trabalha na main" "untracked .worktrees/ is not a pending code edit"
+echo code >"$repo/newfile.sh"
+out="$(cd "$repo" && "$SCRIPTS/status.sh" --state trabalhando --offline --next "nada")"
+assert_contains "$out" "não se trabalha na main" "an untracked code file next to .worktrees/ still warns"
+rm -rf "$repo/.worktrees" "$repo/newfile.sh"
 rm -rf "$repo/docs" "$repo/.process"
 
 git -C "$repo" switch --quiet -c feat/issue-4-x
