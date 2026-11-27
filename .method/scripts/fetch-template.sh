@@ -18,7 +18,7 @@
 #: this script is in the allow list, `git checkout <sha> -- <paths>` is not.
 set -euo pipefail
 # The whole body lives in a function bash reads in full before running it, and the call and the
-# exit share one line: --apply may overwrite this very file, and bash must not read the new bytes (#322).
+# exit share one line: --apply may overwrite this very file, and bash must not read the new bytes.
 main() {
   HERE="$(cd "$(dirname "$0")" && pwd)"
   # shellcheck source=.method/scripts/lib/common.sh
