@@ -153,5 +153,8 @@ commit_push "chore: restore the list" .github/sensitive-paths
 handler "type:feature" success
 # The repo's own list covers the docs checker the CI reads from the base.
 assert_eq ".method/scripts/check-docs.sh" "$(echo .method/scripts/check-docs.sh | python3 "$SCRIPTS/lib/sensitive_paths.py" "$REPO/.github/sensitive-paths")" "check-docs.sh is a sensitive path"
+for f in app/compose.yml app/compose.prod.yml compose.yml app/Dockerfile Dockerfile; do
+  assert_eq "$f" "$(echo "$f" | SENSITIVE_CLASS=owner-ok python3 "$SCRIPTS/lib/sensitive_paths.py" "$REPO/.github/sensitive-paths")" "$f is owner-ok (issue #303)"
+done
 
 finish
