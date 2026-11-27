@@ -36,6 +36,7 @@
 .method/scripts/setup-repo.sh
 .method/scripts/setup-runner.sh
 .method/scripts/start-headless.sh
+.method/scripts/tag-release.sh
 .method/scripts/status.sh
 .method/scripts/summarize-thread.sh
 .method/scripts/trace-view.py
