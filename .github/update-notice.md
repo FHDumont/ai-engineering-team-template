@@ -15,6 +15,8 @@ Trazer o método do commit de destino, partindo do commit de origem gravado em `
 
 O checkout do template da filha é `.process/template` do worktree. O passo único é `.method/scripts/fetch-template.sh [<destino>] --apply` (sem destino, a última tag): ele traz o destino, roda o `.method/scripts/method-diff.sh` do destino, copia só o `outdated` e o `missing`, acrescenta ao fim de `.github/labels.tsv` cada `missing-label`, roda o `--remove` (`removed` e `template-only`) e imprime o `--notice`. Ele nunca sobrescreve um `adapted` nem um `repo-owned`, e o arquivo que o repo apagou de propósito (`deleted`) não volta.
 
+Origem com um `fetch-template.sh` anterior à correção #322: se o `--apply` terminar com `syntax error` depois de copiar os arquivos, o script trocou a si mesmo no meio da execução. Basta rodar o mesmo comando de novo (o script já é o novo) para ver o `--notice`.
+
 Origem anterior à pasta `.method/` (sem `.method/scripts/fetch-template.sh` neste repo): o `fetch-template.sh` antigo não serve, e ele mora aqui. Rode o do próprio destino, com o SHA completo do destino (o curto não resolve no `fetch`):
 
 <!-- update-cmd:before-method -->
