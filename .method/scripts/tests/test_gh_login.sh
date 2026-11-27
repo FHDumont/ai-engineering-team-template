@@ -37,7 +37,7 @@ while IFS= read -r line; do
   case "$line" in
     "$self":*|docs/specs/*|.github/workflows/ci.yml:*) continue ;;
     AGENTS.md:*|docs/repo-notes.md:*|docs/process-design.md:*|.claude/skills/setup/SKILL.md:*)
-      if printf '%s' "$line" | grep -qiE 'nunca|never'; then continue; fi ;;
+      if grep -qiE 'nunca|never' <<<"$line"; then continue; fi ;;
   esac
   offenders="$offenders$line"$'\n'
 done <<<"$(method_grep "$REPO" -nIE --untracked -e "$banned" || true)"

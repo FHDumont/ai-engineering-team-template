@@ -19,7 +19,7 @@ was=8
 printf '#!/usr/bin/env bash\n# see #12\n' >"$fake/.method/scripts/app_report.sh"
 printf 'Check every %s min\n' "$was" >"$fake/docs/adr/ADR-900-app-decision.md"
 mkdir -p "$fake/infra/scripts"
-printf '#!/usr/bin/env bash\nset -euo pipefail\necho x | grep -q x\n' >"$fake/infra/scripts/deploy.sh"
+printf '#!/usr/bin/env bash\nset -euo pipefail\necho x | grep -q x\n' >"$fake/infra/scripts/deploy.sh"  # load-ok: text of a fixture script, not run here
 grep -v 'echo "app=' "$fake/.github/workflows/ci.yml" >"$fake/ci.yml.new"
 mv "$fake/ci.yml.new" "$fake/.github/workflows/ci.yml"
 git -C "$fake" add -A

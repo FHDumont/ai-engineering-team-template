@@ -28,7 +28,7 @@ missing=""
 # The list is the manifest, not .method/scripts/*: a script only of the repository is not the method's (FHDumont/ai-engineering-team-template#207).
 while IFS= read -r name; do
   case "$name" in .method/scripts/*.sh|.method/scripts/*.py) ;; *) continue ;; esac
-  echo "$allow" | grep -qxF "Bash($name *)" || missing="$missing $name"
+  grep -qxF "Bash($name *)" <<<"$allow" || missing="$missing $name"
 done < <(grep -vE '^[[:space:]]*(#|$)' "$REPO/.github/method-files.txt")
 assert_eq "" "$missing" "allow lists every method script by name"
 

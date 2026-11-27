@@ -42,7 +42,7 @@ assert_contains "$(last_output)" "validate: 0/20 in use" "the environment limit 
 sleep 60 & holder=$!
 slot_info validate 1 "$holder" "$repo"
 assert_status 4 "validate.sh waits for a slot and gives up at the timeout" \
-  validate env AI_METHOD_SLOTS_VALIDATE=1 AI_METHOD_WAIT_TIMEOUT_SECONDS=2 "$V" --tests
+  validate env AI_METHOD_SLOTS_VALIDATE=1 AI_METHOD_WAIT_TIMEOUT_SECONDS=2 "$V" --tests  # load-ok: the run is expected to give up; a slower machine only waits longer than the limit
 assert_contains "$(last_output)" "waiting for a validate slot" "the queue says it is waiting"
 assert_contains "$(last_output)" "other-repo #99" "the queue says who holds the slot"
 assert_contains "$(last_output)" "timeout" "the timeout is named"
@@ -51,7 +51,7 @@ assert_eq "" "$(cat "$RUNS" 2>/dev/null || true)" "no test ran while waiting"
 # Queue: the slot frees while waiting and the run goes on.
 ( sleep 2; kill "$holder" 2>/dev/null ) &
 assert_status 0 "validate.sh runs once the slot is free" \
-  validate env AI_METHOD_SLOTS_VALIDATE=1 AI_METHOD_WAIT_TIMEOUT_SECONDS=20 "$V" --tests
+  validate env AI_METHOD_SLOTS_VALIDATE=1 AI_METHOD_WAIT_TIMEOUT_SECONDS=300 "$V" --tests
 assert_eq "1" "$(wc -l <"$RUNS" | tr -d ' ')" "the suite ran once after the wait"
 wait 2>/dev/null || true
 assert_eq "" "$(ls "$SLOTS/validate")" "the slot is freed at the end"
@@ -83,10 +83,10 @@ rm -rf "$SLOTS/fase"; mkdir -p "$SLOTS/fase"
 rm -f "$TMP/hold"
 ( PROBE_HOLD="$TMP/hold" validate env AI_METHOD_SLOTS_VALIDATE=2 "$V" --tests >"$TMP/first.out" 2>&1; echo $? >"$TMP/first.rc" ) &
 # The first run is inside its test (the probe wrote its line) before the second call starts.
-i=0; while [ ! -s "$RUNS" ] && [ "$i" -lt 600 ]; do sleep 0.1; i=$((i + 1)); done
+i=0; while [ ! -s "$RUNS" ] && [ "$i" -lt 3000 ]; do sleep 0.1; i=$((i + 1)); done
 # The second call runs in the background; the first one is released only once it says it waits.
 ( validate env AI_METHOD_SLOTS_VALIDATE=2 "$V" --tests >"$TMP/second.out" 2>&1; echo $? >"$TMP/second.rc" ) &
-i=0; while ! grep -q "already running" "$TMP/second.out" 2>/dev/null && [ "$i" -lt 600 ]; do sleep 0.1; i=$((i + 1)); done
+i=0; while ! grep -q "already running" "$TMP/second.out" 2>/dev/null && [ "$i" -lt 3000 ]; do sleep 0.1; i=$((i + 1)); done
 : >"$TMP/hold"
 wait
 assert_eq "0" "$(cat "$TMP/second.rc")" "a second validate.sh in the same worktree waits and returns the result"

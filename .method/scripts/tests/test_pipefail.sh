@@ -55,5 +55,5 @@ yml="$REPO/.github/workflows/ci.yml"
 hits="$(grep -nE '[^[:space:]] \| grep -[a-zA-Z]*q' "$yml" || true)"
 [ -z "$hits" ] || offenders="$offenders$yml:"$'\n'"$hits"$'\n'
 
-assert_eq "" "$offenders" "no | grep -q under pipefail in production scripts"
+assert_eq "" "$offenders" "no grep -q at the end of a pipe under pipefail in production scripts"
 finish
