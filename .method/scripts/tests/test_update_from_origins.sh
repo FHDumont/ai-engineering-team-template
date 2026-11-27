@@ -41,6 +41,7 @@ while read -r short _; do
     tail -15 "$TMP/update-$short.out"; bad "$short: the command of the notice updates the adopter"; continue
   fi
   assert_eq "yes" "$([ -x "$adopter/.method/scripts/validate.sh" ] && echo yes || echo no)" "$short: the adopter has .method/scripts/validate.sh"
+  git -C "$adopter" add -A
   assert_eq "scripts/app-task.sh" "$(git -C "$adopter" ls-files scripts)" "$short: only the application script stays in scripts/"
 
   # The adapted files the notice lists are merged by hand; this adopter changed none, so the merge is the tip's file.
@@ -54,7 +55,7 @@ while read -r short _; do
   grep -vF 'o job `tests` roda em todo PR' "$adopter/docs/STATE.md" >"$adopter/docs/STATE.md.new" || true
   mv "$adopter/docs/STATE.md.new" "$adopter/docs/STATE.md"
   (cd "$adopter" && bash .method/scripts/setup-repo.sh --record-origin "$tip") >"$TMP/rec-$short.out" 2>&1 || { tail -5 "$TMP/rec-$short.out"; bad "$short: --record-origin"; }
-  printf 'pr\n' >"$adopter/.github/ci-mode"
+  printf 'push\n' >"$adopter/.github/ci-mode"
   git -C "$adopter" add -A
   git -C "$adopter" commit --quiet -m "chore: update the method" || true
   if (cd "$adopter" && env -u PROCESS_VALIDATE_RUNNING AI_METHOD_TEST_JOBS="${AI_METHOD_TEST_JOBS:-4}" .method/scripts/validate.sh --full) >"$TMP/validate-$short.out" 2>&1; then ok; else
