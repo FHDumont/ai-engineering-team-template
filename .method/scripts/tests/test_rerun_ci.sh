@@ -65,4 +65,13 @@ export FAKE_JOBS='{"jobs":[{"name":"CI","conclusion":"cancelled"}]}'
 assert_status 0 "reruns a run whose job CI was cancelled" "$R" 11
 assert_contains "$(gh_calls)" "run rerun 11 --failed" "asks gh to rerun the cancelled job"
 
+# A request GitHub refuses with a 5xx is not a rerun: it is not counted and the error shows (issue #302).
+export FAKE_JOBS='{"jobs":[{"name":"CI","conclusion":"failure"}]}'
+: >"$FAKE_GH_LOG"
+assert_status 1 "a refused rerun request fails" env FAKE_GH_FAIL='run rerun 12' FAKE_GH_FAIL_MSG='HTTP 500: Server Error' RERUN_CI_LIMIT=1 "$R" 12
+assert_contains "$(last_output)" "HTTP 500" "shows the error of the refused request"
+assert_not_contains "$(last_output)" "reran the failed jobs" "does not report a rerun"
+assert_status 0 "the refused request did not use the limit" env RERUN_CI_LIMIT=1 "$R" 12
+assert_contains "$(last_output)" "attempt 1 of 1" "the first accepted rerun is attempt 1"
+
 finish
