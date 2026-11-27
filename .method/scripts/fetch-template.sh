@@ -35,6 +35,15 @@ dir="$root/.process/template"
 mkdir -p "$dir"
 [ -d "$dir/.git" ] || git -C "$dir" init --quiet
 fetch_rev() { git -C "$dir" fetch --quiet --no-tags "$url" "$1" 2>/dev/null; }
+# A short sha is not fetchable: resolve it against the branches of the template first.
+case "$sha" in
+  *[!0-9a-f]*|"") ;;
+  *) if [ "${#sha}" -lt 40 ]; then
+       git -C "$dir" fetch --quiet --no-tags "$url" '+refs/heads/*:refs/remotes/template/*' 2>/dev/null || true
+       full="$(git -C "$dir" rev-parse --verify --quiet "$sha^{commit}")" || die "cannot resolve $sha at $url" 1
+       sha="$full"
+     fi ;;
+esac
 fetch_rev "$sha" || die "cannot fetch $sha from $url" 1
 dest="$(git -C "$dir" rev-parse --verify --quiet "FETCH_HEAD^{commit}")" || die "no commit $sha at $url" 1
 git -C "$dir" update-ref refs/heads/destination "$dest"
@@ -52,7 +61,8 @@ info "template $dest extracted in .process/template"
 origin_ref=""
 git -C "$dir" rev-parse --verify --quiet refs/heads/origin >/dev/null && origin_ref=refs/heads/origin
 md="$dir/.method/scripts/method-diff.sh"
-[ -f "$md" ] || die "$dest has no .method/scripts/method-diff.sh" 1
+[ -f "$md" ] || md="$dir/scripts/method-diff.sh"
+[ -f "$md" ] || die "$dest has no .method/scripts/method-diff.sh nor scripts/method-diff.sh" 1
 # The method-diff.sh and the lib of the destination decide, not the ones of this repository (which may be old).
 run_diff() { (cd "$root" && REPO_ROOT="$root" bash "$md" --template "$dir" --to "$dest" "$@"); }
 diff_args=()
