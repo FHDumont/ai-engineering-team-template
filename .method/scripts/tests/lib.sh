@@ -39,6 +39,8 @@ trap 'exit 143' TERM
 export PROCESS_EVENTS_FILE="$TMP/events.jsonl"
 # No test depends on the bots of this repository: every one reads the fixture.
 export BOTS_FILE="$TESTS_DIR/fixtures/bots.tsv"
+# No test reads or writes the real DUMONTECH_HOME of the machine (#323).
+export DUMONTECH_HOME="$TMP/dumontech-home"
 
 # Paths the suite may scan (#99). Project code outside this list is invisible to it.
 # .method/scripts/tests/template holds checks that exist only in this template and is excluded.

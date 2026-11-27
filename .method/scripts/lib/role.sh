@@ -31,8 +31,8 @@ role_read_token() { # role_read_token <role>
   var="$(role_token_var "$1")" || return $?
   val="${!var-}"
   if [ -z "$val" ]; then
-    f="$(secret_env_file)"
-    if [ -f "$f" ]; then
+    f="$(secret_file_for_var "$var")"
+    if [ -n "$f" ] && [ -f "$f" ]; then
       mode="$(stat -c %a "$f" 2>/dev/null || stat -f %Lp "$f" 2>/dev/null || true)"
       if [ "$mode" = 600 ]; then
         while IFS= read -r line || [ -n "$line" ]; do
