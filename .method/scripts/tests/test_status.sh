@@ -19,6 +19,15 @@ echo edit >>"$repo/README.md"
 out="$(cd "$repo" && "$SCRIPTS/status.sh" --state trabalhando --offline --next "nada")"
 assert_contains "$out" "não se trabalha na main" "warns on main with a pending code edit"
 git -C "$repo" checkout --quiet -- README.md
+
+# Finder droppings are not a code edit (#324), even when .gitignore does not cover them.
+mkdir -p "$repo/docs"; : >"$repo/docs/.DS_Store"; : >"$repo/.DS_Store"
+out="$(cd "$repo" && "$SCRIPTS/status.sh" --state trabalhando --offline --next "nada")"
+assert_not_contains "$out" "não se trabalha na main" "an untracked .DS_Store is not a pending code edit"
+echo code >"$repo/newfile.sh"
+out="$(cd "$repo" && "$SCRIPTS/status.sh" --state trabalhando --offline --next "nada")"
+assert_contains "$out" "não se trabalha na main" "an untracked code file next to .DS_Store still warns"
+rm -f "$repo/newfile.sh" "$repo/.DS_Store"
 rm -rf "$repo/docs" "$repo/.process"
 
 git -C "$repo" switch --quiet -c feat/issue-4-x
