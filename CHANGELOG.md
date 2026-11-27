@@ -4,6 +4,7 @@
 
 ## Funcionalidades
 
+- docs: document shared keys in shared/ and that the method does not touch app startup ([#338](https://github.com/FHDumont/ai-engineering-team-template/pull/338)) · 2026-11-27
 - feat: warn about old .env folders with the command to migrate or remove them ([#333](https://github.com/FHDumont/ai-engineering-team-template/pull/333)) · 2026-11-27
 - feat(secret): honor DUMONTECH_HOME for the repo .env and shared bots.env ([#331](https://github.com/FHDumont/ai-engineering-team-template/pull/331)) · 2026-11-27
 - fix(close-phase): keep the PR body under the limit and let the spec ok cover the merge ([#314](https://github.com/FHDumont/ai-engineering-team-template/pull/314)) · 2026-11-26
@@ -69,6 +70,7 @@
 
 ## Outros
 
+- fix: ignore .worktrees/ in the pending main edit warning and ensure the gitignore lines ([#336](https://github.com/FHDumont/ai-engineering-team-template/pull/336)) · 2026-11-27
 - fix(status): ignore .DS_Store when checking for pending edits on main ([#327](https://github.com/FHDumont/ai-engineering-team-template/pull/327)) · 2026-11-27
 - test: make the method tests load-proof and lint the load patterns ([#319](https://github.com/FHDumont/ai-engineering-team-template/pull/319)) · 2026-11-27
 - feat: versioned method releases by tag ([#318](https://github.com/FHDumont/ai-engineering-team-template/pull/318)) · 2026-11-27
