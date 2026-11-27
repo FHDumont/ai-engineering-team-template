@@ -16,6 +16,8 @@ db/migrations/**
 **/secrets/**
 **/credentials/**
 infra/production/**
+**/compose*.yml
+**/Dockerfile
 # class: gate
 # Dependencies and lockfiles
 package-lock.json
