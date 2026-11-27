@@ -33,6 +33,7 @@ jobs:
     permissions:
       contents: read
       checks: read
+      pull-requests: read
     steps:
       - name: "Checkout"
         uses: actions/checkout@v4
