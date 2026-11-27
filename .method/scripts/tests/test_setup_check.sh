@@ -68,4 +68,28 @@ fake_setup unprotected
 assert_status 0 "check passes in the unprotected mode" "$SETUP" --check
 assert_contains "$(last_output)" "is configured for the method" "unprotected: configured"
 assert_contains "$(last_output)" "mode: unprotected" "unprotected: says the mode"
+
+# #335: .gitignore must have .worktrees/ and .process/; --check names the missing line, the setup appends only those.
+fake_setup ok
+gic="$(make_repo)"
+copy_scripts "$gic"
+mkdir -p "$gic/.github"
+cp "$REPO"/.github/labels.tsv "$REPO"/.github/bots.tsv "$gic/.github/"
+: >"$gic/.github/ci-mode"
+gi="$gic/.gitignore"; GSETUP="$gic/.method/scripts/setup-repo.sh"
+printf '.process/\n' >"$gi"
+assert_status 7 "check exits 7 when .gitignore lacks .worktrees/" "$GSETUP" --check
+assert_contains "$(last_output)" "missing: .gitignore line .worktrees/" "check names .worktrees/"
+assert_not_contains "$(last_output)" ".gitignore line .process/" "check does not name the line that is there"
+printf '.worktrees/\n' >"$gi"
+assert_status 7 "check exits 7 when .gitignore lacks .process/" "$GSETUP" --check
+assert_contains "$(last_output)" "missing: .gitignore line .process/" "check names .process/"
+printf 'keep-me' >"$gi"
+assert_status 0 "setup appends the missing lines" "$GSETUP" --only gitignore
+assert_eq "keep-me
+.worktrees/
+.process/" "$(cat "$gi")" "only the missing lines are appended at the end, nothing removed"
+cp "$gi" "$TMP/gi.after"
+assert_status 0 "setup on a complete .gitignore" "$GSETUP" --only gitignore
+assert_eq "$(cat "$TMP/gi.after")" "$(cat "$gi")" "a .gitignore that has both lines does not change"
 finish

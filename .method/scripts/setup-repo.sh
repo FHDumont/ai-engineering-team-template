@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 #: setup-repo.sh: apply the method's standard to the GitHub repository (idempotent).
 #:
-#: Usage: setup-repo.sh [--dry-run | --check] [--owner-ok] [--only labels|settings|protection]
+#: Usage: setup-repo.sh [--dry-run | --check] [--owner-ok] [--only labels|settings|protection|gitignore]
 #:        setup-repo.sh --record-origin <sha>
 #:
 #: 1. Labels: syncs with .github/labels.tsv (creates, updates color and
@@ -42,6 +42,7 @@
 #:               PROCESS_OFFER_PROJECT / PROCESS_OFFER_RUNNER / PROCESS_OFFER_RUNNER_TRIGGER.
 #:    A runner declined at setup only returns through the triage trigger
 #:    (triage.sh --runner-offer).
+#: 4. .gitignore: appends only the missing `.worktrees/` and `.process/` lines at the end (--check names them).
 #: --check is the single conference of the mandatory setup (phase-start.sh,
 #: open-issue.sh and the session hook call it): it only reads, each thing once
 #: (labels, repository, protection, variables), and exits 0 when all three match and no offer
@@ -434,9 +435,25 @@ sync_protection() {
 }
 
 case "$only" in
-  ""|labels|settings|protection) ;;
-  *) die "--only must be labels, settings or protection" 2 ;;
+  ""|labels|settings|protection|gitignore) ;;
+  *) die "--only must be labels, settings, protection or gitignore" 2 ;;
 esac
+
+# .gitignore must ignore the method's own folders (#335): appends only the missing lines, at the end.
+append_gitignore_line() { # append_gitignore_line <line>
+  local f="$ROOT/.gitignore"
+  if [ -s "$f" ] && [ -n "$(tail -c1 "$f")" ]; then echo >>"$f"; fi
+  echo "$1" >>"$f"
+}
+sync_gitignore() {
+  local line
+  for line in .worktrees/ .process/; do
+    if ! grep -qxF "$line" "$ROOT/.gitignore" 2>/dev/null; then
+      [ "$mode" != check ] || echo "missing: .gitignore line $line" >&2
+      apply "add $line to .gitignore" append_gitignore_line "$line"
+    fi
+  done
+}
 
 # --check: the same reads as --dry-run and --offers, in one run; says only what is missing.
 if [ "$mode" = check ]; then
@@ -448,6 +465,7 @@ if [ "$mode" = check ]; then
   case "$only" in ""|labels) check_part "labels of the method" sync_labels ;; esac
   case "$only" in ""|settings) check_part "repository settings" sync_settings ;; esac
   case "$only" in ""|protection) check_part "protection of $branch" sync_protection ;; esac
+  case "$only" in ""|gitignore) check_part ".gitignore of the method" sync_gitignore ;; esac
   if [ -z "$only" ]; then
     # Same decision as phase-start.sh: a private repository with no recorded CI mode is refused.
     main_root="$(git -C "$ROOT" worktree list --porcelain | sed -n '1s/^worktree //p')"
@@ -481,6 +499,9 @@ case "$only" in
 esac
 case "$only" in
   ""|protection) sync_protection ;;
+esac
+case "$only" in
+  ""|gitignore) sync_gitignore ;;
 esac
 
 if [ "$need_owner_pending" -gt 0 ] && [ "$dry" = 0 ]; then
