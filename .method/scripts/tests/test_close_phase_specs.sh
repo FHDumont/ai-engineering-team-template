@@ -106,6 +106,9 @@ mkdir -p "$repo/docs/specs"
 printf '# Spec\n\n## Fase #1 — x\n\nÁrea sensível: `scripts/gate.sh` (classe `owner-ok`).\n\n## Fase #9 — y\n\nÁrea sensível: `outro.sh`.\n' >"$repo/docs/specs/2026-01-20-ok.md"
 git -C "$repo" add docs
 git -C "$repo" commit --quiet -m "docs: spec ok"
+# The approved text is the one on origin/main.
+git -C "$repo" push --quiet origin HEAD:main
+git -C "$repo" fetch --quiet origin
 cat >"$TMP/handler.sh" <<'H'
 case "$*" in
   "pr list"*"--state open"*) echo 12 ;;
@@ -121,6 +124,15 @@ export PROCESS_EVENTS_FILE="$TMP/spec-ok-events.jsonl"
 assert_status 0 "prepare of an approved issue whose spec declares the area" sh -c "cd '$repo' && .method/scripts/close-phase.sh --prepare --title 'chore: x' --body-file '$TMP/body.md'"
 assert_eq "owner-ok,scripts/gate.sh" "$(jq -r 'select(.event == "spec_ok") | .declared' "$PROCESS_EVENTS_FILE" | tail -1)" "records spec_ok with the declared words of the phase section only"
 assert_eq "$(git -C "$repo" rev-parse HEAD)" "$(jq -r 'select(.event == "spec_ok") | .sha' "$PROCESS_EVENTS_FILE" | tail -1)" "spec_ok is bound to the pushed HEAD"
+# A spec only on the branch (never approved on main) declares nothing.
+git -C "$repo" switch --quiet -c chore/issue-1-specok2 origin/main
+printf '# Spec\n\n## Fase #1 — x\n\nArea: x\n' >"$repo/docs/specs/2026-01-21-ok2.md"
+sed -i.bak 's/^Área sensível:.*/Área sensível: `tudo.sh`./' "$repo/docs/specs/2026-01-20-ok.md"; rm -f "$repo/docs/specs/2026-01-20-ok.md.bak"
+git -C "$repo" add docs
+git -C "$repo" commit --quiet -m "docs: edited declaration"
+: >"$PROCESS_EVENTS_FILE"
+assert_status 0 "prepare after the branch edited the declaration" sh -c "cd '$repo' && .method/scripts/close-phase.sh --prepare --title 'chore: x' --body-file '$TMP/body.md'"
+assert_not_contains "$(cat "$PROCESS_EVENTS_FILE")" "tudo.sh" "an edit of the declaration on the branch is not recorded"
 unset PROCESS_EVENTS_FILE
 
 git -C "$repo" switch --quiet main
