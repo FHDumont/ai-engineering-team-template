@@ -19,7 +19,7 @@
 #: Without --issue, the number comes from the branch name (...issue-12...). The
 #: end mode (end:lab-test / end:auto-close) is read from the issue and used as the
 #: next step when none is given. On main it warns only when code edits are
-#: pending (outside docs/specs/ and .process/): planning and post-close do not warn.
+#: pending (outside docs/specs/, .process/ and .worktrees/): planning and post-close do not warn.
 #: --offline does not call GitHub.
 #: When a long script of the phase is running (.method/scripts/progress.sh), the current step
 #: goes at the end of the state ("trabalhando — validate.sh: tests 23/49 ..., 3m10s")
@@ -178,7 +178,7 @@ fi
 # A single write: `| head -1` does not kill the script with SIGPIPE.
 warn=""
 if is_main_branch "$branch" &&
-   git status --porcelain --untracked-files=all 2>/dev/null | cut -c4- | stdin_grep -qvE '^(docs/specs/|\.process/)|(^|/)\.DS_Store$'; then
+   git status --porcelain --untracked-files=all 2>/dev/null | cut -c4- | stdin_grep -qvE '^(docs/specs/|\.process/|\.worktrees/)|(^|/)\.DS_Store$'; then
   warn=$'\n\nAviso: há edição de código pendente na main; não se trabalha na main (use phase-start.sh).'
 fi
 [ -z "$phases" ] || phases="Fases abertas:"$'\n'"$phases"$'\n'
