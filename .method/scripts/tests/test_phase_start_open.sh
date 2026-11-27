@@ -51,68 +51,23 @@ assert_contains "$out" "initiation: user_asked" "prints the initiation of start_
 assert_contains "$out" "context: fresh" "prints the context of start_session"
 assert_contains "$out" "title: Fase #7" "prints the title of start_session"
 assert_contains "$out" "background:" "prints the background of start_session"
-assert_contains "$out" "initiation: own_initiative" "says what to do when start_session is refused"
+assert_contains "$out" "initiation: own_initiative" "a refusal is the last resort: a card"
 assert_contains "$out" "Do not run .method/scripts/start-headless.sh: headless is off by default" "a refusal is a card, not headless"
-assert_contains "$out" "no --allowedTools Bash beyond the app child" "headless gets no extra Bash allow"
-assert_contains "$out" "get_session for the model and effort of each one" "says to read the pair of each child back"
-assert_contains "$out" 'quote per phase the pair read back ("Fase #n: modelo/esforço")' "says to quote the pair per phase to the owner"
+assert_not_contains "$out" "eartbeat" "no heartbeat anywhere in the steps"
+assert_not_contains "$out" "CronCreate" "no recurring task is created"
+assert_not_contains "$out" "cron " "no cron in the steps"
+assert_contains "$out" "the end of the turn of a child wakes the manager" "the manager wakes by the end of the turn of a child"
 assert_contains "$out" "model: sonnet" "prints the model of the spec"
 assert_contains "$out" "effort: low" "prints the effort of the spec"
 assert_contains "$out" "issue #7" "the prompt names the issue"
 assert_contains "$out" "$wt" "the prompt names the worktree"
-# The manager steps come with the arguments: every session in this turn, the
-# heartbeat that wakes the manager when the end notice of a child never arrives,
-# and its removal in the single end step.
+# The manager steps come with the arguments: every session in this turn, no heartbeat.
 assert_eq 1 "$(grep -c "Open every session above in this same turn" <<<"$out")" "says once to open every session in this turn"
-assert_contains "$out" "create the manager heartbeat" "says to create the manager heartbeat"
-assert_contains "$out" "At least one child is running (app or headless): create the manager heartbeat" "creates the heartbeat only with a child running"
-assert_contains "$out" "create no heartbeat; the manager resumes when the owner writes here" "no heartbeat while every child is a card"
-# Order: the sessions open first, the heartbeat only after list_sessions shows a
-# child running, the stop (card) after it, the removal last.
-# A missing step counts as line 0, so the comparison fails instead of breaking.
-step_line() { local l; l="$(grep -n -F -- "$1" <<<"$out" | head -1 | cut -d: -f1)"; echo "${l:-0}"; }
-hb_line="$(step_line "create the manager heartbeat")"
-open_line="$(step_line "Open every session above in this same turn")"
-stop_line="$(step_line ".method/scripts/status.sh --state esperando --need")"
-del_line="$(step_line "Delete the heartbeat, if it was created, in the single end step")"
-assert_eq 1 "$((open_line < hb_line))" "the heartbeat step comes after the sessions step"
-assert_eq 1 "$((hb_line < stop_line))" "the stop comes after the heartbeat step"
-assert_eq 1 "$((stop_line < del_line))" "the removal of the heartbeat comes last"
-assert_eq 1 "$(grep -c -F -- "--state esperando" <<<"$out")" "one stop command, after the sessions"
-# The stop sentence is ready for --need: which card, in which session, and where the
-# owner finds that session in the sidebar.
+assert_eq 1 "$(grep -c -F -- "--state esperando" <<<"$out")" "one stop command, only for a card"
+# The stop sentence works over Remote Control too: the owner writes "abrir a #n" in a new message.
 need="$(grep -F -- ".method/scripts/status.sh --state esperando --need" <<<"$out" || true)"
-assert_contains "$need" 'clique no cartão "Fase #7" na sessão "TITULO"' "the stop sentence names the card and the session"
-assert_contains "$need" "na barra lateral, dentro do agrupamento da sessão principal; se não aparecer, abra o agrupamento" "the stop sentence says where the session is"
-# The title is read back, never guessed: a session opened by another one does
-# not know its own title; without a way to read it, the sentence names no title.
-assert_contains "$out" "Replace TITULO with the title of this session read back from the app" "says to read the title of the session back"
-assert_contains "$out" "never a guessed one" "says the title is never guessed"
-assert_contains "$out" 'No way to read it: replace na sessão "TITULO" with na sessão que abriu a fase' "says what to write when the title cannot be read"
-assert_contains "$out" "A child session not started yet (its card was not clicked): nothing to do for it" "the heartbeat covers the card not clicked yet"
-assert_contains "$out" "Write to the owner only when something changed since the last heartbeat" "the heartbeat writes only on change"
-assert_contains "$out" 'The same state as the last heartbeat (same phases, same states, same "Você precisa"): end the turn with no message to the owner and without the .method/scripts/status.sh block' "the heartbeat is silent when the state is the same"
-assert_contains "$out" "The only accepted reply when nothing changed is an empty turn" "the heartbeat names the minimum reply when nothing changed"
-assert_contains "$out" 'not even "Sem mudança."' "the heartbeat refuses a sentence that only says nothing changed"
-assert_contains "$out" "When every open phase is only waiting for the owner, delete this heartbeat" "the heartbeat is deleted while every phase waits for the owner"
-assert_contains "$out" "When a phase is working again, create this same heartbeat if it is gone" "the heartbeat comes back when a phase works again"
-assert_contains "$out" "every 4 minutes" "gives the interval of the heartbeat"
-assert_contains "$out" 'cron "*/4 * * * *"' "gives the cron of the heartbeat"
-# An end-step action denied by the app: the heartbeat text sends it to a choice
-# card and the session runs the action itself; the owner never runs a script.
-hb_text="$(grep -F -- "Manager heartbeat of phase #7:" <<<"$out" || true)"
-assert_contains "$hb_text" "denied by the app (.method/scripts/deploy.sh, archiving a session)" "the heartbeat covers an end-step action denied by the app"
-assert_contains "$hb_text" 'choice card (AskUserQuestion) that starts with "Fase #n — título"' "the heartbeat sends a denied action to a choice card"
-assert_contains "$hb_text" '"Autorizar o deploy"' "the heartbeat names the option that authorizes"
-assert_contains "$hb_text" "run the action again yourself" "the heartbeat makes the session run the action after the ok"
-assert_contains "$hb_text" "never ask the owner to run a script or to archive in the sidebar" "the heartbeat never sends the owner to run a script"
-assert_contains "$out" "CronCreate" "names the Claude Code tool of the heartbeat"
-assert_contains "$out" "Você precisa" "says what to do when the tool does not exist"
-assert_contains "$out" "Manager heartbeat of phase #7:" "prints the heartbeat text with the phase"
-assert_contains "$out" "linked sessions" "the heartbeat reads the linked sessions"
-assert_contains "$out" "pull request of each open phase" "the heartbeat reads the PRs of the open phases"
-assert_contains "$out" "do the next step" "the heartbeat does the next step"
-assert_contains "$out" "Delete the heartbeat, if it was created, in the single end step" "says to delete the heartbeat at the end"
+assert_contains "$need" 'escreva "abrir a #7" numa mensagem nova' "the stop sentence asks for a new message, which works over Remote Control"
+assert_not_contains "$need" "clique" "the stop sentence never sends the owner to click a card"
 assert_status 0 "check-env accepts the phase branch with its spec" sh -c "cd '$wt' && .method/scripts/check-env.sh"
 # phase_session is the mark of the session that works on the phase, never of the one that opened it.
 assert_status 0 "check-env runs for the opening session" env CLAUDE_CODE_SESSION_ID=manager sh -c "cd '$wt' && .method/scripts/check-env.sh"
@@ -123,4 +78,14 @@ echo '{"type":"assistant","message":{"model":"claude-sonnet-1"}}' >"$TMP/claude/
 assert_status 0 "check-env runs for the child session" env CLAUDE_CODE_SESSION_ID=child CLAUDE_EFFORT=low CLAUDE_CONFIG_DIR="$TMP/claude" sh -c "cd '$wt' && .method/scripts/check-env.sh"
 assert_eq "7" "$(events | jq -r 'select(.event == "phase_session" and .session_id == "child") | .issue')" "records phase_session for the child session"
 
+
+# A phase of a later wave opens in the same turn and waits for the merge of the previous wave.
+spec eight.md 8
+assert_status 0 "phase-start opens a later-wave phase with --after" env CLAUDE_CODE_SESSION_ID=manager sh -c "cd '$repo' && .method/scripts/phase-start.sh 8 --no-check --after 7"
+out="$(last_output)"
+assert_contains "$out" "wave wait: #7" "names the phase of the previous wave"
+assert_contains "$out" "origin/main" "reads the merge on origin/main"
+assert_contains "$out" "git rebase origin/main" "tells the child to update the branch on main before the first step"
+assert_contains "$out" "background task of your own, no scheduled job" "the wait is a background task of the child"
+assert_not_contains "$out" "eartbeat" "no heartbeat in a later wave either"
 finish
