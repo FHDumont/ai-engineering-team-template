@@ -72,6 +72,37 @@ assert_contains "$(gh_calls)" "--add-label needs-owner-ok" "puts needs-owner-ok"
 handler "type:feature,needs-owner-ok" success
 assert_status 0 "an owner-ok path merges with the owner's ok" sh -c "cd '$repo' && '$CLOSE' --merge --owner-ok '$SHA'"
 
+# The ok of the approved spec (spec_ok in the trace, bound to this SHA) is the owner's ok
+# for the paths and areas it declares, and only for those.
+spec_ok_ev() { # spec_ok_ev <declared> [sha]
+  jq -cn --arg d "$1" --arg s "${2:-$SHA}" '{event: "spec_ok", branch: "feat/issue-5-x", issue: "5", sha: $s, declared: $d}' >>"$TRACE"
+}
+set_list "# class: owner-ok" "feature.txt"
+reset_phase_evidence; export PROCESS_EVENTS_FILE="$TRACE"; child_session 5
+spec_ok_ev "feature.txt,owner-ok"
+handler "type:feature,needs-owner-ok" success
+assert_status 0 "the spec ok covers a declared owner-ok path" sh -c "cd '$repo' && '$CLOSE' --merge"
+assert_contains "$(gh_calls)" "<!-- spec-ok sha:$SHA -->" "records the spec ok on the PR"
+assert_not_contains "$(gh_calls)" "<!-- owner-ok" "no owner-ok marker"
+assert_contains "$(gh_calls)" "pr merge 12" "merges"
+
+reset_phase_evidence; export PROCESS_EVENTS_FILE="$TRACE"; child_session 5
+spec_ok_ev "other.txt"
+handler "type:feature,needs-owner-ok" success
+assert_status 5 "a path the spec did not declare still asks the owner" sh -c "cd '$repo' && '$CLOSE' --merge"
+assert_not_contains "$(gh_calls)" "pr merge" "no merge for an undeclared path"
+assert_contains "$(last_output)" "ask the repo owner" "the board stays"
+
+reset_phase_evidence; export PROCESS_EVENTS_FILE="$TRACE"; child_session 5
+spec_ok_ev "feature.txt" "0000000000000000000000000000000000000000"
+handler "type:feature,needs-owner-ok" success
+assert_status 5 "a spec ok of another SHA does not count" sh -c "cd '$repo' && '$CLOSE' --merge"
+
+reset_phase_evidence; export PROCESS_EVENTS_FILE="$TRACE"; child_session 5
+spec_ok_ev "feature.txt"
+handler "type:feature,needs-owner-ok,area:auth" success
+assert_status 5 "an area label the spec did not declare still asks the owner" sh -c "cd '$repo' && '$CLOSE' --merge"
+
 # An adopter's old file has one class: every path asks for the owner.
 set_list "feature.txt"
 reset_phase_evidence; export PROCESS_EVENTS_FILE="$TRACE"; child_session 5

@@ -378,6 +378,12 @@ prepare() {
     labels="$(gh issue view "$issue" --repo "$repo" --json labels --jq '.labels[].name' | grep -vxE 'approved|needs-context' || true)"
   fi
 
+  # The spec's ok: the phase issue is approved and its spec declares the sensitive area.
+  local spec_declared=""
+  if [ -n "$issue" ] && echo "$(gh issue view "$issue" --repo "$repo" --json labels --jq '.labels[].name' 2>/dev/null || true)" | stdin_grep -qxF approved; then
+    spec_declared="$(spec_declared_areas "$issue")"
+  fi
+
   # Spec with no other open issue: leaves in a phase commit and its text goes into the body.
   remove_done_specs "$closing"
   inherit_validation
@@ -404,6 +410,10 @@ prepare() {
     git push --quiet -u origin "$branch"
     trace_event phase_push sha="$(git rev-parse HEAD)"
     echo "pushed $branch (one push for this round)"
+  fi
+  if [ -n "$spec_declared" ]; then
+    trace_event spec_ok issue="$issue" sha="$(git rev-parse HEAD)" declared="$spec_declared"
+    echo "spec ok recorded for $(git rev-parse --short HEAD): declared $spec_declared"
   fi
 
   progress_step "opening or updating the PR"
@@ -880,6 +890,45 @@ gate_review_required() { # gate_review_required <pr> <sha> <labels> <gate paths>
   exit 5
 }
 
+# The sensitive area the spec of the phase declares: the backticked words of the line
+# "Área sensível:" in its "## Fase #<n>" section, comma-separated (empty: none declared).
+spec_declared_areas() { # spec_declared_areas <issue>
+  local f
+  for f in $(specs_citing "$1" "$ROOT"); do
+    [ -n "$(git ls-files -- "$f")" ] || continue
+    awk -v h="## Fase #$1 " 'index($0, h) == 1 {on=1; next} /^## / {on=0} on && /^Área sensível:/ {print}' "$ROOT/$f" |
+      grep -o '`[^`]*`' | tr -d '`' || true
+  done | sort -u | paste -sd, -
+}
+# 0 when every reason to ask the owner is declared by the spec recorded (spec_ok) for this
+# SHA: each touched owner-ok path and each sensitive area label must be one of the declared
+# words. A path or area the spec did not declare is not covered.
+spec_ok_covers() { # spec_ok_covers <PR head SHA> <labels> <touched paths>
+  local events declared a p w hit
+  events="$(phase_trace_file "$ROOT" 2>/dev/null || true)"
+  [ -n "$events" ] && [ -f "$events" ] || return 1
+  declared="$(jq -rs --arg sha "$1" --arg b "$branch" \
+    '[.[] | select(type == "object" and .event == "spec_ok" and .sha == $sha and .branch == $b)] | last | .declared // empty' \
+    "$events" 2>/dev/null || true)"
+  [ -n "$declared" ] || return 1
+  for a in $SENSITIVE_AREAS; do
+    if echo "$2" | stdin_grep -qxF "$a"; then
+      printf ',%s,' "$declared" | grep -qF ",$a," || return 1
+    fi
+  done
+  while IFS= read -r p; do
+    [ -n "$p" ] || continue
+    hit=0
+    for w in $(printf '%s' "$declared" | tr ',' ' '); do
+      case "$p" in "$w"|*/"$w") hit=1 ;; esac
+    done
+    [ "$hit" = 1 ] || return 1
+  done <<EOF
+$3
+EOF
+  return 0
+}
+
 merge() {
   local n info labels sha state
   n="$(pr_number)"; [ -n "$n" ] || die "no open PR for $branch"
@@ -912,6 +961,14 @@ merge() {
   touched_gate="$(SENSITIVE_CLASS=gate python3 "$HERE/lib/sensitive_paths.py" "$globs" <"$diffed" || true)"
   rm -f "$globs" "$diffed"
   [ -z "$touched" ] || reasons="$reasons sensitive-paths($(echo "$touched" | paste -sd, -))"
+  # The ok of the approved spec that declares these areas counts as the owner's ok for
+  # this HEAD, with no choice question. Anything the spec did not declare still asks.
+  if [ -n "$reasons" ] && spec_ok_covers "$sha" "$labels" "$touched"; then
+    echo "owner's ok given by the approved spec (declared areas cover:$reasons)"
+    gh_role pr comment "$n" --repo "$repo" --body "<!-- spec-ok sha:$sha -->
+Ok do dono dado pela spec aprovada, que declara a área sensível, para:$reasons." >/dev/null
+    reasons=""
+  fi
   if [ -n "$reasons" ]; then
     # --owner-ok only counts with needs-owner-ok already on the PR: the label is the
     # public record that the PR waited for the owner. A PR without it gets the label
