@@ -22,7 +22,13 @@ mkdir -p .process/template && git -C .process/template init --quiet
 git -C .process/template fetch --quiet --no-tags https://github.com/FHDumont/ai-engineering-team-template <destino-completo>
 git -C .process/template checkout --quiet --force --detach FETCH_HEAD
 bash .process/template/.method/scripts/fetch-template.sh <destino-completo> --apply
+if [ -L scripts ]; then git rm -q scripts; fi
+for f in scripts/*; do
+  if [ -e ".method/scripts/${f#scripts/}" ]; then git rm -rqf --ignore-unmatch "$f"; rm -rf "$f"; fi
+done
 ```
+
+O laço final tira de `scripts/` só a cópia antiga de arquivo do método (nome que existe em `.method/scripts/`); o script da aplicação fica.
 
 ## Pronto quando
 
