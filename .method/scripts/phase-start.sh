@@ -303,7 +303,7 @@ for n in "${issues[@]}"; do
   if [ -n "$after" ]; then
     prev="#${after// / #}"
     echo "  wave wait: $prev"
-    echo "  background addition, append it as is (also to the brief file of a headless child): This phase is of a later wave. Do not start the steps yet: wait for the merge of $prev on origin/main. Start a background task of your own, no scheduled job, that ends by itself when it is true (for each previous phase p: gh pr list --state merged --base main --json headRefName --jq '.[].headRefName' | grep -q '^feat/issue-<p>-', checked every 60 seconds, giving up after 6 hours) and wait for its end notice; do not poll it. When it ends: git fetch origin main, then git rebase origin/main inside the worktree, then the first step. If it gave up, say so to the manager with SendMessage and stop with status.sh --state gerenciadora."
+    echo "  background addition, append it as is (also to the brief file of a headless child): This phase is of a later wave. Do not start the steps yet: wait for the merge of $prev on origin/main. Start a background task of your own, no scheduled job, that ends by itself when it is true (true when, for each previous phase p, gh pr list --state merged --base main --json headRefName lists a branch starting with feat/issue-<p>-; check every 60 seconds, give up after 6 hours) and wait for its end notice; do not poll it. When it ends: git fetch origin main, then git rebase origin/main inside the worktree, then the first step. If it gave up, say so to the manager with SendMessage and stop with status.sh --state gerenciadora."
   fi
   i=$((i + 1))
 done
