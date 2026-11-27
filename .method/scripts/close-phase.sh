@@ -408,7 +408,8 @@ prepare() {
 
   progress_step "opening or updating the PR"
   if [ -z "$n" ]; then
-    gh pr create --repo "$repo" --base main --head "$branch" --title "$title" --body-file "$body_file" >/dev/null
+    gh pr create --repo "$repo" --base main --head "$branch" --title "$title" --body-file "$body_file" >/dev/null ||
+      die "gh pr create failed (body $(wc -c <"$body_file") characters; the GitHub limit is 65536): read the gh error above"
     n="$(pr_number)"
     echo "opened PR #$n"
   else
@@ -495,21 +496,29 @@ body_with_spec() { # body_with_spec <body file>
     for f in $(git show --diff-filter=D --name-only --format= "$c" -- 'docs/specs/*.md'); do
       git show "$c^:$f" >"$text"
       [ -z "$issue" ] || spec_cites "$text" "$issue" || continue
-      spec_details "$out" "$f" "$text"
+      spec_details "$out" "$f" "$text" "$c^"
     done
   done
   if [ -n "$issue" ]; then
     for f in $(specs_citing "$issue" "$ROOT"); do
       [ -n "$(git ls-files -- "$f")" ] || continue
-      spec_details "$out" "$f" "$ROOT/$f"
+      spec_details "$out" "$f" "$ROOT/$f" "$(git rev-parse HEAD)"
     done
   fi
   rm -f "$text"
   # No spec of the phase: the original file goes on.
   if cmp -s "$1" "$out"; then rm -f "$out"; echo "$1"; else echo "$out"; fi
 }
-spec_details() { # spec_details <body file> <spec path> <file with the spec text>
+# The body limit of GitHub is 65536 characters; the text of a spec goes in only while
+# the body stays under CLOSE_PHASE_BODY_LIMIT, then the spec is a link to its blob.
+spec_details() { # spec_details <body file> <spec path> <file with the spec text> <commit with the blob>
+  local limit="${CLOSE_PHASE_BODY_LIMIT:-60000}" size
   grep -qF "<summary>Spec ($2)</summary>" "$1" && return 0
+  size="$(( $(wc -c <"$1") + $(wc -c <"$3") ))"
+  if [ "$size" -gt "$limit" ]; then
+    printf '\n<details>\n<summary>Spec (%s)</summary>\n\nText left out (body limit): https://github.com/%s/blob/%s/%s\n\n</details>\n' "$2" "$repo" "$4" "$2" >>"$1"
+    return 0
+  fi
   printf '\n<details>\n<summary>Spec (%s)</summary>\n\n%s\n\n</details>\n' "$2" "$(cat "$3")" >>"$1"
 }
 
