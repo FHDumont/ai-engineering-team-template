@@ -162,4 +162,21 @@ assert_not_contains "$(cat "$TMP/self.out")" "syntax error" "apply over a change
 assert_eq "a2" "$(cat "$r3/.method/scripts/a.sh")" "apply over a changed fetch-template.sh copies the files"
 assert_contains "$(cat "$TMP/self.out")" "applied" "apply over a changed fetch-template.sh reaches the end"
 assert_contains "$(tail -n 5 "$TMP/self.out")" "$d3" "apply over a changed fetch-template.sh still prints the notice"
+
+# #340: --apply resolves a short sha in method-origin, and an origin that does not resolve is an error with the fix command.
+r4="$(make_repo)"
+mkdir -p "$r4/.github" "$r4/.method/scripts"
+echo one >"$r4/.method/scripts/a.sh"
+printf '%s\n' "${origin:0:9}" >"$r4/.github/method-origin"
+(cd "$r4" && bash "$FETCH" "$dest" --url "$template" --apply) >"$TMP/short.out" 2>&1 || bad "apply with a short origin failed: $(cat "$TMP/short.out")"
+assert_eq "two" "$(cat "$r4/.method/scripts/a.sh")" "--apply with a short method-origin copies the outdated file"
+assert_eq "$origin" "$(git -C "$r4/.process/template" rev-parse refs/heads/origin)" "a short method-origin resolves to the full origin commit"
+r5="$(make_repo)"
+mkdir -p "$r5/.github" "$r5/.method/scripts"
+echo one >"$r5/.method/scripts/a.sh"
+printf 'deadbeef\n' >"$r5/.github/method-origin"
+assert_status 1 "--apply with an unresolvable method-origin fails" bash -c "cd '$r5' && '$FETCH' '$dest' --url '$template' --apply"
+out5="$(cd "$r5" && bash "$FETCH" "$dest" --url "$template" --apply 2>&1 || true)"
+assert_contains "$out5" "--record-origin" "the origin error cites the command to fix it"
+assert_eq "one" "$(cat "$r5/.method/scripts/a.sh")" "nothing is copied when the origin does not resolve"
 finish
