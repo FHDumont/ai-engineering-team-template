@@ -3,6 +3,7 @@
 # shellcheck source=.method/scripts/tests/close_phase_common.sh
 source "$(dirname "$0")/close_phase_common.sh"
 
+EXAMPLE_LIST="$SCRIPTS/tests/fixtures/sensitive-paths-example"
 reset_phase_evidence
 child_session 5
 # Conflicting PR: --check calls redo-phase.sh, asks nobody and exits 0 with the new PR.
@@ -126,7 +127,7 @@ commit_push() { # commit_push <subject> <file...>
   git -C "$repo" push --quiet origin feat/issue-5-x
   SHA="$(git -C "$repo" rev-parse HEAD)"
 }
-grep -vxF -e '**/auth/**' -e '.github/sensitive-paths' "$REPO/.github/sensitive-paths" >"$repo/.github/sensitive-paths"
+grep -vxF -e '**/auth/**' -e '.github/sensitive-paths' "$EXAMPLE_LIST" >"$repo/.github/sensitive-paths"
 commit_push "chore: drop entries from the list" .github/sensitive-paths
 handler "type:feature" success
 assert_status 5 "refuses merge of a PR that drops the entry of a path it touches" sh -c "cd '$repo' && '$CLOSE' --merge"
@@ -147,14 +148,14 @@ handler "type:feature" success
 assert_status 1 "refuses merge when the base has no readable list" env FAKE_BASE=nolist sh -c "cd '$repo' && '$CLOSE' --merge --owner-ok '$SHA'"
 assert_contains "$(last_output)" "cannot read .github/sensitive-paths of origin/nolist" "says the base list is unreadable"
 assert_not_contains "$(gh_calls)" "pr merge" "never merges without the base list"
-cp "$REPO/.github/sensitive-paths" "$repo/.github/sensitive-paths"
+cp "$EXAMPLE_LIST" "$repo/.github/sensitive-paths"
 git -C "$repo" rm --quiet newzone/a.txt
 commit_push "chore: restore the list" .github/sensitive-paths
 handler "type:feature" success
 # The repo's own list covers the docs checker the CI reads from the base.
 assert_eq ".method/scripts/check-docs.sh" "$(echo .method/scripts/check-docs.sh | python3 "$SCRIPTS/lib/sensitive_paths.py" "$REPO/.github/sensitive-paths")" "check-docs.sh is a sensitive path"
 for f in app/compose.yml app/compose.prod.yml compose.yml app/Dockerfile Dockerfile; do
-  assert_eq "$f" "$(echo "$f" | SENSITIVE_CLASS=owner-ok python3 "$SCRIPTS/lib/sensitive_paths.py" "$REPO/.github/sensitive-paths")" "$f is owner-ok (issue #303)"
+  assert_eq "$f" "$(echo "$f" | SENSITIVE_CLASS=owner-ok python3 "$SCRIPTS/lib/sensitive_paths.py" "$EXAMPLE_LIST")" "$f is owner-ok (issue #303)"
 done
 
 finish
