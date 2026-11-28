@@ -14,7 +14,7 @@ Repositório criado a partir do template do método (`docs/process-design.md`). 
 - **Runner:** hospedado pelo GitHub (`ubuntu-latest`); a variável `CI_RUNS_ON` não está definida.
 - **Bots (caminho B):** nenhum webhook configurado; `docs/BOTS.md` e `.github/bots.tsv` trazem só exemplos.
 - **Projects:** sem quadro.
-- **Progresso:** scripts longos gravam o andamento em `~/.cache/ai-method/progress/`; `.method/scripts/progress.sh` mostra ao dono.
+- **Progresso:** scripts longos gravam o andamento em `~/.cache/ai-method/progress/`; `.method/scripts/progress.sh` mostra ao dono. Os eventos citam o `log` da saída completa (`~/.cache/ai-method/logs/`, mesma poda de 7 dias) e o `parent_pid`.
 
 ## Pendente
 
