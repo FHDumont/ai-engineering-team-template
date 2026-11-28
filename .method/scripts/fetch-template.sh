@@ -67,7 +67,23 @@ main() {
     origin="$(tr -d '[:space:]' <"$root/.github/method-origin")"
     case "$origin" in
       ""|template) ;;
-      *) if fetch_rev "$origin"; then git -C "$dir" update-ref refs/heads/origin "$(git -C "$dir" rev-parse FETCH_HEAD)"; else info "origin $origin not fetched; method-diff needs --from"; fi ;;
+      *) full=""
+         # A short sha is not fetchable: resolve it against the branches fetched above, like the destination.
+         case "$origin" in
+           *[!0-9a-f]*) ;;
+           *) if [ "${#origin}" -lt 40 ]; then
+                git -C "$dir" fetch --quiet --no-tags "$url" '+refs/heads/*:refs/remotes/template/*' 2>/dev/null || true
+                full="$(git -C "$dir" rev-parse --verify --quiet "$origin^{commit}")" || full=""
+              fi ;;
+         esac
+         [ -n "$full" ] || full="$origin"
+         if fetch_rev "$full"; then
+           git -C "$dir" update-ref refs/heads/origin "$(git -C "$dir" rev-parse FETCH_HEAD)"
+         elif [ "$apply" = 1 ]; then
+           die "origin $origin of .github/method-origin does not resolve at $url; fix it with .method/scripts/setup-repo.sh --record-origin <sha> or find it with .method/scripts/method-diff.sh --find-base" 1
+         else
+           info "origin $origin not fetched; method-diff needs --from"
+         fi ;;
     esac
   fi
   git -C "$dir" checkout --quiet --force --detach "$dest"
