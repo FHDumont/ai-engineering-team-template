@@ -49,6 +49,27 @@ run_lib 42 0
 assert_eq "no" "$([ -e "$dir/old-1.jsonl" ] && echo yes || echo no)" "a file older than 7 days is pruned"
 assert_eq "yes" "$([ -e "$dir/new-1.jsonl" ] && echo yes || echo no)" "a recent file stays"
 
+# Optional fields: log (only when asked) and parent_pid (only with a method script as caller).
+ldir="$AI_METHOD_CACHE/logs"
+(cd "$repo" && env -u AI_METHOD_PARENT_PID bash -c 'source "$1/lib/progress.sh"; progress_start outer.sh 70 log; echo hi >>"$PROGRESS_LOG";
+  bash -c '"'"'source "$1/lib/progress.sh"; progress_start inner.sh 70; progress_end 0'"'"' _ "$1"; progress_end 3' _ "$SCRIPTS")
+lf="$dir/$name-70.jsonl"
+want_log="$ldir/$name-70-outer-"
+assert_eq "true" "$(sed -n 1p "$lf" | jq -r --arg w "$want_log" '.log | startswith($w) and endswith(".log")')" "start carries the absolute log path"
+assert_eq "true" "$(jq -s -r '[.[] | select(.script == "outer.sh")] | map(.log) | unique | length == 1' "$lf")" "start and fail carry the same log"
+assert_eq "true" "$(jq -s -r '[.[] | select(.script == "outer.sh" and .state == "fail")] | length == 1 and (.[0] | has("log"))' "$lf")" "fail carries the log"
+assert_eq "true" "$(jq -s -r '[.[] | select(.script == "outer.sh")] | all(has("parent_pid") | not)' "$lf")" "no method parent: no parent_pid"
+assert_eq "false" "$(jq -s -r '[.[] | select(.script == "inner.sh")] | any(has("log"))' "$lf")" "a script without log has no log field"
+assert_eq "true" "$(jq -s -r 'map(select(.script == "outer.sh"))[0].pid as $p | [.[] | select(.script == "inner.sh")] | all(.parent_pid == $p)' "$lf")" "parent_pid is the pid of the calling script"
+assert_eq "hi" "$(cat "$(sed -n 1p "$lf" | jq -r .log)")" "the log file exists and is written"
+# Logs older than 7 days are pruned with the progress; recent ones stay.
+touch -t 202001010000 "$ldir/old.log"; touch "$ldir/new.log"
+run_lib 71 0
+assert_eq "no" "$([ -e "$ldir/old.log" ] && echo yes || echo no)" "a log older than 7 days is pruned"
+assert_eq "yes" "$([ -e "$ldir/new.log" ] && echo yes || echo no)" "a recent log stays"
+# An old event (no new fields) is still shown by progress.sh next to a new one.
+# (checked below with the other progress.sh cases)
+
 # Nothing recorded without a start, and an unwritable folder never fails the caller.
 rm -rf "$dir"
 bash -c 'source "$1/lib/progress.sh"; progress_step x; progress_end 0' _ "$SCRIPTS"
@@ -78,6 +99,9 @@ assert_eq "2 2" "$(sed -n 2,3p "$vf" | jq -r '"\(.total)"' | paste -sd' ' -)" "e
 printf '#!/usr/bin/env bash\nexit 1\n' >"$vrepo/.method/scripts/tests/test_b.sh"
 assert_status 1 "validate.sh --tests fails with a failing test" env -u PROCESS_VALIDATE_RUNNING "$vrepo/.method/scripts/validate.sh" --tests
 assert_eq "fail" "$(jq -r .state "$vf" | tail -1)" "a failed validate.sh ends with state fail"
+vlog="$(tail -1 "$vf" | jq -r .log)"
+assert_eq "true" "$(jq -s -r 'all(has("log"))' "$vf")" "every validate.sh event carries a log"
+assert_contains "$(cat "$vlog")" "test_b.sh" "the validate.sh log holds the output"
 
 
 # progress.sh: reads the files and shows what is running; status.sh cites the step.
@@ -102,7 +126,10 @@ ev "$dir/$pname-61.jsonl" "$pname" 61 phase-start.sh $dead "reading the CI" null
 ev "$dir/other-9.jsonl" other 9 validate.sh $live "lint" null null 1 step 10
 ev "$dir/other-8.jsonl" other 8 close-phase.sh $live "" null null 50 start 5
 ev "$dir/other-8.jsonl" other 8 close-phase.sh $live "" null null 60 end 4
+ev "$dir/$pname-62.jsonl" "$pname" 62 validate.sh $live "new event" null null 1 step 3
+jq -c '. + {log: "/x/y.log", parent_pid: 1}' "$dir/$pname-62.jsonl" >"$TMP/p62" && mv "$TMP/p62" "$dir/$pname-62.jsonl"
 out="$("$prepo/.method/scripts/progress.sh")"
+assert_contains "$out" "$pname #62 validate.sh: new event" "an event with the new fields is shown"
 assert_contains "$out" "$pname #60 validate.sh: tests test_close_phase.sh 23/49" "shows the script, step and count"
 assert_contains "$out" "other #9 validate.sh: lint" "shows another repo"
 case "$out" in *"4m5"*) ok ;; *) bad "elapsed adds the age of the last event: $out" ;; esac

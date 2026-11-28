@@ -43,7 +43,8 @@
 #: report keeps the fixed order of the tests.
 #:
 #: Progress (for the owner and the dashboard, never printed): each step goes to
-#: ~/.cache/ai-method/progress/<repo>-<issue>.jsonl (.method/scripts/progress.sh reads it).
+#: ~/.cache/ai-method/progress/<repo>-<issue>.jsonl (.method/scripts/progress.sh reads it);
+#: the full output also goes to ~/.cache/ai-method/logs/<repo>-<issue>-validate-<pid>.log.
 #:
 #: Orphans: every test runs with TMPDIR inside a folder of this run. At the end, and on
 #: INT/TERM, a process still alive there (cwd or command line in that folder) is stopped
@@ -418,15 +419,15 @@ export AI_METHOD_OVER_EXPECTED="${AI_METHOD_OVER_EXPECTED:-$RDIR/over-expected}"
 slots_wait validate "$(issue_from_branch "$(current_branch)")" "$ROOT" || exit $?
 slots_load_report | grep '^warn:' || true
 t0="$(now_epoch)"
-progress_start validate.sh "$(issue_from_branch "$(current_branch)")"
+progress_start validate.sh "$(issue_from_branch "$(current_branch)")" log
 started=1
 set +e
-run_validate 2>&1 | tee "$log"
+run_validate 2>&1 | tee "$log" | { if [ -n "$PROGRESS_LOG" ]; then tee -a "$PROGRESS_LOG"; else cat; fi; }
 rc=${PIPESTATUS[0]}
 if [ "$tests" = 1 ]; then
   sleep 1   # a test that exited just now may still be detaching its children
   if orphan="$(orphan_sweep)"; then
-    { printf '%s\n' "$orphan"; echo "FAIL: the suite left orphan processes (listed and stopped above); the test that starts a process stops it"; } 2>&1 | tee -a "$log"
+    { printf '%s\n' "$orphan"; echo "FAIL: the suite left orphan processes (listed and stopped above); the test that starts a process stops it"; } 2>&1 | tee -a "$log" | { if [ -n "$PROGRESS_LOG" ]; then tee -a "$PROGRESS_LOG"; else cat; fi; }
     rc=1
   fi
 fi
