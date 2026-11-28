@@ -67,8 +67,6 @@ touch -t 202001010000 "$ldir/old.log"; touch "$ldir/new.log"
 run_lib 71 0
 assert_eq "no" "$([ -e "$ldir/old.log" ] && echo yes || echo no)" "a log older than 7 days is pruned"
 assert_eq "yes" "$([ -e "$ldir/new.log" ] && echo yes || echo no)" "a recent log stays"
-# An old event (no new fields) is still shown by progress.sh next to a new one.
-# (checked below with the other progress.sh cases)
 
 # Nothing recorded without a start, and an unwritable folder never fails the caller.
 rm -rf "$dir"
