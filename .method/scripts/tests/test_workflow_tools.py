@@ -196,9 +196,15 @@ jobs:
         self.assertIn("timeout-minutes must be 5-30", problems)
 
 
+# The tests own their list (the example globs of the template): an adopter swaps the
+# globs of .github/sensitive-paths for its own and the suite must stay green.
+# test_gate_verifiers_sensitive reads the repo's own list: the gate lines of the method.
+EXAMPLE_LIST = os.path.join(HERE, "fixtures", "sensitive-paths-example")
+
+
 class SensitivePathsTests(unittest.TestCase):
     def test_repo_globs(self):
-        globs = sp.load_globs(os.path.join(ROOT, ".github", "sensitive-paths"))
+        globs = sp.load_globs(EXAMPLE_LIST)
         paths = ["src/auth/login.py", "auth/x.py", "db/migrations/001.sql", ".env", ".env.local",
                  "web/package-lock.json", "package-lock.json", "app/billing/api.ts",
                  "README.md", ".method/scripts/setup-repo.sh", "docs/auth.md", "authors.txt"]
@@ -206,7 +212,7 @@ class SensitivePathsTests(unittest.TestCase):
         self.assertEqual(hits, paths[:8] + [".method/scripts/setup-repo.sh"])
 
     def test_gate_files_sensitive(self):
-        globs = sp.load_globs(os.path.join(ROOT, ".github", "sensitive-paths"))
+        globs = sp.load_globs(EXAMPLE_LIST)
         paths = [".github/workflows/deploy-example.yml", ".method/scripts/close-phase.sh", ".method/scripts/status.sh"]
         self.assertEqual(sp.sensitive(paths, globs), paths[:2])
 
@@ -224,7 +230,7 @@ class SensitivePathsTests(unittest.TestCase):
     def test_classes_of_the_list(self):
         # owner-ok: migrations, secrets, auth, billing and the like. gate: dependencies,
         # deploy workflows and the gate itself. A list with no class header is all owner-ok.
-        globs = os.path.join(ROOT, ".github", "sensitive-paths")
+        globs = EXAMPLE_LIST
         owner = [".env", "db/migrations/1.sql", "x/secrets/k", "x/credentials/k", "app/auth/a.py",
                  "app/billing/b.py", "app/payments/p.py", "infra/production/m.tf", ".method/scripts/setup-repo.sh"]
         gate = ["package-lock.json", "uv.lock", "requirements-dev.txt", ".github/workflows/deploy-x.yml",
@@ -251,7 +257,7 @@ class SensitivePathsTests(unittest.TestCase):
 
     def test_cli_lists_by_class_and_reads_lines_or_nul(self):
         script = os.path.join(ROOT, ".method", "scripts", "lib", "sensitive_paths.py")
-        globs = os.path.join(ROOT, ".github", "sensitive-paths")
+        globs = EXAMPLE_LIST
         def run(stdin, cls=None):
             env = dict(os.environ)
             env.pop("SENSITIVE_CLASS", None)
@@ -342,10 +348,11 @@ class CiStepsTests(unittest.TestCase):
         for key, value in (("user.email", "t@example.org"), ("user.name", "t"),
                            ("commit.gpgsign", "false"), ("core.quotepath", "true")):
             git(self.repo, "config", key, value)
-        # The base has the verifiers of this checkout.
-        for rel in (".method/scripts/lib/sensitive_paths.py", ".github/sensitive-paths"):
+        # The base has the verifier of this checkout and the list of the tests (not the repo's).
+        for rel, src in ((".method/scripts/lib/sensitive_paths.py", os.path.join(ROOT, ".method/scripts/lib/sensitive_paths.py")),
+                         (".github/sensitive-paths", EXAMPLE_LIST)):
             os.makedirs(os.path.dirname(os.path.join(self.repo, rel)), exist_ok=True)
-            shutil.copy(os.path.join(ROOT, rel), os.path.join(self.repo, rel))
+            shutil.copy(src, os.path.join(self.repo, rel))
         git(self.repo, "add", ".method", ".github")
         git(self.repo, "commit", "--quiet", "-m", "chore: seed")
         self.base = git(self.repo, "rev-parse", "HEAD")

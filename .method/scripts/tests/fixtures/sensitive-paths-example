@@ -1,0 +1,44 @@
+# Sensitive paths: one glob per line. `**` matches any number of folders.
+# Two classes, set by the `# class:` lines (a glob before any of them is owner-ok;
+# a path in both is owner-ok):
+# - owner-ok: the `policy` job of CI puts `needs-owner-ok` on the PR and
+#   close-phase.sh --merge refuses without the repo owner's ok.
+# - gate: the PR gets `needs-gate-review` and close-phase.sh --merge asks for a
+#   second close-reviewer opinion ("does it weaken the gate?"), not for the owner.
+# class: owner-ok
+**/auth/**
+**/billing/**
+**/payments/**
+db/migrations/**
+**/migrations/**
+.env*
+**/.env*
+**/secrets/**
+**/credentials/**
+infra/production/**
+**/compose*.yml
+**/Dockerfile
+# class: gate
+# Dependencies and lockfiles
+package-lock.json
+**/package-lock.json
+pnpm-lock.yaml
+**/pnpm-lock.yaml
+yarn.lock
+**/yarn.lock
+poetry.lock
+uv.lock
+requirements*.txt
+Gemfile.lock
+go.sum
+Cargo.lock
+# Deploy workflows and the phase close
+.github/workflows/deploy-*.yml
+.method/scripts/close-phase.sh
+# The CI, the verifiers it reads from the base and this list
+.github/workflows/ci.yml
+.method/scripts/ci-gate.sh
+.method/scripts/check-attribution.sh
+.method/scripts/check-docs.sh
+.method/scripts/lib/sensitive_paths.py
+.github/sensitive-paths

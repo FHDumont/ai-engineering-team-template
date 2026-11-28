@@ -13,7 +13,10 @@ mkdir -p "$repo/.github"
 copy_scripts "$repo"
 assert_contains "$(cat "$repo/.method/scripts/validate.sh")" "ok: stub" "validate.sh is a stub from the copy on"
 assert_contains "$(cat "$repo/.method/scripts/check-docs.sh")" "ok: stub" "check-docs.sh is a stub from the copy on"
-cp "$REPO/.github/sensitive-paths" "$REPO/.github/labels.tsv" "$repo/.github/"
+# The tests own their list (fixtures/sensitive-paths-example), so an adopter that swaps the
+# globs of .github/sensitive-paths keeps the suite green.
+cp "$SCRIPTS/tests/fixtures/sensitive-paths-example" "$repo/.github/sensitive-paths"
+cp "$REPO/.github/labels.tsv" "$repo/.github/"
 git -C "$repo" add .method .github
 git -C "$repo" commit --quiet -m "chore: scripts"
 remote="$TMP/remote.git"
